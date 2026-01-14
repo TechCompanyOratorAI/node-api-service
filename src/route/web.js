@@ -1,28 +1,14 @@
 import express from "express";
-import homeController from '../controllers/homeController';
-import userController from '../controllers/userController';
+import apiRoutes from "../routes/index.js";
 
 let router = express.Router();
 
 let initWebRoutes = (app) => {
-    router.get('/', homeController.getHomePage);
-    router.get('/about', homeController.getAboutPage);
-    router.get('/crud', homeController.getCRUD);
+  // Mount API routes
+  app.use("/api/v1", apiRoutes);
 
-    router.post('/post-crud', homeController.postCRUD);
-    router.get('/get-crud', homeController.displayGetCRUD);
-    router.get('/edit-crud', homeController.getEditCRUD);
-
-    router.post('/put-crud', homeController.putCRUD);
-    router.get('/delete-crud', homeController.deleteCRUD);
-
-
-
-    router.post('/api/login', userController.handleLoging);
-    router.get('/api/get-all-users', userController.handleGetAllUsers);
-
-
-    return app.use("/", router);
-}
+  // Web routes (if any)
+  return app.use("/", router);
+};
 
 module.exports = initWebRoutes;

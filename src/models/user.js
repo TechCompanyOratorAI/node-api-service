@@ -27,6 +27,14 @@ module.exports = (sequelize, DataTypes) => {
       lastName: { type: DataTypes.STRING(100) },
       passwordHash: { type: DataTypes.TEXT, allowNull: false },
       isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+      isEmailVerified: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      emailVerificationToken: { type: DataTypes.STRING },
+      emailVerificationExpires: { type: DataTypes.DATE },
+      passwordResetToken: { type: DataTypes.STRING },
+      passwordResetExpires: { type: DataTypes.DATE },
+      lastLoginAt: { type: DataTypes.DATE },
+      loginAttempts: { type: DataTypes.INTEGER, defaultValue: 0 },
+      lockUntil: { type: DataTypes.DATE },
     },
     { sequelize, modelName: 'User', tableName: 'Users' }
   );
