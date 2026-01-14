@@ -1,5 +1,5 @@
-import { validationResult } from 'express-validator';
-import authService from '../services/authService.js';
+import { validationResult } from "express-validator";
+import authService from "../services/authService.js";
 
 class AuthController {
   // Register new user
@@ -10,8 +10,8 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
-          errors: errors.array()
+          message: "Validation failed",
+          errors: errors.array(),
         });
       }
 
@@ -23,10 +23,39 @@ class AuthController {
         return res.status(400).json(result);
       }
     } catch (error) {
-      console.error('Register controller error:', error);
+      console.error("Register controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
+      });
+    }
+  }
+
+  // Register instructor
+  async registerInstructor(req, res) {
+    try {
+      // Check validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+
+      const result = await authService.registerInstructor(req.body);
+
+      if (result.success) {
+        return res.status(201).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Register instructor controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
       });
     }
   }
@@ -39,8 +68,8 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
-          errors: errors.array()
+          message: "Validation failed",
+          errors: errors.array(),
         });
       }
 
@@ -48,11 +77,11 @@ class AuthController {
 
       if (result.success) {
         // Set refresh token as httpOnly cookie
-        res.cookie('refreshToken', result.tokens.refreshToken, {
+        res.cookie("refreshToken", result.tokens.refreshToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         });
 
         // Remove refresh token from response body
@@ -64,10 +93,10 @@ class AuthController {
         return res.status(401).json(result);
       }
     } catch (error) {
-      console.error('Login controller error:', error);
+      console.error("Login controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
@@ -76,17 +105,17 @@ class AuthController {
   async logout(req, res) {
     try {
       // Clear refresh token cookie
-      res.clearCookie('refreshToken');
-      
+      res.clearCookie("refreshToken");
+
       return res.status(200).json({
         success: true,
-        message: 'Logged out successfully'
+        message: "Logged out successfully",
       });
     } catch (error) {
-      console.error('Logout controller error:', error);
+      console.error("Logout controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
@@ -99,7 +128,7 @@ class AuthController {
       if (!token) {
         return res.status(400).json({
           success: false,
-          message: 'Verification token is required'
+          message: "Verification token is required",
         });
       }
 
@@ -111,10 +140,10 @@ class AuthController {
         return res.status(400).json(result);
       }
     } catch (error) {
-      console.error('Verify email controller error:', error);
+      console.error("Verify email controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
@@ -127,8 +156,8 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
-          errors: errors.array()
+          message: "Validation failed",
+          errors: errors.array(),
         });
       }
 
@@ -141,10 +170,10 @@ class AuthController {
         return res.status(400).json(result);
       }
     } catch (error) {
-      console.error('Resend verification controller error:', error);
+      console.error("Resend verification controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
@@ -157,8 +186,8 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
-          errors: errors.array()
+          message: "Validation failed",
+          errors: errors.array(),
         });
       }
 
@@ -168,13 +197,14 @@ class AuthController {
       // Always return success for security reasons
       return res.status(200).json({
         success: true,
-        message: 'If an account with that email exists, a password reset link has been sent.'
+        message:
+          "If an account with that email exists, a password reset link has been sent.",
       });
     } catch (error) {
-      console.error('Forgot password controller error:', error);
+      console.error("Forgot password controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
@@ -187,8 +217,8 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
-          errors: errors.array()
+          message: "Validation failed",
+          errors: errors.array(),
         });
       }
 
@@ -201,10 +231,10 @@ class AuthController {
         return res.status(400).json(result);
       }
     } catch (error) {
-      console.error('Reset password controller error:', error);
+      console.error("Reset password controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
@@ -217,15 +247,19 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
-          errors: errors.array()
+          message: "Validation failed",
+          errors: errors.array(),
         });
       }
 
       const { currentPassword, newPassword } = req.body;
       const userId = req.user.userId; // From auth middleware
 
-      const result = await authService.changePassword(userId, currentPassword, newPassword);
+      const result = await authService.changePassword(
+        userId,
+        currentPassword,
+        newPassword
+      );
 
       if (result.success) {
         return res.status(200).json(result);
@@ -233,10 +267,10 @@ class AuthController {
         return res.status(400).json(result);
       }
     } catch (error) {
-      console.error('Change password controller error:', error);
+      console.error("Change password controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
@@ -249,7 +283,7 @@ class AuthController {
       if (!refreshToken) {
         return res.status(401).json({
           success: false,
-          message: 'Refresh token not provided'
+          message: "Refresh token not provided",
         });
       }
 
@@ -257,11 +291,11 @@ class AuthController {
 
       if (result.success) {
         // Set new refresh token as httpOnly cookie
-        res.cookie('refreshToken', result.tokens.refreshToken, {
+        res.cookie("refreshToken", result.tokens.refreshToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         });
 
         // Remove refresh token from response body
@@ -271,14 +305,14 @@ class AuthController {
         return res.status(200).json(responseData);
       } else {
         // Clear invalid refresh token
-        res.clearCookie('refreshToken');
+        res.clearCookie("refreshToken");
         return res.status(401).json(result);
       }
     } catch (error) {
-      console.error('Refresh token controller error:', error);
+      console.error("Refresh token controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
@@ -287,17 +321,17 @@ class AuthController {
   async getProfile(req, res) {
     try {
       const userId = req.user.userId; // From auth middleware
-      
+
       // You can fetch additional user data here if needed
       return res.status(200).json({
         success: true,
-        user: req.user
+        user: req.user,
       });
     } catch (error) {
-      console.error('Get profile controller error:', error);
+      console.error("Get profile controller error:", error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: "Internal server error",
       });
     }
   }
