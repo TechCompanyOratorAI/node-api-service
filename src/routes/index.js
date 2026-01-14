@@ -2,6 +2,7 @@ import express from 'express';
 import authRoutes from './authRoutes.js';
 import userRoutes from './userRoutes.js';
 import emailRoutes from './emailRoutes.js';
+import roleRoutes from './roleRoutes.js';
 import { generalRateLimit } from '../middleware/rateLimitMiddleware.js';
 
 const router = express.Router();
@@ -13,6 +14,7 @@ router.use(generalRateLimit);
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/email', emailRoutes);
+router.use('/roles', roleRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import db from "../models/index.js";
 import emailService from "./emailService.js";
+import roleService from "./roleService.js";
 
 const { User } = db;
 
@@ -36,7 +37,7 @@ class AuthService {
     return crypto.randomBytes(32).toString("hex");
   }
 
-  // Register user
+  // Register user (Student by default)
   async register(userData) {
     try {
       const { username, email, password, firstName, lastName } = userData;
@@ -64,7 +65,9 @@ class AuthService {
       // Generate email verification token
       const emailVerificationToken = this.generateRandomToken();
       const emailVerificationExpires = new Date(
-        Date.now() + parseInt(process.env.EMAIL_VERIFICATION_EXPIRES)
+        Date.now() +
+          (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
+            24 * 60 * 60 * 1000) // 24 hours default
       );
 
       // Create user
@@ -79,6 +82,21 @@ class AuthService {
         isEmailVerified: false,
         isActive: true,
       });
+
+      // Assign default role (Student)
+      const roleResult = await roleService.assignDefaultRole(user.userId);
+      if (!roleResult.success) {
+        console.error("Failed to assign default role:", roleResult.error);
+        // Try to assign role directly
+        try {
+          await roleService.assignRoleToUser(user.userId, "Student");
+        } catch (directRoleError) {
+          console.error(
+            "Failed to assign Student role directly:",
+            directRoleError
+          );
+        }
+      }
 
       // Send verification email
       await emailService.sendVerificationEmail(
@@ -106,6 +124,93 @@ class AuthService {
       return {
         success: false,
         message: "Registration failed. Please try again.",
+        error: error.message,
+      };
+    }
+  }
+
+  // Register instructor
+  async registerInstructor(userData) {
+    try {
+      const { username, email, password, firstName, lastName } = userData;
+
+      // Check if user already exists
+      const existingUser = await User.findOne({
+        where: {
+          [db.Sequelize.Op.or]: [{ email }, { username }],
+        },
+      });
+
+      if (existingUser) {
+        return {
+          success: false,
+          message:
+            existingUser.email === email
+              ? "Email already registered"
+              : "Username already taken",
+        };
+      }
+
+      // Hash password
+      const passwordHash = await this.hashPassword(password);
+
+      // Generate email verification token
+      const emailVerificationToken = this.generateRandomToken();
+      const emailVerificationExpires = new Date(
+        Date.now() +
+          (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
+            24 * 60 * 60 * 1000) // 24 hours default
+      );
+
+      // Create user
+      const user = await User.create({
+        username,
+        email,
+        firstName,
+        lastName,
+        passwordHash,
+        emailVerificationToken,
+        emailVerificationExpires,
+        isEmailVerified: false,
+        isActive: true,
+      });
+
+      // Assign Instructor role
+      const roleResult = await roleService.assignRoleToUser(
+        user.userId,
+        "Instructor"
+      );
+      if (!roleResult.success) {
+        console.error("Failed to assign Instructor role:", roleResult.error);
+      }
+
+      // Send verification email for instructor
+      await emailService.sendVerificationEmail(
+        email,
+        firstName,
+        username,
+        emailVerificationToken
+      );
+
+      return {
+        success: true,
+        message:
+          "Instructor registration successful. Please check your email to verify your account.",
+        user: {
+          userId: user.userId,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isEmailVerified: user.isEmailVerified,
+          role: "Instructor",
+        },
+      };
+    } catch (error) {
+      console.error("Instructor registration error:", error);
+      return {
+        success: false,
+        message: "Instructor registration failed. Please try again.",
         error: error.message,
       };
     }
@@ -187,6 +292,10 @@ class AuthService {
       // Generate tokens
       const tokens = this.generateTokens(user.userId);
 
+      // Get user roles
+      const userRolesResult = await roleService.getUserRoles(user.userId);
+      const roles = userRolesResult.success ? userRolesResult.roles : [];
+
       return {
         success: true,
         message: "Login successful",
@@ -198,6 +307,11 @@ class AuthService {
           lastName: user.lastName,
           isEmailVerified: user.isEmailVerified,
           lastLoginAt: new Date(),
+          roles: roles.map((role) => ({
+            roleId: role.roleId,
+            roleName: role.roleName,
+            description: role.description,
+          })),
         },
         tokens,
       };
@@ -282,7 +396,9 @@ class AuthService {
       // Generate new verification token
       const emailVerificationToken = this.generateRandomToken();
       const emailVerificationExpires = new Date(
-        Date.now() + parseInt(process.env.EMAIL_VERIFICATION_EXPIRES)
+        Date.now() +
+          (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
+            24 * 60 * 60 * 1000) // 24 hours default
       );
 
       await User.update(
@@ -332,7 +448,8 @@ class AuthService {
       // Generate password reset token
       const passwordResetToken = this.generateRandomToken();
       const passwordResetExpires = new Date(
-        Date.now() + parseInt(process.env.PASSWORD_RESET_EXPIRES)
+        Date.now() +
+          (parseInt(process.env.PASSWORD_RESET_EXPIRES) || 60 * 60 * 1000) // 1 hour default
       );
 
       await User.update(
