@@ -1,30 +1,50 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 class EmailService {
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST,
-      port: process.env.MAIL_PORT,
-      secure: false,
-      auth: {
-        user: process.env.MAIL_USERNAME,
-        pass: process.env.MAIL_PASSWORD,
-      },
-    });
+    // Check if email configuration exists
+    this.isConfigured = !!(
+      process.env.MAIL_HOST &&
+      process.env.MAIL_USERNAME &&
+      process.env.MAIL_PASSWORD
+    );
+
+    if (this.isConfigured) {
+      this.transporter = nodemailer.createTransport({
+        host: process.env.MAIL_HOST,
+        port: process.env.MAIL_PORT || 587,
+        secure: false,
+        auth: {
+          user: process.env.MAIL_USERNAME,
+          pass: process.env.MAIL_PASSWORD,
+        },
+      });
+    } else {
+      this.transporter = null;
+    }
   }
 
   // Send email function
   async sendEmail(to, subject, html) {
+    if (!this.isConfigured) {
+      return {
+        success: true,
+        message: "Email service not configured - email skipped",
+      };
+    }
+
     try {
       await this.transporter.sendMail({
-        from: `${process.env.MAIL_FROM_NAME} <${process.env.MAIL_FROM_ADDRESS}>`,
+        from: `${process.env.MAIL_FROM_NAME || "Orator AI"} <${
+          process.env.MAIL_FROM_ADDRESS || "noreply@oratorai.com"
+        }>`,
         to,
         subject,
         html,
       });
       return { success: true };
     } catch (error) {
-      console.error('Email sending error:', error);
+      console.error("Email sending error:", error);
       return { success: false, error: error.message };
     }
   }
@@ -41,7 +61,9 @@ class EmailService {
           
           <h2 style="color: #333; margin-bottom: 20px;">Chào mừng bạn đến với Orator AI!</h2>
           
-          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${firstName || username}</strong>,</p>
+          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${
+            firstName || username
+          }</strong>,</p>
           
           <p style="color: #555; line-height: 1.6;">
             Cảm ơn bạn đã đăng ký tài khoản Orator AI. Để hoàn tất quá trình đăng ký, 
@@ -96,7 +118,9 @@ class EmailService {
           
           <h2 style="color: #333; margin-bottom: 20px;">Đặt lại mật khẩu</h2>
           
-          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${firstName || username}</strong>,</p>
+          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${
+            firstName || username
+          }</strong>,</p>
           
           <p style="color: #555; line-height: 1.6;">
             Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản Orator AI của bạn. 
@@ -151,7 +175,9 @@ class EmailService {
           
           <h2 style="color: #333; margin-bottom: 20px;">Tài khoản đã được kích hoạt!</h2>
           
-          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${firstName || username}</strong>,</p>
+          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${
+            firstName || username
+          }</strong>,</p>
           
           <p style="color: #555; line-height: 1.6;">
             Chúc mừng! Tài khoản Orator AI của bạn đã được kích hoạt thành công. 
@@ -191,11 +217,15 @@ class EmailService {
   // Send verification email
   async sendVerificationEmail(email, firstName, username, verificationToken) {
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-    const html = this.generateVerificationEmailHtml(firstName, username, verificationUrl);
-    
+    const html = this.generateVerificationEmailHtml(
+      firstName,
+      username,
+      verificationUrl
+    );
+
     return await this.sendEmail(
       email,
-      'Xác thực địa chỉ email - Orator AI',
+      "Xác thực địa chỉ email - Orator AI",
       html
     );
   }
@@ -203,24 +233,20 @@ class EmailService {
   // Send password reset email
   async sendPasswordResetEmail(email, firstName, username, resetToken) {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-    const html = this.generatePasswordResetEmailHtml(firstName, username, resetUrl);
-    
-    return await this.sendEmail(
-      email,
-      'Đặt lại mật khẩu - Orator AI',
-      html
+    const html = this.generatePasswordResetEmailHtml(
+      firstName,
+      username,
+      resetUrl
     );
+
+    return await this.sendEmail(email, "Đặt lại mật khẩu - Orator AI", html);
   }
 
   // Send welcome email
   async sendWelcomeEmail(email, firstName, username) {
     const html = this.generateWelcomeEmailHtml(firstName, username);
-    
-    return await this.sendEmail(
-      email,
-      'Chào mừng đến với Orator AI!',
-      html
-    );
+
+    return await this.sendEmail(email, "Chào mừng đến với Orator AI!", html);
   }
 
   // Send notification email (generic)
@@ -232,7 +258,9 @@ class EmailService {
             <h1 style="color: #007bff; margin: 0;">Orator AI</h1>
           </div>
           
-          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${firstName || username}</strong>,</p>
+          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${
+            firstName || username
+          }</strong>,</p>
           
           <div style="color: #555; line-height: 1.6; margin: 20px 0;">
             ${message}
@@ -249,17 +277,25 @@ class EmailService {
         </div>
       </div>
     `;
-    
+
     return await this.sendEmail(email, subject, html);
   }
 
   // Test email connection
   async testConnection() {
+    if (!this.isConfigured) {
+      return {
+        success: false,
+        message:
+          "Email service not configured. Please set MAIL_HOST, MAIL_USERNAME, and MAIL_PASSWORD environment variables.",
+      };
+    }
+
     try {
       await this.transporter.verify();
-      return { success: true, message: 'Email service connection successful' };
+      return { success: true, message: "Email service connection successful" };
     } catch (error) {
-      console.error('Email connection test failed:', error);
+      console.error("Email connection test failed:", error);
       return { success: false, error: error.message };
     }
   }

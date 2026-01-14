@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import db from '../models/index.js';
+import roleService from '../services/roleService.js';
 
 const { User } = db;
 
@@ -127,26 +128,17 @@ export const requireRole = (roles) => {
         });
       }
 
-      // Get user roles from database
-      const userWithRoles = await User.findByPk(req.user.userId, {
-        include: [{
-          model: db.UserRole,
-          as: 'userRoles',
-          include: [{
-            model: db.Role,
-            as: 'role'
-          }]
-        }]
-      });
-
-      if (!userWithRoles) {
-        return res.status(401).json({
+      // Get user roles from database (using roleService to avoid association issues)
+      const userRolesResult = await roleService.getUserRoles(req.user.userId);
+      
+      if (!userRolesResult.success) {
+        return res.status(500).json({
           success: false,
-          message: 'User not found'
+          message: 'Failed to get user roles'
         });
       }
 
-      const userRoles = userWithRoles.userRoles.map(ur => ur.role.roleName);
+      const userRoles = userRolesResult.roles.map(role => role.roleName);
       const hasRequiredRole = roles.some(role => userRoles.includes(role));
 
       if (!hasRequiredRole) {
