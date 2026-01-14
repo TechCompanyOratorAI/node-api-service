@@ -3,6 +3,7 @@ import authController from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import {
   validateRegistration,
+  validateInstructorRegistration,
   validateLogin,
   validateEmail,
   validatePasswordReset,
@@ -18,6 +19,7 @@ const router = express.Router();
 
 // Public authentication routes
 router.post('/register', authRateLimit, validateRegistration, authController.register);
+router.post('/register-instructor', authRateLimit, validateInstructorRegistration, authController.registerInstructor);
 router.post('/login', authRateLimit, validateLogin, authController.login);
 router.post('/logout', authController.logout);
 
