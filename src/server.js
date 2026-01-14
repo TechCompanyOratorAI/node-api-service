@@ -1,19 +1,25 @@
 import express from "express";
 import bodyParser from "body-parser";
+import cookieParser from "cookie-parser";
 import viewEngine from "./config/viewEngine";
 import initWebRoutes from "./route/web";
 import connectDB from './config/conectDB';
 import cors from 'cors';
 
-require('dotenv').config();   // giup chayj dc dong process.env
-
+require('dotenv').config();
 
 let app = express();
-app.use(cors({ origin: true }));
 
+// CORS configuration
+app.use(cors({ 
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true // Allow cookies to be sent
+}));
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Middleware
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
 viewEngine(app);
 initWebRoutes(app);
