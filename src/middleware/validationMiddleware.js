@@ -303,6 +303,22 @@ export const validateTopicUpdate = [
     .trim()
 ];
 
+// Presentation creation validation
+export const validatePresentationCreate = [
+  body('topicId')
+    .isInt({ min: 1 })
+    .withMessage('topicId must be a valid integer'),
+  body('title')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Title must be between 1 and 255 characters')
+    .trim(),
+  body('description')
+    .optional()
+    .isLength({ max: 5000 })
+    .withMessage('Description must be less than 5000 characters')
+    .trim()
+];
+
 export default {
   validateRegistration,
   validateInstructorRegistration,
@@ -313,6 +329,7 @@ export default {
   validateCourse,
   validateCourseUpdate,
   validateTopic,
-  validateTopicUpdate
+  validateTopicUpdate,
+  validatePresentationCreate
 };
 
