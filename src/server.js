@@ -22,6 +22,9 @@ app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
+// Static file serving for uploads
+app.use('/uploads', express.static('uploads'));
+
 viewEngine(app);
 initWebRoutes(app);
 

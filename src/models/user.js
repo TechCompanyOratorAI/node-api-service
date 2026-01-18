@@ -10,7 +10,6 @@ module.exports = (sequelize, DataTypes) => {
       User.hasMany(models.TopicEnrollment, { foreignKey: 'studentId', as: 'topicEnrollments' });
       User.hasMany(models.Presentation, { foreignKey: 'studentId', as: 'presentations' });
       User.hasMany(models.Feedback, { foreignKey: 'reviewerId', as: 'givenFeedbacks' });
-
       User.hasMany(models.PresentationAccess, { foreignKey: 'userId', as: 'presentationAccesses' });
       User.hasMany(models.PresentationAccess, { foreignKey: 'grantedBy', as: 'grantedAccesses' });
 
@@ -36,6 +35,7 @@ module.exports = (sequelize, DataTypes) => {
       lastLoginAt: { type: DataTypes.DATE },
       loginAttempts: { type: DataTypes.INTEGER, defaultValue: 0 },
       lockUntil: { type: DataTypes.DATE },
+      avatar: { type: DataTypes.STRING(500), allowNull: true },
     },
     { sequelize, modelName: 'User', tableName: 'Users' }
   );
