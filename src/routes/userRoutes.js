@@ -24,7 +24,7 @@ router.get('/profile',
   (req, res) => {
     // userController.getUserProfile
     res.json({
-      message: 'User profile',
+      message: 'Get user profile',
       user: req.user
     });
   }

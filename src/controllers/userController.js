@@ -145,12 +145,15 @@ class UserController {
 
     async updateUserProfile(req, res) {
         try {
-            const { firstName, lastName } = req.body;
+            const { firstName, lastName, dob, studyMajor, isCensored } = req.body;
             const userId = req.user.userId;
 
             const updateData = {};
             if (firstName !== undefined) updateData.firstName = firstName;
             if (lastName !== undefined) updateData.lastName = lastName;
+            if (dob !== undefined) updateData.dob = dob;
+            if (studyMajor !== undefined) updateData.studyMajor = studyMajor;
+            if (isCensored !== undefined) updateData.isCensored = isCensored;
 
             await User.update(updateData, { where: { userId } });
 
