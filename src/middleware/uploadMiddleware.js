@@ -8,8 +8,17 @@ const SLIDE_MIME_TYPES = new Set([
   'image/png'
 ]);
 
+const AVATAR_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp'
+]);
+
 const MAX_SLIDE_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_MEDIA_FILE_SIZE_BYTES = 500 * 1024 * 1024;
+const MAX_AVATAR_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 const isAudioVideoMimeType = (mimetype) =>
   mimetype?.startsWith('audio/') || mimetype?.startsWith('video/');
@@ -40,6 +49,15 @@ export const uploadMedia = multer({
   fileFilter: createFileFilter(
     (file) => isAudioVideoMimeType(file.mimetype),
     'Unsupported media file type'
+  )
+});
+
+export const uploadAvatar = multer({
+  storage: memoryStorage,
+  limits: { fileSize: MAX_AVATAR_FILE_SIZE_BYTES },
+  fileFilter: createFileFilter(
+    (file) => AVATAR_MIME_TYPES.has(file.mimetype),
+    'Unsupported avatar file type. Only JPEG, PNG, GIF, and WebP are allowed'
   )
 });
 
