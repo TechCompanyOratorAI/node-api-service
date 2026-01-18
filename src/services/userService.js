@@ -87,7 +87,7 @@ class UserService {
     async getUserProfile(userId) {
         try {
             const user = await User.findByPk(userId, {
-                attributes: { exclude: ['passwordHash'] }
+                attributes: { exclude: ['passwordHash', 'emailVerificationToken', 'passwordResetToken'] }
             });
 
             if (!user) {
@@ -103,7 +103,9 @@ class UserService {
             };
 
         } catch (error) {
-            console.error('Get user profile service error:', error);
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Get user profile service error:', error);
+            }
             return {
                 success: false,
                 message: 'Có lỗi xảy ra khi lấy thông tin người dùng'
@@ -131,9 +133,15 @@ class UserService {
                 };
             }
 
+            // Get updated user data
+            const updatedUser = await User.findByPk(userId, {
+                attributes: { exclude: ['passwordHash', 'emailVerificationToken', 'passwordResetToken'] }
+            });
+
             return {
                 success: true,
-                message: 'Thông tin cá nhân đã được cập nhật'
+                message: 'Thông tin cá nhân đã được cập nhật',
+                data: updatedUser
             };
 
         } catch (error) {

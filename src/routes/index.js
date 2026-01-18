@@ -1,6 +1,7 @@
 import express from 'express';
 import authRoutes from './authRoutes.js';
 import userRoutes from './userRoutes.js';
+import feedbackRoutes from './feedbackRoutes.js';
 import emailRoutes from './emailRoutes.js';
 import courseRoutes from './courseRoutes.js';
 import topicRoutes from './topicRoutes.js';
@@ -17,6 +18,7 @@ router.use(generalRateLimit);
 // API Routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/feedback', feedbackRoutes);
 router.use('/email', emailRoutes);
 router.use('/courses', courseRoutes);
 router.use('/topics', topicRoutes);
