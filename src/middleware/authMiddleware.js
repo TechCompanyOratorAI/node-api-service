@@ -160,9 +160,32 @@ export const requireRole = (roles) => {
   };
 };
 
+// Censored status check middleware
+export const requireCensored = () => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    // Check if user is censored (isCensored must be true)
+    if (!req.user.isCensored) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Account is not verified/censored'
+      });
+    }
+
+    next();
+  };
+};
+
 export default {
   authenticateToken,
   optionalAuth,
   requireEmailVerification,
-  requireRole
+  requireRole,
+  requireCensored
 };

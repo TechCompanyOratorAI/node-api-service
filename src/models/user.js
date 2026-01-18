@@ -36,6 +36,9 @@ module.exports = (sequelize, DataTypes) => {
       loginAttempts: { type: DataTypes.INTEGER, defaultValue: 0 },
       lockUntil: { type: DataTypes.DATE },
       avatar: { type: DataTypes.STRING(500), allowNull: true },
+      dob: { type: DataTypes.DATE, allowNull: true },
+      studyMajor: { type: DataTypes.STRING(255), allowNull: true },
+      isCensored: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     },
     { sequelize, modelName: 'User', tableName: 'Users' }
   );
