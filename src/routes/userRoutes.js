@@ -11,12 +11,8 @@ const router = express.Router();
 router.get('/',
   authenticateToken,
   requireEmailVerification,
-  requireRole(['admin']),
-  userController.getAllUsers.bind(userController),
-  // (req, res) => {
-  //   userController.getAllUsers
-  //   res.json({ message: 'Get all users - Admin only' });
-  // }
+  requireRole(['Admin']),
+  userController.getAllUsers.bind(userController)
 );
 
 // Get user profile (any authenticated user)
@@ -47,12 +43,8 @@ router.put('/profile',
 router.delete('/:userId',
   authenticateToken,
   requireEmailVerification,
-  requireRole(['admin']),
+  requireRole(['Admin']),
   userController.deleteUser.bind(userController)
-  // (req, res) => {
-  //   // userController.deleteUser
-  //   res.json({ message: `Delete user ${req.params.userId}` });
-  // });
 );
   
 // Upload avatar (authenticated user, email verified)
