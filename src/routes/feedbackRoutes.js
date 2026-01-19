@@ -15,7 +15,7 @@ router.post('/',
 
 // Get all feedback (admin only)
 router.get('/',
-  requireRole(['admin']),
+  requireRole(['Admin']),
   feedbackController.getAllFeedback
 );
 
