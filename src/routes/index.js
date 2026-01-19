@@ -7,12 +7,8 @@ import topicRoutes from './topicRoutes.js';
 import enrollmentRoutes from './enrollmentRoutes.js';
 import roleRoutes from './roleRoutes.js';
 import presentationRoutes from './presentationRoutes.js';
-import { generalRateLimit } from '../middleware/rateLimitMiddleware.js';
 
 const router = express.Router();
-
-// Apply general rate limiting to all API routes
-router.use(generalRateLimit);
 
 // API Routes
 router.use('/auth', authRoutes);

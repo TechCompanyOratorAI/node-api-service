@@ -10,7 +10,6 @@ import {
   validateChangePassword
 } from '../middleware/validationMiddleware.js';
 import {
-  authRateLimit,
   passwordResetRateLimit,
   emailVerificationRateLimit
 } from '../middleware/rateLimitMiddleware.js';
@@ -18,9 +17,9 @@ import {
 const router = express.Router();
 
 // Public authentication routes
-router.post('/register', authRateLimit, validateRegistration, authController.register);
-router.post('/register-instructor', authRateLimit, validateInstructorRegistration, authController.registerInstructor);
-router.post('/login', authRateLimit, validateLogin, authController.login);
+router.post('/register', validateRegistration, authController.register);
+router.post('/register-instructor', validateInstructorRegistration, authController.registerInstructor);
+router.post('/login', validateLogin, authController.login);
 router.post('/logout', authController.logout);
 
 // Email verification routes
