@@ -366,7 +366,7 @@ class JobService {
                 order: [['createdAt', 'ASC']],
                 attributes: [
                     'jobId', 'jobType', 'status', 'retryCount',
-                    'workerName', 'errorMessage', 
+                    'workerName', 'errorMessage',
                     'createdAt', 'startedAt', 'completedAt'
                 ]
             });
@@ -519,7 +519,7 @@ class JobService {
                     startedAt: null,
                     errorMessage: `Auto-reset: stuck for more than ${hoursStuck} hours`
                 });
-                
+
                 // Resend to queue
                 await this._sendJobToQueue(job);
                 resetCount++;
