@@ -17,6 +17,10 @@ module.exports = (sequelize, DataTypes) => {
 
             // transcript logically belongs to audio, but also link to presentation for easier queries:
             Presentation.hasOne(models.Transcript, { foreignKey: 'presentationId', as: 'transcript' });
+
+            // Job tracking and speaker diarization
+            Presentation.hasMany(models.Job, { foreignKey: 'presentationId', as: 'jobs' });
+            Presentation.hasMany(models.Speaker, { foreignKey: 'presentationId', as: 'speakers' });
         }
     }
 
