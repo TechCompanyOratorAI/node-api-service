@@ -23,7 +23,7 @@ class SpeakerService {
      */
     async createSpeakersFromDiarization(presentationId, diarizationData) {
         const transaction = await db.transaction();
-        
+
         try {
             // Validate presentation exists
             const presentation = await Presentation.findByPk(presentationId);
@@ -68,7 +68,7 @@ class SpeakerService {
                             lastUpdated: new Date().toISOString()
                         }
                     }, { transaction });
-                    
+
                     console.log(`🔄 Updated speaker ${aiSpeakerLabel} for presentation ${presentationId}`);
                 } else {
                     // Create new speaker
@@ -94,7 +94,7 @@ class SpeakerService {
 
             await transaction.commit();
             console.log(`✅ Processed ${speakers.length} speakers for presentation ${presentationId}`);
-            
+
             return speakers;
         } catch (error) {
             await transaction.rollback();
@@ -111,7 +111,7 @@ class SpeakerService {
      */
     async linkSegmentsToSpeakers(presentationId, segmentSpeakerMappings) {
         const transaction = await db.transaction();
-        
+
         try {
             // Get all speakers for this presentation
             const speakers = await Speaker.findAll({
@@ -148,7 +148,7 @@ class SpeakerService {
 
             await transaction.commit();
             console.log(`✅ Linked ${updatedCount} segments to speakers for presentation ${presentationId}`);
-            
+
             return updatedCount;
         } catch (error) {
             await transaction.rollback();
@@ -193,7 +193,7 @@ class SpeakerService {
 
             await speaker.mapToStudent(studentId);
             console.log(`✅ Mapped speaker ${speaker.aiSpeakerLabel} to student ${studentId}`);
-            
+
             return speaker;
         } catch (error) {
             console.error('❌ Error mapping speaker to student:', error);
@@ -215,7 +215,7 @@ class SpeakerService {
 
             await speaker.unmap();
             console.log(`✅ Unmapped speaker ${speaker.aiSpeakerLabel}`);
-            
+
             return speaker;
         } catch (error) {
             console.error('❌ Error unmapping speaker:', error);
@@ -509,7 +509,7 @@ class SpeakerService {
      */
     async deleteSpeaker(speakerId) {
         const transaction = await db.transaction();
-        
+
         try {
             const speaker = await Speaker.findByPk(speakerId);
             if (!speaker) {
@@ -530,7 +530,7 @@ class SpeakerService {
 
             await transaction.commit();
             console.log(`✅ Deleted speaker ${speakerId}`);
-            
+
             return true;
         } catch (error) {
             await transaction.rollback();
@@ -570,7 +570,7 @@ class SpeakerService {
 
             // Get unmapped speakers
             const unmappedSpeakers = await this.getUnmappedSpeakers(presentationId);
-            
+
             // Get enrolled students
             const enrolledStudents = presentation.course.enrollments
                 .filter(e => e.student)
