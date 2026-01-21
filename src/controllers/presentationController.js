@@ -13,12 +13,13 @@ class PresentationController {
         });
       }
 
-      const { topicId, title, description } = req.body;
+      const { topicId, title, description, groupCode } = req.body;
       const result = await presentationService.createPresentation({
         topicId: parseInt(topicId),
         studentId: req.user.userId,
         title,
-        description
+        description,
+        groupCode
       });
 
       return res.status(result.success ? 201 : 400).json(result);
@@ -172,7 +173,7 @@ class PresentationController {
         return res.status(400).json({ success: false, message: 'presentationId must be a number' });
       }
 
-      const { title, description } = req.body;
+      const { title, description, groupCode } = req.body;
 
       const result = await presentationService.updatePresentation(
         parsedPresentationId,

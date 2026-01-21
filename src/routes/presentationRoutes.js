@@ -3,7 +3,7 @@ import presentationController from '../controllers/presentationController.js';
 import { authenticateToken, requireEmailVerification } from '../middleware/authMiddleware.js';
 import { generalRateLimit } from '../middleware/rateLimitMiddleware.js';
 import { uploadSlide, uploadMedia, uploadErrorHandler } from '../middleware/uploadMiddleware.js';
-import { validatePresentationCreate } from '../middleware/validationMiddleware.js';
+import { validatePresentationCreate, validatePresentationUpdate } from '../middleware/validationMiddleware.js';
 
 const router = express.Router();
 
@@ -54,6 +54,7 @@ router.get('/',
 // Update presentation
 router.put('/:presentationId',
   generalRateLimit,
+  validatePresentationUpdate,
   presentationController.updatePresentation
 );
 

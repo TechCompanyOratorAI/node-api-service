@@ -27,7 +27,7 @@ const sanitizeFileName = (filename) => {
 };
 
 class PresentationService {
-  async createPresentation({ topicId, studentId, title, description }) {
+  async createPresentation({ topicId, studentId, title, description, groupCode }) {
     try {
       const topic = await Topic.findByPk(topicId);
       if (!topic) {
@@ -48,6 +48,7 @@ class PresentationService {
         topicId,
         title,
         description,
+        groupCode,
         status: 'draft'
       });
 
@@ -432,7 +433,7 @@ class PresentationService {
         return accessResult;
       }
 
-      const allowedFields = ['title', 'description'];
+      const allowedFields = ['title', 'description', 'groupCode'];
       const updateData = {};
 
       Object.keys(updates).forEach(key => {
