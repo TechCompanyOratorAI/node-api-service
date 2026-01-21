@@ -8,6 +8,10 @@ import topicRoutes from './topicRoutes.js';
 import enrollmentRoutes from './enrollmentRoutes.js';
 import roleRoutes from './roleRoutes.js';
 import presentationRoutes from './presentationRoutes.js';
+import webhookRoutes from './webhookRoutes.js';
+import speakerRoutes from './speakerRoutes.js';
+import jobRoutes from './jobRoutes.js';
+import storageRoutes from './storageRoutes.js';
 
 const router = express.Router();
 
@@ -21,6 +25,10 @@ router.use('/topics', topicRoutes);
 router.use('/enrollments', enrollmentRoutes);
 router.use('/roles', roleRoutes);
 router.use('/presentations', presentationRoutes);
+router.use('/webhooks', webhookRoutes);
+router.use('/speakers', speakerRoutes);
+router.use('/jobs', jobRoutes);
+router.use('/storage', storageRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

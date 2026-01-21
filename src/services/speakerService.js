@@ -10,9 +10,10 @@
  * Business Rule BR-01: AI-generated speaker IDs + user mapping
  */
 
-const { Speaker, TranscriptSegment, User, Presentation } = require('../models');
-const { Op } = require('sequelize');
-const db = require('../models').sequelize;
+import db from '../models/index.js';
+import { Op } from 'sequelize';
+
+const { Speaker, TranscriptSegment, User, Presentation } = db;
 
 class SpeakerService {
     /**
@@ -617,4 +618,4 @@ class SpeakerService {
 }
 
 // Export singleton instance
-module.exports = new SpeakerService();
+export default new SpeakerService();

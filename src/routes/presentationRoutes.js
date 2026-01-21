@@ -33,4 +33,52 @@ router.post('/:presentationId/media',
   presentationController.uploadMedia
 );
 
+// Submit presentation for processing
+router.post('/:presentationId/submit',
+  generalRateLimit,
+  presentationController.submitPresentation
+);
+
+// Get presentation by ID
+router.get('/:presentationId',
+  generalRateLimit,
+  presentationController.getPresentationById
+);
+
+// Get all presentations for current user
+router.get('/',
+  generalRateLimit,
+  presentationController.getAllPresentations
+);
+
+// Update presentation
+router.put('/:presentationId',
+  generalRateLimit,
+  presentationController.updatePresentation
+);
+
+// Delete presentation
+router.delete('/:presentationId',
+  generalRateLimit,
+  presentationController.deletePresentation
+);
+
+// Get processing status
+router.get('/:presentationId/status',
+  generalRateLimit,
+  presentationController.getProcessingStatus
+);
+
+// Get analysis results
+router.get('/:presentationId/results',
+  generalRateLimit,
+  presentationController.getAnalysisResults
+);
+
+// Get presentations by course (for teachers)
+router.get('/course/:courseId',
+  generalRateLimit,
+  presentationController.getPresentationsByCourse
+);
+
 export default router;

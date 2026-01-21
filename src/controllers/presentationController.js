@@ -99,6 +99,183 @@ class PresentationController {
       return res.status(500).json({ success: false, message: 'Internal server error' });
     }
   }
+
+  async submitPresentation(req, res) {
+    try {
+      const { presentationId } = req.params;
+      const parsedPresentationId = parseInt(presentationId);
+
+      if (Number.isNaN(parsedPresentationId)) {
+        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+      }
+
+      const result = await presentationService.submitPresentation(
+        parsedPresentationId,
+        req.user.userId
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Submit presentation controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async getPresentationById(req, res) {
+    try {
+      const { presentationId } = req.params;
+      const parsedPresentationId = parseInt(presentationId);
+
+      if (Number.isNaN(parsedPresentationId)) {
+        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+      }
+
+      const result = await presentationService.getPresentationById(
+        parsedPresentationId,
+        req.user.userId,
+        req.user.role
+      );
+
+      return res.status(result.success ? 200 : 404).json(result);
+    } catch (error) {
+      console.error('Get presentation controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async getAllPresentations(req, res) {
+    try {
+      const { status, limit = 50, offset = 0 } = req.query;
+
+      const result = await presentationService.getAllPresentations(
+        req.user.userId,
+        {
+          status,
+          limit: parseInt(limit),
+          offset: parseInt(offset)
+        }
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Get all presentations controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async updatePresentation(req, res) {
+    try {
+      const { presentationId } = req.params;
+      const parsedPresentationId = parseInt(presentationId);
+
+      if (Number.isNaN(parsedPresentationId)) {
+        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+      }
+
+      const { title, description } = req.body;
+
+      const result = await presentationService.updatePresentation(
+        parsedPresentationId,
+        req.user.userId,
+        { title, description }
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Update presentation controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async deletePresentation(req, res) {
+    try {
+      const { presentationId } = req.params;
+      const parsedPresentationId = parseInt(presentationId);
+
+      if (Number.isNaN(parsedPresentationId)) {
+        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+      }
+
+      const result = await presentationService.deletePresentation(
+        parsedPresentationId,
+        req.user.userId
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Delete presentation controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async getProcessingStatus(req, res) {
+    try {
+      const { presentationId } = req.params;
+      const parsedPresentationId = parseInt(presentationId);
+
+      if (Number.isNaN(parsedPresentationId)) {
+        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+      }
+
+      const result = await presentationService.getProcessingStatus(
+        parsedPresentationId,
+        req.user.userId
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Get processing status controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async getAnalysisResults(req, res) {
+    try {
+      const { presentationId } = req.params;
+      const parsedPresentationId = parseInt(presentationId);
+
+      if (Number.isNaN(parsedPresentationId)) {
+        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+      }
+
+      const result = await presentationService.getAnalysisResults(
+        parsedPresentationId,
+        req.user.userId
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Get analysis results controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  async getPresentationsByCourse(req, res) {
+    try {
+      const { courseId } = req.params;
+      const parsedCourseId = parseInt(courseId);
+
+      if (Number.isNaN(parsedCourseId)) {
+        return res.status(400).json({ success: false, message: 'courseId must be a number' });
+      }
+
+      const { status, limit = 50, offset = 0 } = req.query;
+
+      const result = await presentationService.getPresentationsByCourse(
+        parsedCourseId,
+        {
+          status,
+          limit: parseInt(limit),
+          offset: parseInt(offset)
+        }
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Get presentations by course controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
 }
 
 export default new PresentationController();
