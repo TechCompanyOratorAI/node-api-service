@@ -9,9 +9,11 @@
  * - Cleanup old jobs
  */
 
-const { Job, Presentation } = require('../models');
-const queueService = require('./queueService');
-const { Op } = require('sequelize');
+import db from '../models/index.js';
+import queueService from './queueService.js';
+import { Op } from 'sequelize';
+
+const { Job, Presentation } = db;
 
 const MAX_RETRY_COUNT = 3;
 const JOB_TYPES = {
@@ -561,4 +563,4 @@ class JobService {
 }
 
 // Export singleton instance
-module.exports = new JobService();
+export default new JobService();
