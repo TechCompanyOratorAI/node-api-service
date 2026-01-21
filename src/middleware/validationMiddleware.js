@@ -316,6 +316,30 @@ export const validatePresentationCreate = [
     .optional()
     .isLength({ max: 5000 })
     .withMessage('Description must be less than 5000 characters')
+    .trim(),
+  body('groupCode')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('groupCode must be less than 50 characters')
+    .trim()
+];
+
+// Presentation update validation
+export const validatePresentationUpdate = [
+  body('title')
+    .optional()
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Title must be between 1 and 255 characters')
+    .trim(),
+  body('description')
+    .optional()
+    .isLength({ max: 5000 })
+    .withMessage('Description must be less than 5000 characters')
+    .trim(),
+  body('groupCode')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('groupCode must be less than 50 characters')
     .trim()
 ];
 
@@ -330,6 +354,7 @@ export default {
   validateCourseUpdate,
   validateTopic,
   validateTopicUpdate,
-  validatePresentationCreate
+  validatePresentationCreate,
+  validatePresentationUpdate
 };
 
