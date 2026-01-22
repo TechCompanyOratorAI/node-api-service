@@ -76,7 +76,7 @@ module.exports = (sequelize, DataTypes) => {
             presentationId: { type: DataTypes.INTEGER, allowNull: false },
 
             jobType: {
-                type: DataTypes.ENUM('asr', 'analysis', 'report'),
+                type: DataTypes.ENUM('asr', 'analysis', 'report', 'slides'),
                 allowNull: false
             },
 

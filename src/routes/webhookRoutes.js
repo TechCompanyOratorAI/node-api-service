@@ -3,7 +3,7 @@
  */
 
 import express from 'express';
-import { verifyWebhookAuth, asrComplete, analysisComplete, reportComplete, health } from '../controllers/webhookController.js';
+import { verifyWebhookAuth, asrComplete, analysisComplete, reportComplete, slidesComplete, health } from '../controllers/webhookController.js';
 
 const router = express.Router();
 
@@ -21,5 +21,8 @@ router.post('/analysis-complete', analysisComplete);
 
 // Report worker callback
 router.post('/report-complete', reportComplete);
+
+// Slides worker callback
+router.post('/slides-complete', slidesComplete);
 
 export default router;
