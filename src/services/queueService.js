@@ -15,7 +15,8 @@ const sqsClient = new SQSClient({
 const QUEUE_URLS = {
     asr: process.env.AWS_SQS_ASR_QUEUE_URL,
     analysis: process.env.AWS_SQS_ANALYSIS_QUEUE_URL,
-    report: process.env.AWS_SQS_REPORT_QUEUE_URL
+    report: process.env.AWS_SQS_REPORT_QUEUE_URL,
+    slides: process.env.AWS_SQS_SLIDES_QUEUE_URL
 };
 
 class QueueService {
@@ -57,6 +58,21 @@ class QueueService {
      */
     async sendToReportQueue(data) {
         return this._sendMessage(QUEUE_URLS.report, 'report', data);
+    }
+
+    /**
+     * Send message to Slides queue (for OCR + embeddings)
+     * @param {Object} data - Message data
+     * @param {number} data.presentationId - Presentation ID
+     * @param {number} data.jobId - Job ID
+     * @param {number} data.slideId - Slide ID
+     * @param {string} data.slideUrl - S3 URL of slide file
+     * @param {number} data.slideNumber - Slide number
+     * @param {Object} data.metadata - Additional metadata
+     * @returns {Promise<Object>} - SQS message response
+     */
+    async sendToSlidesQueue(data) {
+        return this._sendMessage(QUEUE_URLS.slides, 'slides', data);
     }
 
     /**
@@ -117,7 +133,7 @@ class QueueService {
 
     /**
      * Receive messages from a queue (for worker polling)
-     * @param {string} queueType - Queue type (asr, analysis, report)
+     * @param {string} queueType - Queue type (asr, analysis, report, slides)
      * @param {number} maxMessages - Max messages to receive (1-10)
      * @param {number} waitTimeSeconds - Long polling wait time (0-20)
      * @returns {Promise<Array>} - Array of messages
@@ -181,7 +197,7 @@ class QueueService {
 
     /**
      * Test queue connectivity
-     * @param {string} queueType - Queue type to test
+     * @param {string} queueType - Queue type to test (asr, analysis, report, slides)
      * @returns {Promise<Object>}
      */
     async testQueue(queueType) {
@@ -235,6 +251,10 @@ class QueueService {
             report: {
                 configured: !!QUEUE_URLS.report,
                 url: QUEUE_URLS.report || 'NOT_CONFIGURED'
+            },
+            slides: {
+                configured: !!QUEUE_URLS.slides,
+                url: QUEUE_URLS.slides || 'NOT_CONFIGURED'
             },
             region
         };

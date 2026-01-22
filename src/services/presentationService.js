@@ -26,6 +26,62 @@ const sanitizeFileName = (filename) => {
   return baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
 };
 
+/**
+ * Detect number of pages in a slide file
+ * @param {Buffer} fileBuffer - File buffer
+ * @param {string} mimeType - MIME type of the file
+ * @returns {Promise<number>} - Number of pages
+ */
+const detectPageCount = async (fileBuffer, mimeType) => {
+  try {
+    // PDF files
+    if (mimeType === 'application/pdf' || mimeType === 'application/x-pdf') {
+      // Try to count pages by searching for /Count in PDF structure
+      // Simple method: count occurrences of /Type/Page or /Page
+      const pdfText = fileBuffer.toString('binary');
+      const pageMatches = pdfText.match(/\/Type[\s]*\/Page[^s]/g);
+      if (pageMatches) {
+        return pageMatches.length;
+      }
+      
+      // Alternative: count /Count entries (less reliable)
+      const countMatches = pdfText.match(/\/Count[\s]+(\d+)/g);
+      if (countMatches) {
+        // Try to extract the largest count value
+        const counts = countMatches.map(match => {
+          const numMatch = match.match(/\d+/);
+          return numMatch ? parseInt(numMatch[0]) : 0;
+        });
+        return Math.max(...counts, 1);
+      }
+      
+      // Fallback: estimate based on file size (very rough)
+      // Average PDF page is ~50-100KB, but this is unreliable
+      return 1; // Default to 1 if can't detect
+    }
+    
+    // PowerPoint files (.pptx)
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+        mimeType === 'application/vnd.ms-powerpoint') {
+      // PPTX is a ZIP file, count slides by counting slide XML files
+      // This requires unzipping, which is complex. For now, return 1.
+      // TODO: Implement proper PPTX page counting using JSZip or similar
+      return 1; // Placeholder
+    }
+    
+    // Image files (single page)
+    if (mimeType.startsWith('image/')) {
+      return 1;
+    }
+    
+    // Default: assume 1 page
+    return 1;
+  } catch (error) {
+    console.error('Error detecting page count:', error);
+    return 1; // Default to 1 page on error
+  }
+};
+
 class PresentationService {
   async createPresentation({ topicId, studentId, title, description, groupCode }) {
     try {
@@ -67,21 +123,20 @@ class PresentationService {
       }
 
       const presentation = accessResult.presentation;
-      let nextSlideNumber = slideNumber;
-
-      if (!nextSlideNumber) {
-        const latestSlide = await Slide.findOne({
-          where: { presentationId: presentation.presentationId },
-          order: [['slideNumber', 'DESC']],
-          attributes: ['slideNumber']
-        });
-        nextSlideNumber = latestSlide?.slideNumber ? latestSlide.slideNumber + 1 : 1;
-      }
+      
+      // Detect number of pages in the file
+      const pageCount = await detectPageCount(file.buffer, file.mimetype);
+      
+      // Use pageCount as slideNumber (or use provided slideNumber if specified)
+      // slideNumber represents the number of pages in this slide file
+      const finalSlideNumber = slideNumber || pageCount;
+      
+      console.log(`📄 Detected ${pageCount} pages in file, using slideNumber: ${finalSlideNumber}`);
 
       const extension = path.extname(file.originalname || '');
       const uniqueSuffix = crypto.randomBytes(6).toString('hex');
-      const safeName = sanitizeFileName(file.originalname || `slide-${nextSlideNumber}${extension}`);
-      const key = `presentations/${presentation.presentationId}/slides/${nextSlideNumber}-${uniqueSuffix}-${safeName}`;
+      const safeName = sanitizeFileName(file.originalname || `slide-${finalSlideNumber}${extension}`);
+      const key = `presentations/${presentation.presentationId}/slides/${finalSlideNumber}-${uniqueSuffix}-${safeName}`;
 
       const uploadResult = await storageService.uploadBuffer({
         key,
@@ -91,13 +146,33 @@ class PresentationService {
 
       const slide = await Slide.create({
         presentationId: presentation.presentationId,
-        slideNumber: nextSlideNumber,
+        slideNumber: finalSlideNumber,
         filePath: uploadResult.url,
         fileName: file.originalname,
         fileFormat: file.mimetype,
         fileSizeBytes: file.size,
         uploadedAt: new Date()
       });
+
+      // Create job and send to slides queue for OCR + embeddings processing
+      try {
+        const job = await jobService.createJob(
+          presentation.presentationId,
+          'slides',
+          {
+            slideId: slide.slideId,
+            slideUrl: uploadResult.url,
+            slideNumber: finalSlideNumber,
+            pageCount: pageCount, // Also include detected page count
+            fileName: file.originalname,
+            fileFormat: file.mimetype
+          }
+        );
+        console.log(`✅ Created slides job ${job.jobId} for slide ${slide.slideId} (${pageCount} pages)`);
+      } catch (jobError) {
+        // Log error but don't fail the upload
+        console.error('⚠️ Failed to create slides job:', jobError);
+      }
 
       return { success: true, slide };
     } catch (error) {

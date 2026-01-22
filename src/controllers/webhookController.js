@@ -23,7 +23,8 @@ const {
     SegmentAnalysis,
     ContentRelevance,
     SemanticSimilarity,
-    AlignmentCheck
+    AlignmentCheck,
+    Slide
 } = db;
 
 /**
@@ -574,6 +575,138 @@ const reportComplete = async (req, res) => {
 };
 
 /**
+ * POST /webhooks/slides-complete
+ * Called by Slides worker when OCR + embeddings processing complete
+ * 
+ * Payload:
+ * {
+ *   jobId: number,
+ *   presentationId: number,
+ *   slideId: number,
+ *   status: 'success' | 'failed',
+ *   error?: string,
+ *   result?: {
+ *     extractedText: string,  // Combined text from all pages
+ *     pages?: [{              // For multi-page files (PDF)
+ *       pageNumber: number,
+ *       text: string
+ *     }],
+ *     embedding?: number[],
+ *     metadata?: object
+ *   }
+ * }
+ */
+const slidesComplete = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+
+    try {
+        const { jobId, presentationId, slideId, status, error, result } = req.body;
+
+        console.log(`📥 Webhook: Slides complete for job ${jobId}, slide ${slideId}, status: ${status}`);
+
+        if (!jobId || !presentationId || !slideId || !status) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: jobId, presentationId, slideId, status'
+            });
+        }
+
+        const job = await jobService.getJobById(jobId);
+        if (!job) {
+            return res.status(404).json({
+                success: false,
+                message: `Job not found: ${jobId}`
+            });
+        }
+
+        // Handle failure
+        if (status === 'failed') {
+            await jobService.markJobFailed(jobId, error || 'Slides processing failed', true);
+            await transaction.commit();
+
+            return res.json({
+                success: true,
+                message: 'Slides processing failure recorded'
+            });
+        }
+
+        // Handle success - Update slide with OCR results
+        if (result) {
+            const slide = await Slide.findByPk(slideId, { transaction });
+            if (!slide) {
+                throw new Error(`Slide not found: ${slideId}`);
+            }
+
+            const updateData = {};
+            
+            // Combine text from all pages if pages data exists
+            if (result.pages && Array.isArray(result.pages) && result.pages.length > 0) {
+                // Combine text from all pages
+                const combinedText = result.pages.map(p => 
+                    `[Trang ${p.pageNumber}]\n${p.text}`
+                ).join('\n\n');
+                updateData.extractedText = combinedText;
+                console.log(`✅ Extracted text from ${result.pages.length} pages`);
+            } else if (result.extractedText !== undefined) {
+                // Fallback to extractedText if pages not available
+                updateData.extractedText = result.extractedText;
+            }
+
+            await slide.update(updateData, { transaction });
+
+            console.log(`✅ Updated slide ${slideId} with OCR results`);
+
+            // Note: Embedding storage can be added later if needed
+            // For now, we'll just log that we received it
+            if (result.embedding && result.embedding.length > 0) {
+                console.log(`📊 Received embedding vector of length ${result.embedding.length} for slide ${slideId}`);
+                // TODO: Store embedding in a dedicated table or add metadata field to Slides table
+            }
+        }
+
+        // Mark job as completed
+        await jobService.markJobCompleted(jobId, {
+            slideProcessed: true,
+            slideId,
+            extractedText: result?.extractedText ? result.extractedText.length : 0,
+            hasEmbedding: !!(result?.embedding && result.embedding.length > 0)
+        });
+
+        await transaction.commit();
+
+        console.log(`✅ Slides webhook processed successfully for job ${jobId}`);
+
+        return res.json({
+            success: true,
+            message: 'Slides processing results saved successfully',
+            data: {
+                jobId,
+                presentationId,
+                slideId
+            }
+        });
+
+    } catch (error) {
+        await transaction.rollback();
+        console.error('❌ Slides webhook error:', error);
+
+        try {
+            if (req.body.jobId) {
+                await jobService.markJobFailed(req.body.jobId, `Webhook processing error: ${error.message}`, false);
+            }
+        } catch (jobError) {
+            console.error('Failed to mark job as failed:', jobError);
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to process slides webhook',
+            error: error.message
+        });
+    }
+};
+
+/**
  * GET /webhooks/health
  * Health check endpoint for workers
  */
@@ -602,5 +735,6 @@ export {
     asrComplete,
     analysisComplete,
     reportComplete,
+    slidesComplete,
     health
 };

@@ -19,7 +19,8 @@ const MAX_RETRY_COUNT = 3;
 const JOB_TYPES = {
     ASR: 'asr',
     ANALYSIS: 'analysis',
-    REPORT: 'report'
+    REPORT: 'report',
+    SLIDES: 'slides'
 };
 
 const JOB_STATUS = {
@@ -51,19 +52,47 @@ class JobService {
                 throw new Error(`Presentation not found: ${presentationId}`);
             }
 
-            // Check for existing pending/running job of same type
-            const existingJob = await Job.findOne({
-                where: {
-                    presentationId,
-                    jobType,
-                    status: {
-                        [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING]
+            // Check for existing pending/running job
+            // For slides: check by slideId in metadata (each slide needs its own job)
+            // For other types: check by presentationId + jobType (one job per presentation)
+            let existingJob = null;
+
+            if (jobType === JOB_TYPES.SLIDES && metadata?.slideId) {
+                // For slides, check if there's already a job for this specific slide
+                const jobs = await Job.findAll({
+                    where: {
+                        presentationId,
+                        jobType,
+                        status: {
+                            [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING]
+                        }
                     }
-                }
-            });
+                });
+
+                // Filter by slideId in metadata
+                existingJob = jobs.find(job => {
+                    const jobMetadata = job.metadata || {};
+                    return jobMetadata.slideId === metadata.slideId;
+                });
+            } else {
+                // For other job types, check by presentationId + jobType
+                existingJob = await Job.findOne({
+                    where: {
+                        presentationId,
+                        jobType,
+                        status: {
+                            [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING]
+                        }
+                    }
+                });
+            }
 
             if (existingJob) {
-                console.log(`⚠️ Job already exists for presentation ${presentationId}, type ${jobType}`);
+                if (jobType === JOB_TYPES.SLIDES) {
+                    console.log(`⚠️ Job already exists for slide ${metadata?.slideId}, presentation ${presentationId}`);
+                } else {
+                    console.log(`⚠️ Job already exists for presentation ${presentationId}, type ${jobType}`);
+                }
                 return existingJob;
             }
 
@@ -101,11 +130,10 @@ class JobService {
                 include: ['audioRecord']
             });
 
-            let messageId;
-
+            let queueResponse;
             switch (job.jobType) {
                 case JOB_TYPES.ASR:
-                    messageId = await queueService.sendToASRQueue({
+                    queueResponse = await queueService.sendToASRQueue({
                         jobId: job.jobId,
                         presentationId: job.presentationId,
                         audioUrl: presentation.audioRecord?.fileUrl || '',
@@ -114,7 +142,7 @@ class JobService {
                     break;
 
                 case JOB_TYPES.ANALYSIS:
-                    messageId = await queueService.sendToAnalysisQueue({
+                    queueResponse = await queueService.sendToAnalysisQueue({
                         jobId: job.jobId,
                         presentationId: job.presentationId,
                         metadata: job.metadata
@@ -122,9 +150,20 @@ class JobService {
                     break;
 
                 case JOB_TYPES.REPORT:
-                    messageId = await queueService.sendToReportQueue({
+                    queueResponse = await queueService.sendToReportQueue({
                         jobId: job.jobId,
                         presentationId: job.presentationId,
+                        metadata: job.metadata
+                    });
+                    break;
+
+                case JOB_TYPES.SLIDES:
+                    queueResponse = await queueService.sendToSlidesQueue({
+                        jobId: job.jobId,
+                        presentationId: job.presentationId,
+                        slideId: job.metadata?.slideId,
+                        slideUrl: job.metadata?.slideUrl,
+                        slideNumber: job.metadata?.slideNumber,
                         metadata: job.metadata
                     });
                     break;
@@ -133,9 +172,16 @@ class JobService {
                     throw new Error(`Unknown job type: ${job.jobType}`);
             }
 
+            // Extract messageId from response object
+            const messageId = queueResponse?.messageId || queueResponse?.MessageId || null;
+
             // Update job with SQS message ID
-            await job.update({ sqsMessageId: messageId });
-            console.log(`📤 Sent job ${job.jobId} to ${job.jobType} queue, messageId: ${messageId}`);
+            if (messageId) {
+                await job.update({ sqsMessageId: messageId });
+                console.log(`📤 Sent job ${job.jobId} to ${job.jobType} queue, messageId: ${messageId}`);
+            } else {
+                console.warn(`⚠️ No messageId returned from queue service for job ${job.jobId}`);
+            }
 
         } catch (error) {
             console.error(`❌ Error sending job ${job.jobId} to queue:`, error);
