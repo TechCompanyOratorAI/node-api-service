@@ -32,6 +32,12 @@ router.get('/',
     courseController.getAllCourses
 );
 
+// Get my courses (for logged-in instructor)
+// Query params: semester, academicYear, isActive, search, page, limit, sortBy, sortOrder
+router.get('/my-courses',
+    courseController.getMyCourses
+);
+
 // Get specific course by ID
 // Query params: includeStats=true (optional)
 router.get('/:courseId',

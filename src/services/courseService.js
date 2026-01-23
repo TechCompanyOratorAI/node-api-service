@@ -87,7 +87,12 @@ class CourseService {
             if (instructorId) where.instructorId = instructorId;
             if (semester) where.semester = semester;
             if (academicYear) where.academicYear = academicYear;
-            if (isActive !== undefined) where.isActive = isActive;
+            // Default to active courses only if not specified (for student access)
+            if (isActive !== undefined) {
+                where.isActive = isActive;
+            } else {
+                where.isActive = true;
+            }
 
             // Search in course code or name
             if (search) {
@@ -132,6 +137,117 @@ class CourseService {
             return {
                 success: false,
                 message: 'Failed to retrieve courses',
+                error: error.message
+            };
+        }
+    }
+
+    // Get courses by instructor ID
+    async getCoursesByInstructor(instructorId, filters = {}, pagination = {}) {
+        try {
+            // Verify instructor exists
+            const instructor = await User.findByPk(instructorId);
+            if (!instructor) {
+                return {
+                    success: false,
+                    message: 'Instructor not found'
+                };
+            }
+
+            const {
+                semester,
+                academicYear,
+                isActive,
+                search
+            } = filters;
+
+            const {
+                page = 1,
+                limit = 10,
+                sortBy = 'createdAt',
+                sortOrder = 'DESC'
+            } = pagination;
+
+            const offset = (page - 1) * limit;
+
+            // Build where clause
+            const where = {
+                instructorId: instructorId
+            };
+            if (semester) where.semester = semester;
+            if (academicYear) where.academicYear = academicYear;
+            // Default to active courses only if not specified
+            if (isActive !== undefined) {
+                where.isActive = isActive;
+            } else {
+                where.isActive = true;
+            }
+
+            // Search in course code or name
+            if (search) {
+                where[db.Sequelize.Op.or] = [
+                    { courseCode: { [db.Sequelize.Op.like]: `%${search}%` } },
+                    { courseName: { [db.Sequelize.Op.like]: `%${search}%` } }
+                ];
+            }
+
+            const { count, rows: courses } = await Course.findAndCountAll({
+                where,
+                include: [
+                    {
+                        model: User,
+                        as: 'instructor',
+                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email']
+                    },
+                    {
+                        model: Topic,
+                        as: 'topics',
+                        attributes: ['topicId', 'topicName', 'sequenceNumber']
+                    },
+                    {
+                        model: Enrollment,
+                        as: 'enrollments',
+                        attributes: ['enrollmentId', 'studentId'],
+                        required: false
+                    }
+                ],
+                limit: parseInt(limit),
+                offset: parseInt(offset),
+                order: [[sortBy, sortOrder]],
+                distinct: true
+            });
+
+            return {
+                success: true,
+                instructor: {
+                    userId: instructor.userId,
+                    username: instructor.username,
+                    firstName: instructor.firstName,
+                    lastName: instructor.lastName,
+                    email: instructor.email
+                },
+                data: courses.map(course => {
+                    const courseData = course.toJSON();
+                    // Remove enrollments array and add count instead
+                    const enrollmentCount = courseData.enrollments?.length || 0;
+                    delete courseData.enrollments;
+                    return {
+                        ...courseData,
+                        enrollmentCount
+                    };
+                }),
+                pagination: {
+                    total: count,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(count / limit)
+                }
+            };
+        } catch (error) {
+            console.error('Get courses by instructor error:', error);
+            return {
+                success: false,
+                message: 'Failed to retrieve courses by instructor',
                 error: error.message
             };
         }
