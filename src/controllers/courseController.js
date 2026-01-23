@@ -1,5 +1,6 @@
 import { validationResult } from 'express-validator';
 import courseService from '../services/courseService.js';
+import roleService from '../services/roleService.js';
 
 class CourseController {
     // Create new course
@@ -104,8 +105,19 @@ class CourseController {
         try {
             const { courseId } = req.params;
             const includeStats = req.query.includeStats === 'true';
+            const userId = req.user?.userId;
 
-            const result = await courseService.getCourseById(courseId, includeStats);
+            // Get user roles to check if student
+            let isStudent = false;
+            if (userId) {
+                const userRolesResult = await roleService.getUserRoles(userId);
+                if (userRolesResult.success) {
+                    const userRoles = userRolesResult.roles.map(role => role.roleName);
+                    isStudent = userRoles.includes('Student') && !userRoles.some(role => ['Admin', 'Instructor', 'Teacher'].includes(role));
+                }
+            }
+
+            const result = await courseService.getCourseById(courseId, includeStats, isStudent);
 
             if (result.success) {
                 return res.status(200).json(result);

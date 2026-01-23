@@ -254,7 +254,7 @@ class CourseService {
     }
 
     // Get course by ID
-    async getCourseById(courseId, includeStats = false) {
+    async getCourseById(courseId, includeStats = false, isStudent = false) {
         try {
             const includeOptions = [
                 {
@@ -285,7 +285,14 @@ class CourseService {
                 );
             }
 
-            const course = await Course.findByPk(courseId, {
+            // Build where clause - students can only see active courses
+            const where = { courseId };
+            if (isStudent) {
+                where.isActive = true;
+            }
+
+            const course = await Course.findOne({
+                where,
                 include: includeOptions
             });
 
