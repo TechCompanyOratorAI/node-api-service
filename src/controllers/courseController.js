@@ -64,6 +64,41 @@ class CourseController {
         }
     }
 
+    // Get my courses (for logged-in instructor)
+    async getMyCourses(req, res) {
+        try {
+            const instructorId = req.user.userId;
+            
+            const filters = {
+                semester: req.query.semester,
+                academicYear: req.query.academicYear,
+                isActive: req.query.isActive,
+                search: req.query.search
+            };
+
+            const pagination = {
+                page: req.query.page,
+                limit: req.query.limit,
+                sortBy: req.query.sortBy,
+                sortOrder: req.query.sortOrder
+            };
+
+            const result = await courseService.getCoursesByInstructor(instructorId, filters, pagination);
+
+            if (result.success) {
+                return res.status(200).json(result);
+            } else {
+                return res.status(404).json(result);
+            }
+        } catch (error) {
+            console.error('Get my courses controller error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
+            });
+        }
+    }
+
     // Get course by ID
     async getCourseById(req, res) {
         try {
