@@ -280,7 +280,7 @@ class SpeakerService {
                 include.push({
                     model: User,
                     as: 'mappedStudent',
-                    attributes: ['userId', 'fullName', 'email']
+                    attributes: ['userId', 'firstName', 'lastName', 'email']
                 });
             }
 
@@ -331,7 +331,7 @@ class SpeakerService {
                     {
                         model: User,
                         as: 'mappedStudent',
-                        attributes: ['userId', 'fullName', 'email']
+                        attributes: ['userId', 'firstName', 'lastName', 'email']
                     },
                     {
                         model: Presentation,
@@ -559,7 +559,7 @@ class SpeakerService {
                         include: [{
                             model: User,
                             as: 'student',
-                            attributes: ['userId', 'fullName', 'email']
+                            attributes: ['userId', 'firstName', 'lastName', 'email']
                         }]
                     }]
                 }]
