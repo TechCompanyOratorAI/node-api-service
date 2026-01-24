@@ -43,7 +43,7 @@ const detectPageCount = async (fileBuffer, mimeType) => {
       if (pageMatches) {
         return pageMatches.length;
       }
-      
+
       // Alternative: count /Count entries (less reliable)
       const countMatches = pdfText.match(/\/Count[\s]+(\d+)/g);
       if (countMatches) {
@@ -54,26 +54,26 @@ const detectPageCount = async (fileBuffer, mimeType) => {
         });
         return Math.max(...counts, 1);
       }
-      
+
       // Fallback: estimate based on file size (very rough)
       // Average PDF page is ~50-100KB, but this is unreliable
       return 1; // Default to 1 if can't detect
     }
-    
+
     // PowerPoint files (.pptx)
     if (mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
-        mimeType === 'application/vnd.ms-powerpoint') {
+      mimeType === 'application/vnd.ms-powerpoint') {
       // PPTX is a ZIP file, count slides by counting slide XML files
       // This requires unzipping, which is complex. For now, return 1.
       // TODO: Implement proper PPTX page counting using JSZip or similar
       return 1; // Placeholder
     }
-    
+
     // Image files (single page)
     if (mimeType.startsWith('image/')) {
       return 1;
     }
-    
+
     // Default: assume 1 page
     return 1;
   } catch (error) {
@@ -123,14 +123,14 @@ class PresentationService {
       }
 
       const presentation = accessResult.presentation;
-      
+
       // Detect number of pages in the file
       const pageCount = await detectPageCount(file.buffer, file.mimetype);
-      
+
       // Use pageCount as slideNumber (or use provided slideNumber if specified)
       // slideNumber represents the number of pages in this slide file
       const finalSlideNumber = slideNumber || pageCount;
-      
+
       console.log(`📄 Detected ${pageCount} pages in file, using slideNumber: ${finalSlideNumber}`);
 
       const extension = path.extname(file.originalname || '');
@@ -294,12 +294,33 @@ class PresentationService {
         };
       }
 
-      // Check if already submitted
-      if (presentation.status === 'processing' || presentation.status === 'completed') {
+      // Check if already submitted (allow re-submit if failed or no active job)
+      if (presentation.status === 'completed') {
         return {
           success: false,
-          message: `Presentation is already ${presentation.status}`
+          message: 'Presentation is already completed'
         };
+      }
+
+      // If processing, cleanup orphaned jobs first, then check for active jobs
+      if (presentation.status === 'processing') {
+        // Cleanup any orphaned jobs (queued/running but SQS message deleted)
+        const cleanedCount = await jobService.cleanupOrphanedJobs(presentationId);
+        if (cleanedCount > 0) {
+          console.log(`🧹 Cleaned up ${cleanedCount} orphaned job(s) for presentation ${presentationId}`);
+        }
+
+        // Re-check for active jobs after cleanup
+        const activeJob = await jobService.getActiveJobForPresentation(presentationId);
+        if (activeJob) {
+          return {
+            success: false,
+            message: 'Presentation is already being processed',
+            job: activeJob
+          };
+        }
+        // If no active job after cleanup, allow re-submit
+        console.log(`⚠️ Presentation ${presentationId} has status 'processing' but no active job after cleanup. Allowing re-submit.`);
       }
 
       // Update presentation status
@@ -405,12 +426,12 @@ class PresentationService {
           {
             model: User,
             as: 'student',
-            attributes: ['userId', 'fullName', 'email']
+            attributes: ['userId', 'firstName', 'lastName', 'email']
           },
           {
             model: Topic,
             as: 'topic',
-            attributes: ['topicId', 'title', 'courseId']
+            attributes: ['topicId', 'topicName', 'courseId']
           },
           {
             model: Course,
@@ -471,7 +492,7 @@ class PresentationService {
           {
             model: Topic,
             as: 'topic',
-            attributes: ['topicId', 'title']
+            attributes: ['topicId', 'topicName']
           },
           {
             model: AudioRecord,
@@ -820,12 +841,12 @@ class PresentationService {
           {
             model: User,
             as: 'student',
-            attributes: ['userId', 'fullName', 'email']
+            attributes: ['userId', 'firstName', 'lastName', 'email']
           },
           {
             model: Topic,
             as: 'topic',
-            attributes: ['topicId', 'title']
+            attributes: ['topicId', 'topicName']
           }
         ]
       });

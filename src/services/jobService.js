@@ -136,7 +136,7 @@ class JobService {
                     queueResponse = await queueService.sendToASRQueue({
                         jobId: job.jobId,
                         presentationId: job.presentationId,
-                        audioUrl: presentation.audioRecord?.fileUrl || '',
+                        audioUrl: presentation.audioRecord?.filePath || '',
                         metadata: job.metadata
                     });
                     break;
@@ -330,6 +330,36 @@ class JobService {
     }
 
     /**
+     * Mark orphaned jobs as failed (jobs với status queued/running nhưng SQS message đã bị xóa)
+     * @param {number} presentationId 
+     * @returns {Promise<number>} - Số jobs đã cleanup
+     */
+    async cleanupOrphanedJobs(presentationId) {
+        try {
+            const orphanedJobs = await Job.findAll({
+                where: {
+                    presentationId,
+                    status: {
+                        [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING]
+                    }
+                }
+            });
+
+            let cleanedCount = 0;
+            for (const job of orphanedJobs) {
+                await job.markAsFailed('Job cleanup: SQS message no longer exists or job was orphaned');
+                cleanedCount++;
+                console.log(`🧹 Cleaned up orphaned job ${job.jobId} for presentation ${presentationId}`);
+            }
+
+            return cleanedCount;
+        } catch (error) {
+            console.error('❌ Error cleaning up orphaned jobs:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Retry failed job
      * @param {number} jobId 
      * @returns {Promise<Job>}
@@ -365,6 +395,30 @@ class JobService {
             return job;
         } catch (error) {
             console.error('❌ Error retrying job:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Kiểm tra xem có job đang active (queued/running) cho presentation không
+     * @param {number} presentationId 
+     * @returns {Promise<Job|null>}
+     */
+    async getActiveJobForPresentation(presentationId) {
+        try {
+            const activeJob = await Job.findOne({
+                where: {
+                    presentationId,
+                    status: {
+                        [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING]
+                    }
+                },
+                order: [['createdAt', 'DESC']]
+            });
+
+            return activeJob;
+        } catch (error) {
+            console.error('❌ Error getting active job:', error);
             throw error;
         }
     }
