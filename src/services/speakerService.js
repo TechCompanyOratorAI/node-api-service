@@ -23,7 +23,7 @@ class SpeakerService {
      * @returns {Promise<Speaker[]>}
      */
     async createSpeakersFromDiarization(presentationId, diarizationData) {
-        const transaction = await db.transaction();
+        const transaction = await db.sequelize.transaction();
 
         try {
             // Validate presentation exists
@@ -111,7 +111,7 @@ class SpeakerService {
      * @returns {Promise<number>} - Number of segments updated
      */
     async linkSegmentsToSpeakers(presentationId, segmentSpeakerMappings) {
-        const transaction = await db.transaction();
+        const transaction = await db.sequelize.transaction();
 
         try {
             // Get all speakers for this presentation
@@ -509,7 +509,7 @@ class SpeakerService {
      * @returns {Promise<boolean>}
      */
     async deleteSpeaker(speakerId) {
-        const transaction = await db.transaction();
+        const transaction = await db.sequelize.transaction();
 
         try {
             const speaker = await Speaker.findByPk(speakerId);

@@ -134,6 +134,22 @@ const asrComplete = async (req, res) => {
 
         // Handle success - Save transcript
         if (transcript && transcript.segments) {
+            // Get presentation with audioRecord to retrieve audioId
+            const presentation = await Presentation.findByPk(presentationId, {
+                include: [{ model: db.AudioRecord, as: 'audioRecord' }],
+                transaction
+            });
+
+            if (!presentation) {
+                throw new Error(`Presentation not found: ${presentationId}`);
+            }
+
+            if (!presentation.audioRecord) {
+                throw new Error(`No audio record found for presentation ${presentationId}`);
+            }
+
+            const audioId = presentation.audioRecord.audioId;
+
             // Create or update transcript record
             let transcriptRecord = await Transcript.findOne({
                 where: { presentationId },
@@ -142,16 +158,16 @@ const asrComplete = async (req, res) => {
 
             if (transcriptRecord) {
                 await transcriptRecord.update({
-                    fullText: transcript.fullText,
-                    language: transcript.language || 'vi',
-                    processingStatus: 'completed'
+                    audioId,
+                    fullTranscript: transcript.fullText,
+                    language: transcript.language || 'vi'
                 }, { transaction });
             } else {
                 transcriptRecord = await Transcript.create({
                     presentationId,
-                    fullText: transcript.fullText,
+                    audioId,
+                    fullTranscript: transcript.fullText,
                     language: transcript.language || 'vi',
-                    processingStatus: 'completed',
                     generatedAt: new Date()
                 }, { transaction });
             }
@@ -165,11 +181,11 @@ const asrComplete = async (req, res) => {
             // Create transcript segments
             const segments = transcript.segments.map(seg => ({
                 transcriptId: transcriptRecord.transcriptId,
-                order: seg.order,
+                segmentNumber: seg.order,
                 startTimestamp: seg.startTimestamp,
                 endTimestamp: seg.endTimestamp,
-                text: seg.text,
-                confidence: seg.confidence || null,
+                segmentText: seg.text,
+                confidenceScore: seg.confidence || null,
                 speakerId: null // Will be linked later in diarization
             }));
 
@@ -179,9 +195,15 @@ const asrComplete = async (req, res) => {
             });
 
             console.log(`✅ Created transcript with ${createdSegments.length} segments`);
+            
+            // Commit transcript and segments immediately to avoid timeout rollback
+            await transaction.commit();
+            console.log(`✅ Transcript transaction committed`);
+        }
 
-            // Process diarization if available
-            if (diarization && diarization.speakers) {
+        // Process diarization if available (outside main transaction)
+        if (transcript && transcript.segments && diarization && diarization.speakers) {
+            try {
                 // Create speakers from diarization
                 const speakers = await speakerService.createSpeakersFromDiarization(
                     presentationId,
@@ -192,25 +214,36 @@ const asrComplete = async (req, res) => {
 
                 // Link segments to speakers
                 if (diarization.segmentSpeakerMappings) {
-                    // Map segment order to segmentId
-                    const segmentIdMap = {};
-                    createdSegments.forEach(seg => {
-                        segmentIdMap[seg.order] = seg.segmentId;
+                    // Get transcript to get segment IDs
+                    const transcriptRecord = await Transcript.findOne({
+                        where: { presentationId },
+                        include: [{ model: TranscriptSegment, as: 'segments' }]
                     });
 
-                    // Convert mappings to use segmentId instead of order
-                    const mappingsWithIds = diarization.segmentSpeakerMappings.map(m => ({
-                        segmentId: segmentIdMap[m.order] || m.segmentId,
-                        aiSpeakerLabel: m.aiSpeakerLabel
-                    })).filter(m => m.segmentId); // Filter out invalid mappings
+                    if (transcriptRecord && transcriptRecord.segments) {
+                        // Map segment order to segmentId
+                        const segmentIdMap = {};
+                        transcriptRecord.segments.forEach(seg => {
+                            segmentIdMap[seg.segmentNumber] = seg.segmentId;
+                        });
 
-                    await speakerService.linkSegmentsToSpeakers(
-                        presentationId,
-                        mappingsWithIds
-                    );
+                        // Convert mappings to use segmentId instead of order
+                        const mappingsWithIds = diarization.segmentSpeakerMappings.map(m => ({
+                            segmentId: segmentIdMap[m.order] || m.segmentId,
+                            aiSpeakerLabel: m.aiSpeakerLabel
+                        })).filter(m => m.segmentId); // Filter out invalid mappings
 
-                    console.log(`✅ Linked segments to speakers`);
+                        await speakerService.linkSegmentsToSpeakers(
+                            presentationId,
+                            mappingsWithIds
+                        );
+
+                        console.log(`✅ Linked segments to speakers`);
+                    }
                 }
+            } catch (diarizationError) {
+                console.error('⚠️ Diarization processing error (transcript saved):', diarizationError);
+                // Don't fail the whole request - transcript is already saved
             }
         }
 
@@ -220,8 +253,6 @@ const asrComplete = async (req, res) => {
             segmentCount: transcript?.segments?.length || 0,
             speakerCount: diarization?.speakers?.length || 0
         });
-
-        await transaction.commit();
 
         console.log(`✅ ASR webhook processed successfully for job ${jobId}`);
 
@@ -237,7 +268,10 @@ const asrComplete = async (req, res) => {
         });
 
     } catch (error) {
-        await transaction.rollback();
+        // Only rollback if transaction is still pending (not committed yet)
+        if (!transaction.finished) {
+            await transaction.rollback();
+        }
         console.error('❌ ASR webhook error:', error);
 
         // Try to mark job as failed
