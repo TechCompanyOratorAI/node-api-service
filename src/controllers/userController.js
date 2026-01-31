@@ -111,6 +111,30 @@ class UserController {
             });
         }
     }
+
+    async getInstructorsByMajor(req, res) {
+        try {
+            const filters = {
+                major: req.query.major,
+                search: req.query.search
+            };
+
+            const result = await userService.getInstructorsByMajor(filters);
+
+            if (result.success) {
+                return res.status(200).json(result);
+            } else {
+                return res.status(400).json(result);
+            }
+
+        } catch (error) {
+            console.error('Get instructors by major controller error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Có lỗi xảy ra khi lấy danh sách giảng viên'
+            });
+        }
+    }
 }
 
 export default new UserController();

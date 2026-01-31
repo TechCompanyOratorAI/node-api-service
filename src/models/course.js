@@ -4,9 +4,27 @@ const { Model } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
     class Course extends Model {
         static associate(models) {
-            Course.belongsTo(models.User, { foreignKey: 'instructorId', as: 'instructor' });
+            // Multi-instructor support via course_instructors M:N table
+            Course.belongsToMany(models.User, {
+                through: models.CourseInstructor,
+                foreignKey: 'courseId',
+                otherKey: 'instructorId',
+                as: 'instructors'
+            });
 
-            Course.hasMany(models.Enrollment, { foreignKey: 'courseId', as: 'enrollments' });
+            Course.hasMany(models.CourseInstructor, {
+                foreignKey: 'courseId',
+                as: 'courseInstructors'
+            });
+
+            // Class hierarchy: Course -> Classes
+            Course.hasMany(models.Class, {
+                foreignKey: 'courseId',
+                as: 'classes'
+            });
+
+            // Keep existing associations
+            // Enrollment removed - now belongs to Class, not Course
             Course.hasMany(models.Topic, { foreignKey: 'courseId', as: 'topics' });
             Course.hasMany(models.Presentation, { foreignKey: 'courseId', as: 'presentations' });
         }
@@ -17,8 +35,8 @@ module.exports = (sequelize, DataTypes) => {
             courseId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
             courseCode: { type: DataTypes.STRING(30), allowNull: false },
             courseName: { type: DataTypes.STRING(200), allowNull: false },
+            majorCode: { type: DataTypes.STRING(20), allowNull: true, comment: 'Major code (e.g., SE, CS, IT)' },
             description: { type: DataTypes.TEXT },
-            instructorId: { type: DataTypes.INTEGER, allowNull: false },
             semester: { type: DataTypes.STRING(30) },
             academicYear: { type: DataTypes.INTEGER },
             startDate: { type: DataTypes.DATEONLY },

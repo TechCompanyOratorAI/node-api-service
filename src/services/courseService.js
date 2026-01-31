@@ -1,58 +1,86 @@
 import db from '../models/index.js';
 
-const { Course, Topic, User, Presentation, Enrollment } = db;
+const { Course, Topic, User, Presentation, Enrollment, CourseInstructor } = db;
 
 class CourseService {
-    // Create new course
-    async createCourse(courseData, instructorId) {
-        try {
-            const { courseCode, courseName, description, semester, academicYear, startDate, endDate } = courseData;
+    // Create new course (with multi-instructor support)
+    async createCourse(courseData, createdBy) {
+        const transaction = await db.sequelize.transaction();
 
-            // Check if course code already exists for this instructor
+        try {
+            const {
+                courseCode,
+                courseName,
+                majorCode,
+                description,
+                semester,
+                academicYear,
+                startDate,
+                endDate,
+                instructorIds = [] // Array of instructor IDs
+            } = courseData;
+
+            // Check if course code already exists
             const existingCourse = await Course.findOne({
                 where: {
                     courseCode,
-                    instructorId,
                     isActive: true
                 }
             });
 
             if (existingCourse) {
+                await transaction.rollback();
                 return {
                     success: false,
-                    message: 'Course code already exists for this instructor'
+                    message: 'Course code already exists'
                 };
             }
 
+            // Create course (no single instructorId FK)
             const course = await Course.create({
                 courseCode,
                 courseName,
+                majorCode,
                 description,
-                instructorId,
                 semester,
                 academicYear,
                 startDate,
                 endDate,
                 isActive: true
+            }, { transaction });
+
+            // Assign instructors via course_instructors M:N table
+            if (instructorIds && instructorIds.length > 0) {
+                const assignments = instructorIds.map((instructorId) => ({
+                    courseId: course.courseId,
+                    instructorId,
+                    assignedBy: createdBy
+                }));
+
+                await CourseInstructor.bulkCreate(assignments, { transaction });
+            }
+
+            await transaction.commit();
+
+            // Fetch course with instructors
+            const courseWithInstructors = await Course.findByPk(course.courseId, {
+                include: [
+                    {
+                        model: User,
+                        as: 'instructors',
+                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
+                        through: { attributes: ['assignedAt'] }
+                    }
+                ]
             });
 
             return {
                 success: true,
                 message: 'Course created successfully',
-                course: {
-                    courseId: course.courseId,
-                    courseCode: course.courseCode,
-                    courseName: course.courseName,
-                    description: course.description,
-                    semester: course.semester,
-                    academicYear: course.academicYear,
-                    startDate: course.startDate,
-                    endDate: course.endDate,
-                    isActive: course.isActive,
-                    createdAt: course.createdAt
-                }
+                course: courseWithInstructors
             };
         } catch (error) {
+            await transaction.rollback();
             console.error('Create course error:', error);
             return {
                 success: false,
@@ -82,9 +110,8 @@ class CourseService {
 
             const offset = (page - 1) * limit;
 
-            // Build where clause
+            // Build where clause for Course table
             const where = {};
-            if (instructorId) where.instructorId = instructorId;
             if (semester) where.semester = semester;
             if (academicYear) where.academicYear = academicYear;
             // Default to active courses only if not specified (for student access)
@@ -102,18 +129,30 @@ class CourseService {
                 ];
             }
 
+            // Build instructors include with optional filter
+            const instructorsInclude = {
+                model: User,
+                as: 'instructors',
+                attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
+                through: { attributes: ['role', 'assignedAt'] },
+                required: false
+            };
+
+            // If filtering by instructorId, add where clause to instructor join
+            if (instructorId) {
+                instructorsInclude.where = { userId: instructorId };
+                instructorsInclude.required = true;
+            }
+
             const { count, rows: courses } = await Course.findAndCountAll({
                 where,
                 include: [
-                    {
-                        model: User,
-                        as: 'instructor',
-                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email']
-                    },
+                    instructorsInclude,
                     {
                         model: Topic,
                         as: 'topics',
-                        attributes: ['topicId', 'topicName', 'sequenceNumber']
+                        attributes: ['topicId', 'topicName', 'sequenceNumber'],
+                        required: false
                     }
                 ],
                 limit: parseInt(limit),
@@ -142,7 +181,7 @@ class CourseService {
         }
     }
 
-    // Get courses by instructor ID
+    // Get courses by instructor ID (updated for M:N relationship)
     async getCoursesByInstructor(instructorId, filters = {}, pagination = {}) {
         try {
             // Verify instructor exists
@@ -170,10 +209,8 @@ class CourseService {
 
             const offset = (page - 1) * limit;
 
-            // Build where clause
-            const where = {
-                instructorId: instructorId
-            };
+            // Build where clause for Course table
+            const where = {};
             if (semester) where.semester = semester;
             if (academicYear) where.academicYear = academicYear;
             // Default to active courses only if not specified
@@ -196,13 +233,17 @@ class CourseService {
                 include: [
                     {
                         model: User,
-                        as: 'instructor',
-                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email']
+                        as: 'instructors',
+                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
+                        through: { attributes: ['role', 'assignedAt'] },
+                        where: { userId: instructorId }, // Filter by instructor ID in M:N
+                        required: true
                     },
                     {
                         model: Topic,
                         as: 'topics',
-                        attributes: ['topicId', 'topicName', 'sequenceNumber']
+                        attributes: ['topicId', 'topicName', 'sequenceNumber'],
+                        required: false
                     },
                     {
                         model: Enrollment,
@@ -253,14 +294,15 @@ class CourseService {
         }
     }
 
-    // Get course by ID
+    // Get course by ID (updated for M:N instructors)
     async getCourseById(courseId, includeStats = false, isStudent = false) {
         try {
             const includeOptions = [
                 {
                     model: User,
-                    as: 'instructor',
-                    attributes: ['userId', 'username', 'firstName', 'lastName', 'email']
+                    as: 'instructors',
+                    attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
+                    through: { attributes: ['role', 'assignedAt'] }
                 },
                 {
                     model: Topic,
@@ -313,7 +355,7 @@ class CourseService {
                 startDate: course.startDate,
                 endDate: course.endDate,
                 isActive: course.isActive,
-                instructor: course.instructor,
+                instructors: course.instructors, // Changed from instructor to instructors
                 topics: course.topics,
                 createdAt: course.createdAt,
                 updatedAt: course.updatedAt
@@ -343,38 +385,58 @@ class CourseService {
 
     // Update course
     async updateCourse(courseId, courseData, userId) {
+        const transaction = await db.sequelize.transaction();
+
         try {
-            const course = await Course.findByPk(courseId);
+            const course = await Course.findByPk(courseId, { transaction });
 
             if (!course) {
+                await transaction.rollback();
                 return {
                     success: false,
                     message: 'Course not found'
                 };
             }
 
-            // Check if user is the instructor
-            if (course.instructorId !== userId) {
+            // Check if user is an instructor of this course
+            const isInstructor = await CourseInstructor.findOne({
+                where: { courseId, instructorId: userId },
+                transaction
+            });
+
+            if (!isInstructor) {
+                await transaction.rollback();
                 return {
                     success: false,
                     message: 'You do not have permission to update this course'
                 };
             }
 
-            const { courseCode, courseName, description, semester, academicYear, startDate, endDate, isActive } = courseData;
+            const {
+                courseCode,
+                courseName,
+                description,
+                semester,
+                academicYear,
+                startDate,
+                endDate,
+                isActive,
+                instructorIds // Array of instructor IDs to update
+            } = courseData;
 
             // If updating course code, check for duplicates
             if (courseCode && courseCode !== course.courseCode) {
                 const existingCourse = await Course.findOne({
                     where: {
                         courseCode,
-                        instructorId: userId,
                         courseId: { [db.Sequelize.Op.ne]: courseId },
                         isActive: true
-                    }
+                    },
+                    transaction
                 });
 
                 if (existingCourse) {
+                    await transaction.rollback();
                     return {
                         success: false,
                         message: 'Course code already exists'
@@ -382,6 +444,7 @@ class CourseService {
                 }
             }
 
+            // Update course basic info
             await course.update({
                 courseCode: courseCode || course.courseCode,
                 courseName: courseName || course.courseName,
@@ -391,25 +454,49 @@ class CourseService {
                 startDate: startDate || course.startDate,
                 endDate: endDate || course.endDate,
                 isActive: isActive !== undefined ? isActive : course.isActive
+            }, { transaction });
+
+            // Update instructors if instructorIds provided
+            if (instructorIds && Array.isArray(instructorIds)) {
+                // Remove existing instructor assignments
+                await CourseInstructor.destroy({
+                    where: { courseId },
+                    transaction
+                });
+
+                // Add new instructor assignments
+                if (instructorIds.length > 0) {
+                    const assignments = instructorIds.map((instructorId) => ({
+                        courseId: course.courseId,
+                        instructorId,
+                        assignedBy: userId
+                    }));
+
+                    await CourseInstructor.bulkCreate(assignments, { transaction });
+                }
+            }
+
+            await transaction.commit();
+
+            // Fetch updated course with instructors
+            const updatedCourse = await Course.findByPk(courseId, {
+                include: [
+                    {
+                        model: User,
+                        as: 'instructors',
+                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
+                        through: { attributes: ['assignedAt'] }
+                    }
+                ]
             });
 
             return {
                 success: true,
                 message: 'Course updated successfully',
-                course: {
-                    courseId: course.courseId,
-                    courseCode: course.courseCode,
-                    courseName: course.courseName,
-                    description: course.description,
-                    semester: course.semester,
-                    academicYear: course.academicYear,
-                    startDate: course.startDate,
-                    endDate: course.endDate,
-                    isActive: course.isActive,
-                    updatedAt: course.updatedAt
-                }
+                course: updatedCourse
             };
         } catch (error) {
+            await transaction.rollback();
             console.error('Update course error:', error);
             return {
                 success: false,
@@ -431,8 +518,12 @@ class CourseService {
                 };
             }
 
-            // Check if user is the instructor
-            if (course.instructorId !== userId) {
+            // Check if user is an instructor of this course
+            const isInstructor = await CourseInstructor.findOne({
+                where: { courseId, instructorId: userId }
+            });
+
+            if (!isInstructor) {
                 return {
                     success: false,
                     message: 'You do not have permission to delete this course'
@@ -483,8 +574,12 @@ class CourseService {
                 };
             }
 
-            // Check if user is the instructor
-            if (course.instructorId !== userId) {
+            // Check if user is an instructor of this course
+            const isInstructor = await CourseInstructor.findOne({
+                where: { courseId, instructorId: userId }
+            });
+
+            if (!isInstructor) {
                 return {
                     success: false,
                     message: 'You do not have permission to create topics for this course'
@@ -611,12 +706,13 @@ class CourseService {
                     {
                         model: Course,
                         as: 'course',
-                        attributes: ['courseId', 'courseCode', 'courseName', 'instructorId'],
+                        attributes: ['courseId', 'courseCode', 'courseName'],
                         include: [
                             {
                                 model: User,
-                                as: 'instructor',
-                                attributes: ['userId', 'username', 'firstName', 'lastName']
+                                as: 'instructors',
+                                attributes: ['userId', 'username', 'firstName', 'lastName'],
+                                through: { attributes: [] }
                             }
                         ]
                     },
@@ -682,8 +778,12 @@ class CourseService {
                 };
             }
 
-            // Check if user is the course instructor
-            if (topic.course.instructorId !== userId) {
+            // Check if user is an instructor of this course
+            const isInstructor = await CourseInstructor.findOne({
+                where: { courseId: topic.courseId, instructorId: userId }
+            });
+
+            if (!isInstructor) {
                 return {
                     success: false,
                     message: 'You do not have permission to update this topic'
@@ -795,6 +895,240 @@ class CourseService {
             return {
                 success: false,
                 message: 'Failed to delete topic',
+                error: error.message
+            };
+        }
+    }
+
+    // ============================================================================
+    // Course Instructor Management Methods (NEW)
+    // ============================================================================
+
+    /**
+     * Add instructor to course
+     * @param {number} courseId - Course ID
+     * @param {number} instructorId - Instructor user ID
+     * @param {number} assignedBy - User ID who assigned the instructor
+     * @returns {Promise<object>} - Result object
+     */
+    async addCourseInstructor(courseId, instructorId, assignedBy) {
+        try {
+            // Check if course exists
+            const course = await Course.findByPk(courseId);
+            if (!course) {
+                return {
+                    success: false,
+                    message: 'Course not found'
+                };
+            }
+
+            // Check if instructor user exists
+            const instructor = await User.findByPk(instructorId);
+            if (!instructor) {
+                return {
+                    success: false,
+                    message: 'Instructor not found'
+                };
+            }
+
+            // Check if already assigned
+            const existing = await CourseInstructor.findOne({
+                where: { courseId, instructorId }
+            });
+
+            if (existing) {
+                return {
+                    success: false,
+                    message: 'Instructor already assigned to this course'
+                };
+            }
+
+            // Create assignment
+            await CourseInstructor.create({
+                courseId,
+                instructorId,
+                assignedBy
+            });
+
+            return {
+                success: true,
+                message: 'Instructor assigned to course successfully'
+            };
+        } catch (error) {
+            console.error('Add course instructor error:', error);
+            return {
+                success: false,
+                message: 'Failed to assign instructor to course',
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Remove instructor from course
+     * @param {number} courseId - Course ID
+     * @param {number} instructorId - Instructor user ID
+     * @returns {Promise<object>} - Result object
+     */
+    async removeCourseInstructor(courseId, instructorId) {
+        try {
+            const assignment = await CourseInstructor.findOne({
+                where: { courseId, instructorId }
+            });
+
+            if (!assignment) {
+                return {
+                    success: false,
+                    message: 'Instructor not assigned to this course'
+                };
+            }
+
+            await assignment.destroy();
+
+            return {
+                success: true,
+                message: 'Instructor removed from course successfully'
+            };
+        } catch (error) {
+            console.error('Remove course instructor error:', error);
+            return {
+                success: false,
+                message: 'Failed to remove instructor from course',
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Get all instructors for a course
+     * @param {number} courseId - Course ID
+     * @returns {Promise<object>} - Result with instructors list
+     */
+    async getCourseInstructors(courseId) {
+        try {
+            const course = await Course.findByPk(courseId, {
+                include: [
+                    {
+                        model: User,
+                        as: 'instructors',
+                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
+                        through: {
+                            attributes: ['assignedAt']
+                        }
+                    }
+                ]
+            });
+
+            if (!course) {
+                return {
+                    success: false,
+                    message: 'Course not found'
+                };
+            }
+
+            return {
+                success: true,
+                data: course.instructors
+            };
+        } catch (error) {
+            console.error('Get course instructors error:', error);
+            return {
+                success: false,
+                message: 'Failed to get course instructors',
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Get available instructors for a course (same major)
+     * @param {number} courseId - Course ID
+     * @param {object} filters - Filter options { search }
+     * @returns {Promise<object>} - Result with instructors list
+     */
+    async getAvailableInstructors(courseId, filters = {}) {
+        try {
+            // Get course to find its major
+            const course = await Course.findByPk(courseId);
+            if (!course) {
+                return {
+                    success: false,
+                    message: 'Course not found'
+                };
+            }
+
+            const { search } = filters;
+
+            // Build where clause for instructors
+            const where = {
+                isActive: true
+            };
+
+            // Filter by course major if exists
+            if (course.majorCode) {
+                where.studyMajor = { [db.Sequelize.Op.like]: `%${course.majorCode}%` };
+            }
+
+            // Search filter
+            if (search) {
+                where[db.Sequelize.Op.or] = [
+                    { username: { [db.Sequelize.Op.like]: `%${search}%` } },
+                    { firstName: { [db.Sequelize.Op.like]: `%${search}%` } },
+                    { lastName: { [db.Sequelize.Op.like]: `%${search}%` } },
+                    { email: { [db.Sequelize.Op.like]: `%${search}%` } }
+                ];
+            }
+
+            // Get instructors with Instructor role
+            const instructors = await User.findAll({
+                where,
+                attributes: ['userId', 'username', 'firstName', 'lastName', 'email', 'studyMajor'],
+                include: [{
+                    association: 'userRoles',
+                    include: [{
+                        association: 'role',
+                        where: { roleName: 'Instructor' }
+                    }]
+                }],
+                order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+            });
+
+            // Get already assigned instructors
+            const assignedInstructors = await CourseInstructor.findAll({
+                where: { courseId },
+                attributes: ['instructorId']
+            });
+
+            const assignedIds = assignedInstructors.map(ci => ci.instructorId);
+
+            // Filter out already assigned instructors (only show available ones)
+            const availableInstructors = instructors.filter(instructor =>
+                !assignedIds.includes(instructor.userId)
+            );
+
+            const instructorsList = availableInstructors.map(instructor => ({
+                userId: instructor.userId,
+                username: instructor.username,
+                firstName: instructor.firstName,
+                lastName: instructor.lastName,
+                email: instructor.email,
+                studyMajor: instructor.studyMajor
+            }));
+
+            return {
+                success: true,
+                data: instructorsList,
+                count: instructorsList.length,
+                courseMajor: course.majorCode,
+                totalInstructors: instructors.length,
+                alreadyAssigned: assignedIds.length
+            };
+
+        } catch (error) {
+            console.error('Get available instructors error:', error);
+            return {
+                success: false,
+                message: 'Failed to get available instructors',
                 error: error.message
             };
         }

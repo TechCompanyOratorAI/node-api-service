@@ -5,7 +5,15 @@ module.exports = (sequelize, DataTypes) => {
   class User extends Model {
     static associate(models) {
       User.hasMany(models.UserRole, { foreignKey: 'userId', as: 'userRoles' });
-      User.hasMany(models.Course, { foreignKey: 'instructorId', as: 'instructedCourses' });
+
+      // Multi-instructor support via course_instructors M:N table
+      User.belongsToMany(models.Course, {
+        through: models.CourseInstructor,
+        foreignKey: 'instructorId',
+        otherKey: 'courseId',
+        as: 'instructedCourses'
+      });
+
       User.hasMany(models.Enrollment, { foreignKey: 'studentId', as: 'enrollments' });
       User.hasMany(models.TopicEnrollment, { foreignKey: 'studentId', as: 'topicEnrollments' });
       User.hasMany(models.Presentation, { foreignKey: 'studentId', as: 'presentations' });

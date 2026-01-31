@@ -6,6 +6,7 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       Presentation.belongsTo(models.User, { foreignKey: 'studentId', as: 'student' });
       Presentation.belongsTo(models.Course, { foreignKey: 'courseId', as: 'course' });
+      Presentation.belongsTo(models.Class, { foreignKey: 'classId', as: 'class' });
       Presentation.belongsTo(models.Topic, { foreignKey: 'topicId', as: 'topic' });
 
       Presentation.hasOne(models.AudioRecord, { foreignKey: 'presentationId', as: 'audioRecord' });
@@ -28,6 +29,7 @@ module.exports = (sequelize, DataTypes) => {
 
       studentId: { type: DataTypes.INTEGER, allowNull: false },
       courseId: { type: DataTypes.INTEGER, allowNull: false },
+      classId: { type: DataTypes.INTEGER, allowNull: true },
       topicId: { type: DataTypes.INTEGER, allowNull: false },
       groupCode: {
         type: DataTypes.STRING(50),

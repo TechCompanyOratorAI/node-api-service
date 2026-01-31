@@ -66,8 +66,8 @@ class AuthService {
       const emailVerificationToken = this.generateRandomToken();
       const emailVerificationExpires = new Date(
         Date.now() +
-          (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
-            24 * 60 * 60 * 1000) // 24 hours default
+        (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
+          24 * 60 * 60 * 1000) // 24 hours default
       );
 
       // Create user
@@ -132,7 +132,7 @@ class AuthService {
   // Register instructor
   async registerInstructor(userData) {
     try {
-      const { username, email, password, firstName, lastName } = userData;
+      const { username, email, password, firstName, lastName, studyMajor } = userData;
 
       // Check if user already exists
       const existingUser = await User.findOne({
@@ -158,8 +158,8 @@ class AuthService {
       const emailVerificationToken = this.generateRandomToken();
       const emailVerificationExpires = new Date(
         Date.now() +
-          (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
-            24 * 60 * 60 * 1000) // 24 hours default
+        (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
+          24 * 60 * 60 * 1000) // 24 hours default
       );
 
       // Create user
@@ -168,6 +168,7 @@ class AuthService {
         email,
         firstName,
         lastName,
+        studyMajor,
         passwordHash,
         emailVerificationToken,
         emailVerificationExpires,
@@ -397,8 +398,8 @@ class AuthService {
       const emailVerificationToken = this.generateRandomToken();
       const emailVerificationExpires = new Date(
         Date.now() +
-          (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
-            24 * 60 * 60 * 1000) // 24 hours default
+        (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
+          24 * 60 * 60 * 1000) // 24 hours default
       );
 
       await User.update(
@@ -449,7 +450,7 @@ class AuthService {
       const passwordResetToken = this.generateRandomToken();
       const passwordResetExpires = new Date(
         Date.now() +
-          (parseInt(process.env.PASSWORD_RESET_EXPIRES) || 60 * 60 * 1000) // 1 hour default
+        (parseInt(process.env.PASSWORD_RESET_EXPIRES) || 60 * 60 * 1000) // 1 hour default
       );
 
       await User.update(

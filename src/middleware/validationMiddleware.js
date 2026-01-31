@@ -1,4 +1,4 @@
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 
 // Registration validation
 export const validateRegistration = [
@@ -12,7 +12,7 @@ export const validateRegistration = [
     .isEmail()
     .withMessage("Please provide a valid email address")
     .normalizeEmail(),
-  
+
   body("password")
     .isLength({ min: 8 })
     .withMessage("Password must be at least 8 characters long")
@@ -28,7 +28,7 @@ export const validateRegistration = [
     .isLength({ max: 100 })
     .withMessage("First name must be less than 100 characters")
     .trim(),
-  
+
   body("lastName")
     .optional()
     .isLength({ max: 100 })
@@ -71,6 +71,12 @@ export const validateInstructorRegistration = [
     .withMessage("Last name is required")
     .isLength({ max: 100 })
     .withMessage("Last name must be less than 100 characters")
+    .trim(),
+
+  body("studyMajor")
+    .optional()
+    .isLength({ min: 2, max: 255 })
+    .withMessage("Study major must be between 2 and 255 characters")
     .trim(),
 ];
 
@@ -146,6 +152,13 @@ export const validateCourse = [
     .isLength({ min: 3, max: 200 })
     .withMessage('Course name must be between 3 and 200 characters')
     .trim(),
+
+  body('majorCode')
+    .optional()
+    .isLength({ min: 2, max: 20 })
+    .withMessage('Major code must be between 2 and 20 characters')
+    .trim()
+    .toUpperCase(),
 
   body('description')
     .optional()
@@ -343,6 +356,184 @@ export const validatePresentationUpdate = [
     .trim()
 ];
 
+// ============================================================================
+// Class & Enrollment Validation (NEW)
+// ============================================================================
+
+// Class creation validation
+export const validateCreateClass = [
+  param('courseId')
+    .isInt({ min: 1 })
+    .withMessage('ID khóa học phải là số nguyên hợp lệ'),
+
+  body('classCode')
+    .trim()
+    .notEmpty()
+    .withMessage('Mã lớp học là bắt buộc')
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Mã lớp học phải từ 1 đến 50 ký tự')
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Mã lớp học chỉ được chứa chữ cái, số, gạch ngang và gạch dưới'),
+
+  body('className')
+    .trim()
+    .notEmpty()
+    .withMessage('Tên lớp học là bắt buộc')
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Tên lớp học phải từ 1 đến 200 ký tự'),
+
+  body('description')
+    .optional()
+    .isLength({ max: 5000 })
+    .withMessage('Mô tả không được vượt quá 5000 ký tự')
+    .trim(),
+
+  body('startDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Ngày bắt đầu phải là định dạng ngày hợp lệ'),
+
+  body('endDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Ngày kết thúc phải là định dạng ngày hợp lệ')
+    .custom((value, { req }) => {
+      if (req.body.startDate && value) {
+        const start = new Date(req.body.startDate);
+        const end = new Date(value);
+        if (end <= start) {
+          throw new Error('Ngày kết thúc phải sau ngày bắt đầu');
+        }
+      }
+      return true;
+    }),
+
+  body('maxStudents')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Số lượng sinh viên tối đa phải là số nguyên dương'),
+
+  body('status')
+    .optional()
+    .isIn(['active', 'closed', 'archived'])
+    .withMessage('Trạng thái phải là: active, closed hoặc archived')
+];
+
+// Class update validation
+export const validateUpdateClass = [
+  body('classCode')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Mã lớp học phải từ 1 đến 50 ký tự')
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Mã lớp học chỉ được chứa chữ cái, số, gạch ngang và gạch dưới'),
+
+  body('className')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Tên lớp học phải từ 1 đến 200 ký tự'),
+
+  body('description')
+    .optional()
+    .isLength({ max: 5000 })
+    .withMessage('Mô tả không được vượt quá 5000 ký tự')
+    .trim(),
+
+  body('startDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Ngày bắt đầu phải là định dạng ngày hợp lệ'),
+
+  body('endDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Ngày kết thúc phải là định dạng ngày hợp lệ'),
+
+  body('maxStudents')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Số lượng sinh viên tối đa phải là số nguyên dương'),
+
+  body('status')
+    .optional()
+    .isIn(['active', 'closed', 'archived'])
+    .withMessage('Trạng thái phải là: active, closed hoặc archived')
+];
+
+// Enrollment key creation validation
+export const validateCreateKey = [
+  body('enrollKey')
+    .notEmpty()
+    .withMessage('Mã tham gia là bắt buộc')
+    .matches(/^[A-Z]{2}[0-9]{4}$/)
+    .withMessage('Mã tham gia phải có định dạng: 2 chữ cái in hoa + 4 số (ví dụ: AB1234)'),
+
+  body('expiresAt')
+    .optional()
+    .isISO8601()
+    .withMessage('Ngày hết hạn phải là định dạng ngày hợp lệ')
+    .custom((value) => {
+      if (value) {
+        const expiry = new Date(value);
+        const now = new Date();
+        if (expiry <= now) {
+          throw new Error('Ngày hết hạn phải sau thời điểm hiện tại');
+        }
+      }
+      return true;
+    }),
+
+  body('maxUses')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Số lần sử dụng tối đa phải là số nguyên dương')
+    .matches(/^[A-Z0-9_-]+$/i)
+    .withMessage('Mã tùy chỉnh chỉ được chứa chữ cái, số, gạch ngang và gạch dưới'),
+
+  body('description')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Mô tả không được vượt quá 500 ký tự')
+    .trim()
+];
+
+// Student join class validation
+export const validateJoinClass = [
+  body('enrollKey')
+    .trim()
+    .notEmpty()
+    .withMessage('Mã tham gia lớp học là bắt buộc')
+    .matches(/^[A-Z]{2}[0-9]{4}$/)
+    .withMessage('Mã tham gia phải có định dạng: 2 chữ cái in hoa + 4 số (ví dụ: AB1234)')
+];
+
+// Assign instructor validation
+export const validateAssignInstructor = [
+  body('instructorId')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('ID giảng viên phải là số nguyên hợp lệ'),
+  body('instructorIds')
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage('Danh sách ID giảng viên phải là mảng và có ít nhất 1 phần tử'),
+  body('instructorIds.*')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Mỗi ID giảng viên phải là số nguyên hợp lệ'),
+  body().custom((value) => {
+    if (!value.instructorId && !value.instructorIds) {
+      throw new Error('Phải cung cấp instructorId hoặc instructorIds');
+    }
+    if (value.instructorId && value.instructorIds) {
+      throw new Error('Chỉ cung cấp instructorId hoặc instructorIds, không cả hai');
+    }
+    return true;
+  })
+];
+
 export default {
   validateRegistration,
   validateInstructorRegistration,
@@ -355,6 +546,11 @@ export default {
   validateTopic,
   validateTopicUpdate,
   validatePresentationCreate,
-  validatePresentationUpdate
+  validatePresentationUpdate,
+  validateCreateClass,
+  validateUpdateClass,
+  validateCreateKey,
+  validateJoinClass,
+  validateAssignInstructor
 };
 
