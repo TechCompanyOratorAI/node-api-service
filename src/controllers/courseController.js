@@ -69,7 +69,7 @@ class CourseController {
     async getMyCourses(req, res) {
         try {
             const instructorId = req.user.userId;
-            
+
             const filters = {
                 semester: req.query.semester,
                 academicYear: req.query.academicYear,
@@ -293,6 +293,148 @@ class CourseController {
             }
         } catch (error) {
             console.error('Delete topic controller error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    // ============================================================================
+    // Course Instructor Management
+    // ============================================================================
+
+    // Add instructor(s) to course
+    async addCourseInstructor(req, res) {
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Validation failed',
+                    errors: errors.array()
+                });
+            }
+
+            const { courseId } = req.params;
+            const { instructorId, instructorIds } = req.body;
+            const assignedBy = req.user.userId;
+
+            // Handle single instructor
+            if (instructorId) {
+                const result = await courseService.addCourseInstructor(
+                    parseInt(courseId),
+                    instructorId,
+                    assignedBy
+                );
+
+                if (result.success) {
+                    return res.status(201).json(result);
+                } else {
+                    return res.status(400).json(result);
+                }
+            }
+
+            // Handle multiple instructors
+            if (instructorIds && Array.isArray(instructorIds)) {
+                const results = [];
+                const errors = [];
+
+                for (const instrId of instructorIds) {
+                    const result = await courseService.addCourseInstructor(
+                        parseInt(courseId),
+                        instrId,
+                        assignedBy
+                    );
+
+                    if (result.success) {
+                        results.push({ instructorId: instrId, ...result });
+                    } else {
+                        errors.push({ instructorId: instrId, error: result.message });
+                    }
+                }
+
+                return res.status(201).json({
+                    success: true,
+                    message: `Đã thêm ${results.length}/${instructorIds.length} giảng viên`,
+                    added: results,
+                    failed: errors
+                });
+            }
+        } catch (error) {
+            console.error('Add course instructor controller error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    // Remove instructor from course
+    async removeCourseInstructor(req, res) {
+        try {
+            const { courseId, instructorId } = req.params;
+
+            const result = await courseService.removeCourseInstructor(
+                parseInt(courseId),
+                parseInt(instructorId)
+            );
+
+            if (result.success) {
+                return res.status(200).json(result);
+            } else {
+                return res.status(400).json(result);
+            }
+        } catch (error) {
+            console.error('Remove course instructor controller error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    // Get course instructors
+    async getCourseInstructors(req, res) {
+        try {
+            const { courseId } = req.params;
+
+            const result = await courseService.getCourseInstructors(parseInt(courseId));
+
+            if (result.success) {
+                return res.status(200).json(result);
+            } else {
+                return res.status(404).json(result);
+            }
+        } catch (error) {
+            console.error('Get course instructors controller error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    // Get available instructors for course (same major)
+    async getAvailableInstructors(req, res) {
+        try {
+            const { courseId } = req.params;
+            const filters = {
+                search: req.query.search
+            };
+
+            const result = await courseService.getAvailableInstructors(
+                parseInt(courseId),
+                filters
+            );
+
+            if (result.success) {
+                return res.status(200).json(result);
+            } else {
+                return res.status(404).json(result);
+            }
+        } catch (error) {
+            console.error('Get available instructors controller error:', error);
             return res.status(500).json({
                 success: false,
                 message: 'Internal server error'

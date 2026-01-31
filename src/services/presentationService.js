@@ -18,7 +18,9 @@ const {
   Feedback,
   AnalysisResult,
   User,
-  Course
+  Course,
+  Class,
+  Enrollment
 } = db;
 
 const sanitizeFileName = (filename) => {
@@ -83,24 +85,65 @@ const detectPageCount = async (fileBuffer, mimeType) => {
 };
 
 class PresentationService {
-  async createPresentation({ topicId, studentId, title, description, groupCode }) {
+  async createPresentation({ classId, topicId, studentId, title, description, groupCode }) {
     try {
-      const topic = await Topic.findByPk(topicId);
+      // Step 1: Validate classId is provided
+      if (!classId) {
+        return { success: false, message: 'Class ID is required' };
+      }
+
+      // Step 2: Validate class exists and get class data
+      const classData = await Class.findByPk(classId, {
+        include: [{ model: Course, as: 'course' }]
+      });
+
+      if (!classData) {
+        return { success: false, message: 'Class not found' };
+      }
+
+      // Step 3: Validate student is enrolled in the class
+      const classEnrollment = await Enrollment.findOne({
+        where: {
+          studentId,
+          classId,
+          status: 'enrolled'
+        }
+      });
+
+      if (!classEnrollment) {
+        return { success: false, message: 'You are not enrolled in this class' };
+      }
+
+      // Step 4: Validate topic exists and belongs to class's course
+      const topic = await Topic.findByPk(topicId, {
+        include: [{ model: Course, as: 'course' }]
+      });
+
       if (!topic) {
         return { success: false, message: 'Topic not found' };
       }
 
-      const enrollment = await TopicEnrollment.findOne({
+      if (topic.courseId !== classData.courseId) {
+        return {
+          success: false,
+          message: 'Topic does not belong to this class\'s course'
+        };
+      }
+
+      // Step 5: Check topic enrollment (if using topic-based enrollment)
+      const topicEnrollment = await TopicEnrollment.findOne({
         where: { topicId, studentId, status: 'enrolled' }
       });
 
-      if (!enrollment) {
+      if (!topicEnrollment) {
         return { success: false, message: 'You are not enrolled in this topic' };
       }
 
+      // Step 6: Create presentation with classId
       const presentation = await Presentation.create({
         studentId,
-        courseId: topic.courseId,
+        classId,
+        courseId: classData.courseId,
         topicId,
         title,
         description,
@@ -861,6 +904,116 @@ class PresentationService {
     } catch (error) {
       console.error('Get presentations by course error:', error);
       return { success: false, message: 'Failed to get presentations', error: error.message };
+    }
+  }
+
+  /**
+   * Get presentations for instructor (filtered by assigned classes)
+   * @param {number} instructorId - Instructor user ID
+   * @param {object} filters - Filter options (status, classId, courseId, search)
+   * @param {object} pagination - Pagination options
+   * @returns {Promise<object>} - Result with presentations
+   */
+  async getPresentationsByInstructor(instructorId, filters = {}, pagination = {}) {
+    try {
+      const { ClassInstructor } = db;
+
+      // Step 1: Get instructor's assigned classes
+      const instructorClasses = await ClassInstructor.findAll({
+        where: { instructorId },
+        attributes: ['classId']
+      });
+
+      if (instructorClasses.length === 0) {
+        return {
+          success: true,
+          data: [],
+          pagination: {
+            total: 0,
+            page: parseInt(pagination.page || 1),
+            limit: parseInt(pagination.limit || 20),
+            totalPages: 0
+          }
+        };
+      }
+
+      const classIds = instructorClasses.map(ci => ci.classId);
+
+      // Step 2: Build where clause
+      const where = {
+        classId: { [db.Sequelize.Op.in]: classIds }
+      };
+
+      // Apply filters
+      if (filters.status) {
+        where.status = filters.status;
+      }
+      if (filters.classId) {
+        where.classId = parseInt(filters.classId);
+      }
+      if (filters.courseId) {
+        where.courseId = parseInt(filters.courseId);
+      }
+      if (filters.search) {
+        where[db.Sequelize.Op.or] = [
+          { title: { [db.Sequelize.Op.like]: `%${filters.search}%` } },
+          { description: { [db.Sequelize.Op.like]: `%${filters.search}%` } }
+        ];
+      }
+
+      // Pagination
+      const page = parseInt(pagination.page || 1);
+      const limit = parseInt(pagination.limit || 20);
+      const offset = (page - 1) * limit;
+
+      // Step 3: Query presentations
+      const { count, rows: presentations } = await Presentation.findAndCountAll({
+        where,
+        limit,
+        offset,
+        order: [['submittedAt', 'DESC'], ['createdAt', 'DESC']],
+        include: [
+          {
+            model: Class,
+            as: 'class',
+            attributes: ['classId', 'classCode', 'className']
+          },
+          {
+            model: Course,
+            as: 'course',
+            attributes: ['courseId', 'courseCode', 'courseName']
+          },
+          {
+            model: Topic,
+            as: 'topic',
+            attributes: ['topicId', 'topicName', 'sequenceNumber']
+          },
+          {
+            model: User,
+            as: 'student',
+            attributes: ['userId', 'username', 'firstName', 'lastName', 'email']
+          }
+        ],
+        distinct: true
+      });
+
+      return {
+        success: true,
+        data: presentations,
+        pagination: {
+          total: count,
+          page,
+          limit,
+          totalPages: Math.ceil(count / limit)
+        }
+      };
+    } catch (error) {
+      console.error('Get presentations by instructor error:', error);
+      return {
+        success: false,
+        message: 'Failed to get presentations for instructor',
+        error: error.message
+      };
     }
   }
 }

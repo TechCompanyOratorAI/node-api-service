@@ -1,21 +1,56 @@
 import express from 'express';
 import enrollmentController from '../controllers/enrollmentController.js';
 import { authenticateToken, requireEmailVerification, requireRole } from '../middleware/authMiddleware.js';
+import { validateJoinClass } from '../middleware/validationMiddleware.js';
 
 const router = express.Router();
 
+// Apply authentication and email verification to all routes
 router.use(authenticateToken);
 router.use(requireEmailVerification);
-router.use(requireRole(['Student']));
 
-// Course enrollments
-router.post('/courses/:courseId', enrollmentController.enrollCourse);
-router.delete('/courses/:courseId', enrollmentController.dropCourse);
-router.get('/courses', enrollmentController.listMyCourses);
+router.post(
+    '/join',
+    requireRole(['Student']),
+    validateJoinClass,
+    enrollmentController.joinClass
+);
 
-// Topic enrollments
-router.post('/topics/:topicId', enrollmentController.enrollTopic);
-router.delete('/topics/:topicId', enrollmentController.dropTopic);
-router.get('/topics', enrollmentController.listMyTopics);
+router.get(
+    '/me/classes',
+    requireRole(['Student']),
+    enrollmentController.getMyClasses
+);
+
+router.delete(
+    '/classes/:classId/leave',
+    requireRole(['Student']),
+    enrollmentController.leaveClass
+);
+
+router.get(
+    '/classes/:classId/students',
+    requireRole(['Admin', 'Instructor']),
+    enrollmentController.getClassStudents
+);
+
+router.post(
+    '/topics/:topicId',
+    requireRole(['Student']),
+    enrollmentController.enrollTopic
+);
+
+router.delete(
+    '/topics/:topicId',
+    requireRole(['Student']),
+    enrollmentController.dropTopic
+);
+
+router.get(
+    '/me/topics',
+    requireRole(['Student']),
+    enrollmentController.listMyTopics
+);
 
 export default router;
+

@@ -3,9 +3,9 @@ require("dotenv").config();
 import express from "express";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
-import viewEngine from "./config/viewEngine";
-import initWebRoutes from "./route/web";
-import connectDB from "./config/conectDB";
+import viewEngine from "./config/viewEngine.js";
+import initWebRoutes from "./route/web.js";
+import connectDB from "./config/conectDB.js";
 import cors from "cors";
 
 let app = express();

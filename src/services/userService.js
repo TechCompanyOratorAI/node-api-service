@@ -7,11 +7,11 @@ import fs from 'fs';
 const { User } = db;
 
 const AVATAR_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/gif',
-  'image/webp'
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp'
 ]);
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
@@ -199,6 +199,62 @@ class UserService {
             return {
                 success: false,
                 message: 'Có lỗi xảy ra khi xóa người dùng'
+            };
+        }
+    }
+
+    /**
+     * Get instructors filtered by major (for course assignment)
+     * @param {object} filters - Filter options { major, search }
+     * @returns {Promise<object>} - Result with instructors list
+     */
+    async getInstructorsByMajor(filters = {}) {
+        try {
+            const { major, search } = filters;
+
+            // Build where clause
+            const where = {
+                isActive: true
+            };
+
+            if (major) {
+                where.studyMajor = { [db.Sequelize.Op.like]: `%${major}%` };
+            }
+
+            if (search) {
+                where[db.Sequelize.Op.or] = [
+                    { username: { [db.Sequelize.Op.like]: `%${search}%` } },
+                    { firstName: { [db.Sequelize.Op.like]: `%${search}%` } },
+                    { lastName: { [db.Sequelize.Op.like]: `%${search}%` } },
+                    { email: { [db.Sequelize.Op.like]: `%${search}%` } }
+                ];
+            }
+
+            const instructors = await User.findAll({
+                where,
+                attributes: ['userId', 'username', 'firstName', 'lastName', 'email', 'studyMajor'],
+                include: [{
+                    association: 'userRoles',
+                    include: [{
+                        association: 'role',
+                        where: { roleName: 'Instructor' }
+                    }]
+                }],
+                order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+            });
+
+            return {
+                success: true,
+                data: instructors,
+                count: instructors.length
+            };
+
+        } catch (error) {
+            console.error('Get instructors by major error:', error);
+            return {
+                success: false,
+                message: 'Có lỗi xảy ra khi lấy danh sách giảng viên',
+                error: error.message
             };
         }
     }

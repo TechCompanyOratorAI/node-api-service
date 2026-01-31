@@ -5,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     class Enrollment extends Model {
         static associate(models) {
             Enrollment.belongsTo(models.User, { foreignKey: 'studentId', as: 'student' });
-            Enrollment.belongsTo(models.Course, { foreignKey: 'courseId', as: 'course' });
+            Enrollment.belongsTo(models.Class, { foreignKey: 'classId', as: 'class' });
         }
     }
 
@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
         {
             enrollmentId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
             studentId: { type: DataTypes.INTEGER, allowNull: false },
-            courseId: { type: DataTypes.INTEGER, allowNull: false },
+            classId: { type: DataTypes.INTEGER, allowNull: false },
             enrolledAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
             status: {
                 type: DataTypes.ENUM('enrolled', 'dropped', 'completed'),

@@ -46,13 +46,21 @@ router.delete('/:userId',
   requireRole(['Admin']),
   userController.deleteUser.bind(userController)
 );
-  
+
 // Upload avatar (authenticated user, email verified)
 router.post('/avatar',
   authenticateToken,
   requireEmailVerification,
   uploadAvatar.single('avatar'),
   userController.uploadAvatar.bind(userController)
+);
+
+// Get instructors by major (for course assignment)
+router.get('/instructors/by-major',
+  authenticateToken,
+  requireEmailVerification,
+  requireRole(['Admin']),
+  userController.getInstructorsByMajor.bind(userController)
 );
 
 export default router;
