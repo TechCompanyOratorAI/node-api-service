@@ -21,6 +21,13 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(requireEmailVerification);
 
+// Get all classes (Admin only)
+router.get(
+    '/classes',
+    requireRole(['Admin']),
+    classController.getAllClasses
+);
+
 router.post(
     '/courses/:courseId/classes',
     requireRole(['Admin', 'Instructor']),

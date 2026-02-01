@@ -98,6 +98,62 @@ class ClassService {
     }
 
     /**
+     * Get all classes (Admin only) with pagination and filters
+     */
+    async getAllClasses({ page = 1, limit = 20, search, courseId }) {
+        try {
+            const where = {};
+
+            // Filter by courseId if provided
+            if (courseId) {
+                where.courseId = courseId;
+            }
+
+            // Search by classCode or className
+            if (search) {
+                where[Op.or] = [
+                    { classCode: { [Op.like]: `%${search}%` } },
+                    { className: { [Op.like]: `%${search}%` } }
+                ];
+            }
+
+            const offset = (page - 1) * limit;
+
+            const { count, rows: classes } = await Class.findAndCountAll({
+                where,
+                include: [
+                    { model: Course, as: 'course', attributes: ['courseId', 'courseCode', 'courseName'] },
+                    { model: User, as: 'instructors', through: { attributes: [] }, attributes: ['userId', 'username', 'firstName', 'lastName'] },
+                    { model: Enrollment, as: 'enrollments', attributes: ['enrollmentId'] },
+                    { model: EnrollKey, as: 'enrollKeys', attributes: ['keyId', 'isActive'] }
+                ],
+                limit: parseInt(limit),
+                offset: parseInt(offset),
+                order: [['createdAt', 'DESC']],
+                distinct: true
+            });
+
+            return {
+                success: true,
+                data: classes.map(c => ({
+                    ...c.toJSON(),
+                    enrollmentCount: c.enrollments?.length || 0,
+                    activeKeyCount: c.enrollKeys?.filter(k => k.isActive).length || 0
+                })),
+                pagination: {
+                    total: count,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(count / limit)
+                }
+            };
+        } catch (error) {
+            console.error('Get all classes error:', error);
+            return { success: false, message: 'Không thể lấy danh sách lớp học', error: error.message };
+        }
+    }
+
+    /**
      * Get class by ID
      */
     async getClassById(classId, userId, userRole) {

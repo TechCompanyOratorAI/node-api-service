@@ -32,6 +32,30 @@ class ClassController {
         }
     }
 
+    // Get all classes (Admin only)
+    async getAllClasses(req, res) {
+        try {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 20;
+            const search = req.query.search;
+            const courseId = req.query.courseId ? parseInt(req.query.courseId) : null;
+
+            const result = await classService.getAllClasses({ page, limit, search, courseId });
+
+            if (result.success) {
+                return res.status(200).json(result);
+            } else {
+                return res.status(400).json(result);
+            }
+        } catch (error) {
+            console.error('Get all classes error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Lỗi server nội bộ'
+            });
+        }
+    }
+
     // Get classes by course
     async getClassesByCourse(req, res) {
         try {

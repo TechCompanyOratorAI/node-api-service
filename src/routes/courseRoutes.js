@@ -37,11 +37,13 @@ router.get('/:courseId',
 );
 
 router.patch('/:courseId',
+    requireRole(['Admin']),
     validateCourseUpdate,
     courseController.updateCourse
 );
 
 router.delete('/:courseId',
+    requireRole(['Admin']),
     courseController.deleteCourse
 );
 
