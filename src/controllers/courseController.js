@@ -146,7 +146,9 @@ class CourseController {
             }
 
             const { courseId } = req.params;
-            const result = await courseService.updateCourse(courseId, req.body, req.user.userId);
+            // Get user role (Admin has priority)
+            const userRole = req.userRoles && req.userRoles.includes('Admin') ? 'Admin' : 'Instructor';
+            const result = await courseService.updateCourse(courseId, req.body, req.user.userId, userRole);
 
             if (result.success) {
                 return res.status(200).json(result);
@@ -166,7 +168,9 @@ class CourseController {
     async deleteCourse(req, res) {
         try {
             const { courseId } = req.params;
-            const result = await courseService.deleteCourse(courseId, req.user.userId);
+            // Get user role (Admin has priority)
+            const userRole = req.userRoles && req.userRoles.includes('Admin') ? 'Admin' : 'Instructor';
+            const result = await courseService.deleteCourse(courseId, req.user.userId, userRole);
 
             if (result.success) {
                 return res.status(200).json(result);

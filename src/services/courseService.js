@@ -134,7 +134,7 @@ class CourseService {
                 model: User,
                 as: 'instructors',
                 attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
-                through: { attributes: ['role', 'assignedAt'] },
+                through: { attributes: ['assignedAt', 'assignedBy'] },
                 required: false
             };
 
@@ -235,7 +235,7 @@ class CourseService {
                         model: User,
                         as: 'instructors',
                         attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
-                        through: { attributes: ['role', 'assignedAt'] },
+                        through: { attributes: ['assignedAt', 'assignedBy'] },
                         where: { userId: instructorId }, // Filter by instructor ID in M:N
                         required: true
                     },
@@ -243,12 +243,6 @@ class CourseService {
                         model: Topic,
                         as: 'topics',
                         attributes: ['topicId', 'topicName', 'sequenceNumber'],
-                        required: false
-                    },
-                    {
-                        model: Enrollment,
-                        as: 'enrollments',
-                        attributes: ['enrollmentId', 'studentId'],
                         required: false
                     }
                 ],
@@ -267,16 +261,7 @@ class CourseService {
                     lastName: instructor.lastName,
                     email: instructor.email
                 },
-                data: courses.map(course => {
-                    const courseData = course.toJSON();
-                    // Remove enrollments array and add count instead
-                    const enrollmentCount = courseData.enrollments?.length || 0;
-                    delete courseData.enrollments;
-                    return {
-                        ...courseData,
-                        enrollmentCount
-                    };
-                }),
+                data: courses.map(course => course.toJSON()),
                 pagination: {
                     total: count,
                     page: parseInt(page),
@@ -302,7 +287,7 @@ class CourseService {
                     model: User,
                     as: 'instructors',
                     attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
-                    through: { attributes: ['role', 'assignedAt'] }
+                    through: { attributes: ['assignedAt', 'assignedBy'] }
                 },
                 {
                     model: Topic,
@@ -384,7 +369,7 @@ class CourseService {
     }
 
     // Update course
-    async updateCourse(courseId, courseData, userId) {
+    async updateCourse(courseId, courseData, userId, userRole) {
         const transaction = await db.sequelize.transaction();
 
         try {
@@ -398,18 +383,20 @@ class CourseService {
                 };
             }
 
-            // Check if user is an instructor of this course
-            const isInstructor = await CourseInstructor.findOne({
-                where: { courseId, instructorId: userId },
-                transaction
-            });
+            // Check if user is an instructor of this course (skip for Admin)
+            if (userRole !== 'Admin') {
+                const isInstructor = await CourseInstructor.findOne({
+                    where: { courseId, instructorId: userId },
+                    transaction
+                });
 
-            if (!isInstructor) {
-                await transaction.rollback();
-                return {
-                    success: false,
-                    message: 'You do not have permission to update this course'
-                };
+                if (!isInstructor) {
+                    await transaction.rollback();
+                    return {
+                        success: false,
+                        message: 'You do not have permission to update this course'
+                    };
+                }
             }
 
             const {
@@ -507,7 +494,7 @@ class CourseService {
     }
 
     // Delete course (soft delete)
-    async deleteCourse(courseId, userId) {
+    async deleteCourse(courseId, userId, userRole) {
         try {
             const course = await Course.findByPk(courseId);
 
@@ -518,16 +505,18 @@ class CourseService {
                 };
             }
 
-            // Check if user is an instructor of this course
-            const isInstructor = await CourseInstructor.findOne({
-                where: { courseId, instructorId: userId }
-            });
+            // Check if user is an instructor of this course (skip for Admin)
+            if (userRole !== 'Admin') {
+                const isInstructor = await CourseInstructor.findOne({
+                    where: { courseId, instructorId: userId }
+                });
 
-            if (!isInstructor) {
-                return {
-                    success: false,
-                    message: 'You do not have permission to delete this course'
-                };
+                if (!isInstructor) {
+                    return {
+                        success: false,
+                        message: 'You do not have permission to delete this course'
+                    };
+                }
             }
 
             // Check if course has presentations
