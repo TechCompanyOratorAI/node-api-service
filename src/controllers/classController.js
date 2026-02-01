@@ -16,7 +16,10 @@ class ClassController {
                 });
             }
 
-            const result = await classService.createClass(req.body, req.user.userId);
+            // Get courseId from URL params
+            const { courseId } = req.params;
+            const classData = { ...req.body, courseId: parseInt(courseId) };
+            const result = await classService.createClass(classData, req.user.userId);
 
             if (result.success) {
                 return res.status(201).json(result);
