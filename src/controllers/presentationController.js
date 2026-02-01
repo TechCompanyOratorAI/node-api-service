@@ -13,8 +13,9 @@ class PresentationController {
         });
       }
 
-      const { topicId, title, description, groupCode } = req.body;
+      const { classId, topicId, title, description, groupCode } = req.body;
       const result = await presentationService.createPresentation({
+        classId: parseInt(classId),
         topicId: parseInt(topicId),
         studentId: req.user.userId,
         title,
