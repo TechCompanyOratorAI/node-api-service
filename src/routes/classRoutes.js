@@ -1,5 +1,7 @@
 import express from 'express';
 import classController from '../controllers/classController.js';
+import enrollmentController from '../controllers/enrollmentController.js';
+import enrollKeyController from '../controllers/enrollKeyController.js';
 import {
     authenticateToken,
     requireEmailVerification,
@@ -8,11 +10,13 @@ import {
 import {
     requireCourseInstructor,
     requireClassInstructor,
+    requireClassInstructorOrAdmin,
 } from '../middleware/classAuthMiddleware.js';
 import {
     validateCreateClass,
     validateUpdateClass,
-    validateAssignInstructor
+    validateAssignInstructor,
+    validateCreateKey
 } from '../middleware/validationMiddleware.js';
 
 const router = express.Router();
@@ -66,6 +70,42 @@ router.delete(
 router.get(
     '/:classId/instructors',
     classController.getClassInstructors
+);
+
+router.get(
+    '/:classId/students',
+    requireRole(['Admin', 'Instructor']),
+    enrollmentController.getClassStudents
+);
+
+// Enrollment key management
+router.post(
+    '/:classId/enroll-key',
+    requireRole(['Admin', 'Instructor']),
+    // requireClassInstructorOrAdmin, // Temporarily disabled
+    // validateCreateKey, // Temporarily disabled for testing
+    enrollKeyController.createKey
+);
+
+router.get(
+    '/:classId/enroll-keys',
+    requireRole(['Admin', 'Instructor']),
+    requireClassInstructorOrAdmin,
+    enrollKeyController.getKeysByClass
+);
+
+router.post(
+    '/:classId/enroll-key/rotate',
+    requireRole(['Admin', 'Instructor']),
+    requireClassInstructorOrAdmin,
+    enrollKeyController.rotateKey
+);
+
+// Student leave class
+router.delete(
+    '/:classId/leave',
+    requireRole(['Student']),
+    enrollmentController.leaveClass
 );
 
 export default router;

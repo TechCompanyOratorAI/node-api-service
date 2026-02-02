@@ -22,18 +22,6 @@ router.get(
     enrollmentController.getMyClasses
 );
 
-router.delete(
-    '/classes/:classId/leave',
-    requireRole(['Student']),
-    enrollmentController.leaveClass
-);
-
-router.get(
-    '/classes/:classId/students',
-    requireRole(['Admin', 'Instructor']),
-    enrollmentController.getClassStudents
-);
-
 router.post(
     '/topics/:topicId',
     requireRole(['Student']),

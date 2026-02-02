@@ -463,15 +463,11 @@ export const validateUpdateClass = [
 
 // Enrollment key creation validation
 export const validateCreateKey = [
-  body('classId')
-    .isInt({ min: 1 })
-    .withMessage('classId phải là số nguyên dương'),
-
-  body('enrollKey')
-    .notEmpty()
-    .withMessage('Mã tham gia là bắt buộc')
-    .matches(/^[A-Z]{2}[0-9]{4}$/)
-    .withMessage('Mã tham gia phải có định dạng: 2 chữ cái in hoa + 4 số (ví dụ: AB1234)'),
+  body('customKey')
+    .optional()
+    .isString()
+    .isLength({ min: 6, max: 50 })
+    .withMessage('Mã tham gia tùy chỉnh phải có từ 6-50 ký tự'),
 
   body('expiresAt')
     .optional()
@@ -491,9 +487,7 @@ export const validateCreateKey = [
   body('maxUses')
     .optional()
     .isInt({ min: 1 })
-    .withMessage('Số lần sử dụng tối đa phải là số nguyên dương')
-    .matches(/^[A-Z0-9_-]+$/i)
-    .withMessage('Mã tùy chỉnh chỉ được chứa chữ cái, số, gạch ngang và gạch dưới'),
+    .withMessage('Số lần sử dụng tối đa phải là số nguyên dương'),
 
   body('description')
     .optional()

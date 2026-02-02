@@ -17,7 +17,12 @@ class EnrollKeyService {
      * Authorization: Admin OR instructor assigned to both course AND class
      */
     async createKey(classId, keyData, userId, userRole) {
-        const { expiresAt, maxUses, enrollKey } = keyData;
+        const { expiresAt, maxUses, customKey } = keyData;
+
+        console.log('Service createKey - keyData:', keyData);
+        console.log('Service createKey - customKey:', customKey);
+        console.log('Service createKey - expiresAt:', expiresAt);
+        console.log('Service createKey - maxUses:', maxUses);
 
         try {
             const classData = await Class.findByPk(classId);
@@ -46,13 +51,15 @@ class EnrollKeyService {
                 }
             }
 
-            // Use provided enrollKey
-            const keyValue = enrollKey;
+            // Generate or use custom key
+            const keyValue = customKey || this.generateKey();
 
-            // Check key unique
-            const existing = await EnrollKey.findOne({ where: { keyValue } });
-            if (existing) {
-                return { success: false, message: 'Mã tham gia đã tồn tại, vui lòng chọn mã khác' };
+            // Check key unique (only if keyValue is provided)
+            if (keyValue) {
+                const existing = await EnrollKey.findOne({ where: { keyValue } });
+                if (existing) {
+                    return { success: false, message: 'Mã tham gia đã tồn tại, vui lòng chọn mã khác' };
+                }
             }
 
             // Create key
