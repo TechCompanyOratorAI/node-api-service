@@ -48,6 +48,26 @@ class EnrollmentController {
     }
 
     /**
+     * Get student's enrolled classes with their enroll keys
+     * GET /api/v1/enrollments/me/keys
+     */
+    async getMyEnrollKeys(req, res) {
+        try {
+            const studentId = req.user.userId;
+            const result = await enrollmentService.getMyEnrollKeys(studentId);
+
+            return res.status(result.success ? 200 : 400).json(result);
+        } catch (error) {
+            console.error('Get my enroll keys controller error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Lỗi server nội bộ',
+                error: error.message
+            });
+        }
+    }
+
+    /**
      * Get student's enrolled classes
      * GET /api/v1/me/classes
      */

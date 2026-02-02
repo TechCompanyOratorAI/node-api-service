@@ -164,6 +164,37 @@ class EnrollKeyService {
     }
 
     /**
+     * Get all enrollment keys (Admin only)
+     */
+    async getAllKeys() {
+        try {
+            const keys = await EnrollKey.findAll({
+                include: [
+                    {
+                        model: Class,
+                        as: 'class',
+                        attributes: ['classId', 'classCode', 'className'],
+                        include: [{ model: Course, as: 'course', attributes: ['courseId', 'courseCode', 'courseName'] }]
+                    }
+                ],
+                order: [['createdAt', 'DESC']]
+            });
+
+            return {
+                success: true,
+                data: keys.map(k => ({
+                    ...k.toJSON(),
+                    isValid: k.isValid(),
+                    remainingUses: k.maxUses ? k.maxUses - k.usedCount : null
+                }))
+            };
+        } catch (error) {
+            console.error('Get all keys error:', error);
+            return { success: false, message: 'Không thể lấy danh sách mã đăng ký', error: error.message };
+        }
+    }
+
+    /**
      * Get keys for class
      */
     async getKeysByClass(classId, userId, userRole) {

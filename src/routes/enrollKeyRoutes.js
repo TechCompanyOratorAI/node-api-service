@@ -15,40 +15,53 @@ router.use(authenticateToken);
 router.use(requireEmailVerification);
 
 
+// [POST] /enroll-keys - Create enroll key for class
 router.post(
-    '/classes/:classId/enroll-key',
+    '/',
     requireRole(['Admin', 'Instructor']),
-    requireClassInstructorOrAdmin, // Admin bypasses, Instructor must be assigned to class
+    requireClassInstructorOrAdmin,
     validateCreateKey,
     enrollKeyController.createKey
 );
 
 
+// [GET] /enroll-keys - Get all enroll keys (Admin only)
+router.get(
+    '/',
+    requireRole(['Admin']),
+    enrollKeyController.getAllKeys
+);
+
+
+// [POST] /enroll-keys/:classId/rotate - Rotate enroll key
 router.post(
-    '/classes/:classId/enroll-key/rotate',
+    '/:classId/rotate',
     requireRole(['Admin', 'Instructor']),
     requireClassInstructorOrAdmin,
     enrollKeyController.rotateKey
 );
 
 
+// [DELETE] /enroll-keys/:keyId - Revoke enroll key
 router.delete(
-    '/enroll-keys/:keyId',
+    '/:keyId',
     requireRole(['Admin', 'Instructor']),
     enrollKeyController.revokeKey
 );
 
 
+// [GET] /enroll-keys/:classId - Get all enroll keys for class
 router.get(
-    '/classes/:classId/enroll-keys',
+    '/:classId',
     requireRole(['Admin', 'Instructor']),
     requireClassInstructorOrAdmin,
     enrollKeyController.getKeysByClass
 );
 
 
+// [POST] /enroll-keys/validate - Validate enroll key (Student)
 router.post(
-    '/enroll-keys/validate',
+    '/validate',
     requireRole(['Student']),
     enrollKeyController.validateKey
 );

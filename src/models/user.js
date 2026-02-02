@@ -23,6 +23,14 @@ module.exports = (sequelize, DataTypes) => {
 
       User.hasMany(models.AIConfig, { foreignKey: 'managedBy', as: 'aiConfigs' });
       User.hasMany(models.SystemSetting, { foreignKey: 'updatedBy', as: 'updatedSettings' });
+
+      // Many-to-Many với Group qua bảng trung gian GroupStudent
+      User.belongsToMany(models.Group, {
+        through: models.GroupStudent,
+        foreignKey: 'studentId',
+        otherKey: 'groupId',
+        as: 'groups'
+      });
     }
   }
 
