@@ -19,10 +19,17 @@ class EnrollmentController {
                 });
             }
 
-            const { enrollKey } = req.body;
+            const { enrollKey, classId } = req.body;
             const studentId = req.user.userId;
 
-            const result = await enrollmentService.joinClass(enrollKey, studentId);
+            if (!classId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'classId là bắt buộc'
+                });
+            }
+
+            const result = await enrollmentService.joinClass(enrollKey, studentId, parseInt(classId));
 
             if (result.success) {
                 return res.status(200).json(result);

@@ -498,12 +498,16 @@ export const validateCreateKey = [
 
 // Student join class validation
 export const validateJoinClass = [
+  body('classId')
+    .isInt({ min: 1 })
+    .withMessage('classId phải là số nguyên dương'),
+  
   body('enrollKey')
     .trim()
     .notEmpty()
     .withMessage('Mã tham gia lớp học là bắt buộc')
-    .matches(/^[A-Z]{2}[0-9]{4}$/)
-    .withMessage('Mã tham gia phải có định dạng: 2 chữ cái in hoa + 4 số (ví dụ: AB1234)')
+    .isLength({ min: 6, max: 50 })
+    .withMessage('Mã tham gia phải có từ 6-50 ký tự')
 ];
 
 // Assign instructor validation
