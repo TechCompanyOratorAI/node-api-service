@@ -46,10 +46,10 @@ router.use('/groups', groupRoutes);
 
 // Student quick access routes
 router.get('/me/classes',
-    authenticateToken,
-    requireEmailVerification,
-    requireRole(['Student']),
-    enrollmentController.getMyClasses
+  authenticateToken,
+  requireEmailVerification,
+  requireRole(['Student']),
+  enrollmentController.getMyClasses
 );
 
 // Health check endpoint

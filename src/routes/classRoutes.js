@@ -28,21 +28,6 @@ router.get(
     classController.getAllClasses
 );
 
-router.post(
-    '/courses/:courseId/classes',
-    requireRole(['Admin', 'Instructor']),
-    requireCourseInstructor, // Check instructor is assigned to course
-    validateCreateClass,
-    classController.createClass
-);
-
-
-router.get(
-    '/courses/:courseId/classes',
-    requireRole(['Admin', 'Instructor']),
-    classController.getClassesByCourse
-);
-
 
 router.get(
     '/:classId',
