@@ -23,7 +23,7 @@ router.use(requireEmailVerification);
 
 // Get all classes (Admin only)
 router.get(
-    '/classes',
+    '/',
     requireRole(['Admin']),
     classController.getAllClasses
 );
@@ -45,15 +45,13 @@ router.get(
 
 
 router.get(
-    '/classes/:classId',
-    authenticateToken,
-    requireEmailVerification,
+    '/:classId',
     requireRole(['Admin', 'Instructor', 'Student']),
     classController.getClassById
 );
 
 router.put(
-    '/classes/:classId',
+    '/:classId',
     requireRole(['Admin', 'Instructor']),
     requireClassInstructor, // Check instructor is assigned to class
     validateUpdateClass,
@@ -62,26 +60,26 @@ router.put(
 
 
 router.delete(
-    '/classes/:classId',
+    '/:classId',
     requireRole(['Admin']),
     classController.deleteClass
 );
 
 router.post(
-    '/classes/:classId/instructors',
+    '/:classId/instructors',
     requireRole(['Admin', 'Instructor']),
     validateAssignInstructor,
     classController.assignInstructor
 );
 
 router.delete(
-    '/classes/:classId/instructors/:instructorId',
+    '/:classId/instructors/:instructorId',
     requireRole(['Admin', 'Instructor']),
     classController.removeInstructor
 );
 
 router.get(
-    '/classes/:classId/instructors',
+    '/:classId/instructors',
     classController.getClassInstructors
 );
 

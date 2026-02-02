@@ -44,6 +44,14 @@ router.use('/enroll-keys', enrollKeyRoutes);
 // Group Routes - mounted at /groups
 router.use('/groups', groupRoutes);
 
+// Student quick access routes
+router.get('/me/classes',
+    authenticateToken,
+    requireEmailVerification,
+    requireRole(['Student']),
+    enrollmentController.getMyClasses
+);
+
 // Health check endpoint
 router.get('/health', (req, res) => {
   res.status(200).json({
