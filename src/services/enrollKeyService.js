@@ -51,15 +51,48 @@ class EnrollKeyService {
                 }
             }
 
+            // Check if class already has an active key
+            const activeKey = await EnrollKey.findOne({
+                where: {
+                    classId,
+                    isActive: true,
+                    isRevoked: false
+                }
+            });
+
+            if (activeKey) {
+                // Check if key is still valid (not expired and not reached max uses)
+                const now = new Date();
+                const isExpired = activeKey.expiresAt && new Date(activeKey.expiresAt) <= now;
+                const isMaxUsesReached = activeKey.maxUses && activeKey.usedCount >= activeKey.maxUses;
+
+                if (!isExpired && !isMaxUsesReached) {
+                    return {
+                        success: false,
+                        message: 'Lớp học đã có mã đăng ký đang hoạt động. Vui lòng thu hồi hoặc đợi mã cũ hết hạn',
+                        existingKey: {
+                            keyId: activeKey.keyId,
+                            keyValue: activeKey.keyValue,
+                            expiresAt: activeKey.expiresAt,
+                            maxUses: activeKey.maxUses,
+                            usedCount: activeKey.usedCount
+                        }
+                    };
+                }
+            }
+
             // Generate or use custom key
             const keyValue = customKey || this.generateKey();
 
-            // Check key unique (only if keyValue is provided)
-            if (keyValue) {
-                const existing = await EnrollKey.findOne({ where: { keyValue } });
-                if (existing) {
-                    return { success: false, message: 'Mã tham gia đã tồn tại, vui lòng chọn mã khác' };
-                }
+            // Check key unique within this class only (allow same key for different classes)
+            const existingInClass = await EnrollKey.findOne({ 
+                where: { 
+                    classId,
+                    keyValue 
+                } 
+            });
+            if (existingInClass) {
+                return { success: false, message: 'Lớp học này đã sử dụng mã này rồi' };
             }
 
             // Create key

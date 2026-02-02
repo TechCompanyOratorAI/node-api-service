@@ -7,13 +7,16 @@ class EnrollmentService {
     /**
      * Join class using enrollment key (Student)
      */
-    async joinClass(keyValue, studentId) {
+    async joinClass(keyValue, studentId, classId) {
         const transaction = await db.sequelize.transaction();
 
         try {
-            // Step 1: Validate key with row lock
+            // Step 1: Validate key with row lock - must match both keyValue AND classId
             const key = await EnrollKey.findOne({
-                where: { keyValue },
+                where: { 
+                    keyValue,
+                    classId  // Key must belong to the specified class
+                },
                 include: [{ model: Class, as: 'class' }],
                 lock: transaction.LOCK.UPDATE,
                 transaction
@@ -21,7 +24,7 @@ class EnrollmentService {
 
             if (!key) {
                 await transaction.rollback();
-                return { success: false, message: 'Mã đăng ký không hợp lệ' };
+                return { success: false, message: 'Mã đăng ký không hợp lệ hoặc không thuộc lớp học này' };
             }
 
             // Step 2: Validate key status
