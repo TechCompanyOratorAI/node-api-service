@@ -16,7 +16,15 @@ class EnrollKeyController {
                 });
             }
 
-            const { classId } = req.params;
+            // Get classId from body instead of params
+            const { classId } = req.body;
+            if (!classId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'classId là bắt buộc'
+                });
+            }
+
             const userId = req.user.userId;
             const userRole = req.userRoles?.includes('Admin') ? 'Admin' :
                 req.userRoles?.includes('Instructor') ? 'Instructor' : 'Student';
@@ -130,6 +138,25 @@ class EnrollKeyController {
             }
         } catch (error) {
             console.error('Get keys by class error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Lỗi server nội bộ'
+            });
+        }
+    }
+
+    // Get all keys (Admin only)
+    async getAllKeys(req, res) {
+        try {
+            const result = await enrollKeyService.getAllKeys();
+
+            if (result.success) {
+                return res.status(200).json(result);
+            } else {
+                return res.status(400).json(result);
+            }
+        } catch (error) {
+            console.error('Get all keys error:', error);
             return res.status(500).json({
                 success: false,
                 message: 'Lỗi server nội bộ'

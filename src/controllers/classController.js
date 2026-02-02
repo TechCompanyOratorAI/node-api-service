@@ -4,7 +4,6 @@ const { validationResult } = require('express-validator');
 const classService = require('../services/classService');
 
 class ClassController {
-    // Create new class
     async createClass(req, res) {
         try {
             const errors = validationResult(req);
@@ -18,6 +17,15 @@ class ClassController {
 
             // Get courseId from URL params
             const { courseId } = req.params;
+            
+            // Validate courseId
+            if (!courseId || isNaN(parseInt(courseId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID khóa học không hợp lệ'
+                });
+            }
+            
             const classData = { ...req.body, courseId: parseInt(courseId) };
             const result = await classService.createClass(classData, req.user.userId);
 
@@ -40,6 +48,21 @@ class ClassController {
         try {
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 20;
+            
+            // Validate pagination params
+            if (isNaN(page) || page < 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tham số page không hợp lệ'
+                });
+            }
+            if (isNaN(limit) || limit < 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tham số limit không hợp lệ'
+                });
+            }
+            
             const search = req.query.search;
             const courseId = req.query.courseId ? parseInt(req.query.courseId) : null;
 
@@ -63,6 +86,15 @@ class ClassController {
     async getClassesByCourse(req, res) {
         try {
             const { courseId } = req.params;
+            
+            // Validate courseId
+            if (!courseId || isNaN(parseInt(courseId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID khóa học không hợp lệ'
+                });
+            }
+            
             const userId = req.user.userId;
             // Get primary role from req.userRoles (set by requireRole middleware)
             const userRole = req.userRoles?.includes('Admin') ? 'Admin' :
@@ -92,6 +124,15 @@ class ClassController {
     async getClassById(req, res) {
         try {
             const { classId } = req.params;
+            
+            // Validate classId
+            if (!classId || isNaN(parseInt(classId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID lớp học không hợp lệ'
+                });
+            }
+            
             const userId = req.user.userId;
             const userRole = req.userRoles?.includes('Admin') ? 'Admin' :
                 req.userRoles?.includes('Instructor') ? 'Instructor' : 'Student';
@@ -130,6 +171,15 @@ class ClassController {
             }
 
             const { classId } = req.params;
+            
+            // Validate classId
+            if (!classId || isNaN(parseInt(classId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID lớp học không hợp lệ'
+                });
+            }
+            
             const userId = req.user.userId;
             const userRole = req.userRoles?.includes('Admin') ? 'Admin' :
                 req.userRoles?.includes('Instructor') ? 'Instructor' : 'Student';
@@ -160,6 +210,15 @@ class ClassController {
     async deleteClass(req, res) {
         try {
             const { classId } = req.params;
+            
+            // Validate classId
+            if (!classId || isNaN(parseInt(classId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID lớp học không hợp lệ'
+                });
+            }
+            
             const userId = req.user.userId;
 
             const result = await classService.deleteClass(
@@ -194,6 +253,15 @@ class ClassController {
             }
 
             const { classId } = req.params;
+            
+            // Validate classId
+            if (!classId || isNaN(parseInt(classId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID lớp học không hợp lệ'
+                });
+            }
+            
             const { instructorId, instructorIds } = req.body;
             const assignedBy = req.user.userId;
 
@@ -259,6 +327,20 @@ class ClassController {
         try {
             const { classId, instructorId } = req.params;
 
+            // Validate classId and instructorId
+            if (!classId || isNaN(parseInt(classId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID lớp học không hợp lệ'
+                });
+            }
+            if (!instructorId || isNaN(parseInt(instructorId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID giảng viên không hợp lệ'
+                });
+            }
+
             const result = await classService.removeInstructor(
                 parseInt(classId),
                 parseInt(instructorId)
@@ -282,6 +364,14 @@ class ClassController {
     async getClassInstructors(req, res) {
         try {
             const { classId } = req.params;
+
+            // Validate classId
+            if (!classId || isNaN(parseInt(classId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID lớp học không hợp lệ'
+                });
+            }
 
             const db = require('../models');
             const { ClassInstructor, User } = db;

@@ -90,6 +90,64 @@ class EnrollmentService {
     }
 
     /**
+     * Get student's enrolled classes WITH their enroll keys
+     * Useful for students to see keys of classes they're enrolled in (to share with friends)
+     */
+    async getMyEnrollKeys(studentId) {
+        try {
+            const enrollments = await Enrollment.findAll({
+                where: { studentId, status: 'enrolled' },
+                include: [
+                    {
+                        model: Class,
+                        as: 'class',
+                        include: [
+                            { model: Course, as: 'course' },
+                            {
+                                model: EnrollKey,
+                                as: 'enrollKeys',
+                                where: { isActive: true },
+                                required: false
+                            }
+                        ]
+                    }
+                ],
+                order: [[{ model: Class, as: 'class' }, 'classCode', 'ASC']]
+            });
+
+            const result = enrollments.map(e => {
+                const classData = e.toJSON();
+                return {
+                    enrollmentId: e.enrollmentId,
+                    enrolledAt: e.enrolledAt,
+                    class: {
+                        classId: classData.class.classId,
+                        classCode: classData.class.classCode,
+                        className: classData.class.className,
+                        course: classData.class.course
+                    },
+                    enrollKeys: classData.class.enrollKeys?.map(key => ({
+                        keyId: key.keyId,
+                        keyValue: key.keyValue,
+                        expiresAt: key.expiresAt,
+                        maxUses: key.maxUses,
+                        usedCount: key.usedCount,
+                        remainingUses: key.maxUses ? key.maxUses - key.usedCount : null
+                    })) || []
+                };
+            });
+
+            return {
+                success: true,
+                data: result
+            };
+        } catch (error) {
+            console.error('Get my enroll keys error:', error);
+            return { success: false, message: 'Không thể lấy danh sách mã đăng ký', error: error.message };
+        }
+    }
+
+    /**
      * Get student's enrolled classes
      */
     async getMyClasses(studentId) {

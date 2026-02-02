@@ -36,7 +36,6 @@ export const validateRegistration = [
     .trim(),
 ];
 
-// Instructor registration validation (same as student but with required firstName/lastName)
 export const validateInstructorRegistration = [
   body("username")
     .isLength({ min: 3, max: 50 })
@@ -464,6 +463,10 @@ export const validateUpdateClass = [
 
 // Enrollment key creation validation
 export const validateCreateKey = [
+  body('classId')
+    .isInt({ min: 1 })
+    .withMessage('classId phải là số nguyên dương'),
+
   body('enrollKey')
     .notEmpty()
     .withMessage('Mã tham gia là bắt buộc')
