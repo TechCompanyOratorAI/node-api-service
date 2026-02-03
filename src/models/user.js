@@ -24,6 +24,12 @@ module.exports = (sequelize, DataTypes) => {
       User.hasMany(models.AIConfig, { foreignKey: 'managedBy', as: 'aiConfigs' });
       User.hasMany(models.SystemSetting, { foreignKey: 'updatedBy', as: 'updatedSettings' });
 
+      // Department association for instructors
+      User.belongsTo(models.Department, {
+        foreignKey: 'departmentId',
+        as: 'department'
+      });
+
       // Many-to-Many với Group qua bảng trung gian GroupStudent
       User.belongsToMany(models.Group, {
         through: models.GroupStudent,
@@ -54,6 +60,7 @@ module.exports = (sequelize, DataTypes) => {
       avatar: { type: DataTypes.STRING(500), allowNull: true },
       dob: { type: DataTypes.DATE, allowNull: true },
       studyMajor: { type: DataTypes.STRING(255), allowNull: true },
+      departmentId: { type: DataTypes.INTEGER, allowNull: true, comment: 'Department for instructors' },
       isCensored: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     },
     { sequelize, modelName: 'User', tableName: 'Users' }

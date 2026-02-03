@@ -501,7 +501,7 @@ export const validateJoinClass = [
   body('classId')
     .isInt({ min: 1 })
     .withMessage('classId phải là số nguyên dương'),
-  
+
   body('enrollKey')
     .trim()
     .notEmpty()

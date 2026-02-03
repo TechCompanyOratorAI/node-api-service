@@ -13,7 +13,7 @@ class EnrollmentService {
         try {
             // Step 1: Validate key with row lock - must match both keyValue AND classId
             const key = await EnrollKey.findOne({
-                where: { 
+                where: {
                     keyValue,
                     classId  // Key must belong to the specified class
                 },

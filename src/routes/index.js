@@ -15,7 +15,9 @@ import storageRoutes from './storageRoutes.js';
 import classRoutes from './classRoutes.js';
 import groupRoutes from './groupRoutes.js';
 import enrollKeyRoutes from './enrollKeyRoutes.js';
+import departmentRoutes from './departmentRoutes.js';
 import enrollmentController from '../controllers/enrollmentController.js';
+import classController from '../controllers/classController.js';
 import { authenticateToken, requireEmailVerification, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -44,6 +46,9 @@ router.use('/enroll-keys', enrollKeyRoutes);
 // Group Routes - mounted at /groups
 router.use('/groups', groupRoutes);
 
+// Department Routes - mounted at /departments
+router.use('/departments', departmentRoutes);
+
 // Student quick access routes
 router.get('/me/classes',
   authenticateToken,
@@ -52,14 +57,13 @@ router.get('/me/classes',
   enrollmentController.getMyClasses
 );
 
-// Health check endpoint
-router.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'API is running',
-    timestamp: new Date().toISOString()
-  });
-});
+// Instructor quick access routes
+router.get('/me/teaching-classes',
+  authenticateToken,
+  requireEmailVerification,
+  requireRole(['Instructor']),
+  classController.getMyTeachingClasses
+);
 
 // 404 handler for API routes
 router.use('*', (req, res) => {

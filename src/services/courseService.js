@@ -11,7 +11,7 @@ class CourseService {
             const {
                 courseCode,
                 courseName,
-                majorCode,
+                departmentId,
                 description,
                 semester,
                 academicYear,
@@ -40,7 +40,7 @@ class CourseService {
             const course = await Course.create({
                 courseCode,
                 courseName,
-                majorCode,
+                departmentId,
                 description,
                 semester,
                 academicYear,
@@ -95,6 +95,8 @@ class CourseService {
         try {
             const {
                 instructorId,
+                departmentId,
+                majorCode,
                 semester,
                 academicYear,
                 isActive,
@@ -114,6 +116,8 @@ class CourseService {
             const where = {};
             if (semester) where.semester = semester;
             if (academicYear) where.academicYear = academicYear;
+            if (departmentId) where.departmentId = departmentId;
+            if (majorCode) where.majorCode = majorCode;
             // Default to active courses only if not specified (for student access)
             if (isActive !== undefined) {
                 where.isActive = isActive;
@@ -1000,7 +1004,7 @@ class CourseService {
                     {
                         model: User,
                         as: 'instructors',
-                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
+                        attributes: ['userId', 'username', 'firstName', 'lastName', 'email', 'departmentId'],
                         through: {
                             attributes: ['assignedAt']
                         }
@@ -1037,7 +1041,7 @@ class CourseService {
      */
     async getAvailableInstructors(courseId, filters = {}) {
         try {
-            // Get course to find its major
+            // Get course to find its department
             const course = await Course.findByPk(courseId);
             if (!course) {
                 return {
@@ -1053,9 +1057,9 @@ class CourseService {
                 isActive: true
             };
 
-            // Filter by course major if exists
-            if (course.majorCode) {
-                where.studyMajor = { [db.Sequelize.Op.like]: `%${course.majorCode}%` };
+            // Filter by course department if exists
+            if (course.departmentId) {
+                where.departmentId = course.departmentId;
             }
 
             // Search filter
@@ -1071,7 +1075,7 @@ class CourseService {
             // Get instructors with Instructor role
             const instructors = await User.findAll({
                 where,
-                attributes: ['userId', 'username', 'firstName', 'lastName', 'email', 'studyMajor'],
+                attributes: ['userId', 'username', 'firstName', 'lastName', 'email', 'departmentId'],
                 include: [{
                     association: 'userRoles',
                     include: [{
@@ -1101,14 +1105,14 @@ class CourseService {
                 firstName: instructor.firstName,
                 lastName: instructor.lastName,
                 email: instructor.email,
-                studyMajor: instructor.studyMajor
+                departmentId: instructor.departmentId
             }));
 
             return {
                 success: true,
                 data: instructorsList,
                 count: instructorsList.length,
-                courseMajor: course.majorCode,
+                departmentId: course.departmentId,
                 totalInstructors: instructors.length,
                 alreadyAssigned: assignedIds.length
             };
