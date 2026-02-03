@@ -59,7 +59,7 @@ router.post('/:courseId/classes',
 );
 
 router.get('/:courseId/classes',
-    requireRole(['Admin', 'Instructor']),
+    requireRole(['Admin', 'Instructor', 'Student']),
     classController.getClassesByCourse
 );
 

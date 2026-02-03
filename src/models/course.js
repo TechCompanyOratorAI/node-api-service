@@ -23,6 +23,12 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'classes'
             });
 
+            // Department association
+            Course.belongsTo(models.Department, {
+                foreignKey: 'departmentId',
+                as: 'department'
+            });
+
             // Keep existing associations
             // Enrollment removed - now belongs to Class, not Course
             Course.hasMany(models.Topic, { foreignKey: 'courseId', as: 'topics' });
@@ -36,6 +42,7 @@ module.exports = (sequelize, DataTypes) => {
             courseCode: { type: DataTypes.STRING(30), allowNull: false },
             courseName: { type: DataTypes.STRING(200), allowNull: false },
             majorCode: { type: DataTypes.STRING(20), allowNull: true, comment: 'Major code (e.g., SE, CS, IT)' },
+            departmentId: { type: DataTypes.INTEGER, allowNull: true, comment: 'Department ID' },
             description: { type: DataTypes.TEXT },
             semester: { type: DataTypes.STRING(30) },
             academicYear: { type: DataTypes.INTEGER },

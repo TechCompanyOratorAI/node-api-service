@@ -58,8 +58,8 @@ class ClassService {
         try {
             const where = { courseId };
 
-            // If not admin, filter by instructor assignment
-            if (userRole !== 'Admin') {
+            // If Instructor (not admin or student), filter by instructor assignment
+            if (userRole === 'Instructor') {
                 const instructorClassIds = await ClassInstructor.findAll({
                     where: { instructorId: userId },
                     attributes: ['classId']
@@ -71,6 +71,7 @@ class ClassService {
 
                 where.classId = { [Op.in]: instructorClassIds };
             }
+            // Admin and Student can see all classes in course
 
             const classes = await Class.findAll({
                 where,
@@ -150,6 +151,81 @@ class ClassService {
         } catch (error) {
             console.error('Get all classes error:', error);
             return { success: false, message: 'Không thể lấy danh sách lớp học', error: error.message };
+        }
+    }
+
+    /**
+
+     * Get classes assigned to instructor
+     */
+    async getMyTeachingClasses(instructorId) {
+        try {
+            // Get all classIds assigned to this instructor
+            const assignments = await ClassInstructor.findAll({
+                where: { instructorId },
+                attributes: ['classId']
+            });
+
+            if (assignments.length === 0) {
+                return { success: true, data: [], message: 'Bạn chưa được phân công vào lớp nào' };
+            }
+
+            const classIds = assignments.map(a => a.classId);
+
+            // Get full class details
+            const classes = await Class.findAll({
+                where: { classId: { [Op.in]: classIds } },
+                include: [
+                    {
+                        model: Course,
+                        as: 'course',
+                        attributes: ['courseId', 'courseCode', 'courseName', 'semester', 'academicYear']
+                    },
+                    {
+                        model: User,
+                        as: 'instructors',
+                        through: { attributes: [] },
+                        attributes: ['userId', 'username', 'firstName', 'lastName']
+                    },
+                    {
+                        model: Enrollment,
+                        as: 'enrollments',
+                        attributes: ['enrollmentId', 'studentId', 'status'],
+                        where: { status: 'enrolled' },
+                        required: false
+                    },
+                    {
+                        model: EnrollKey,
+                        as: 'enrollKeys',
+                        attributes: ['keyId', 'keyValue', 'isActive', 'expiresAt', 'maxUses', 'usedCount'],
+                        where: { isActive: true, isRevoked: false },
+                        required: false
+                    }
+                ],
+                order: [['createdAt', 'DESC']]
+            });
+
+            return {
+                success: true,
+                data: classes.map(c => ({
+                    classId: c.classId,
+                    classCode: c.classCode,
+                    className: c.className,
+                    description: c.description,
+                    status: c.status,
+                    startDate: c.startDate,
+                    endDate: c.endDate,
+                    maxStudents: c.maxStudents,
+                    course: c.course,
+                    instructors: c.instructors,
+                    enrollmentCount: c.enrollments?.length || 0,
+                    activeKeys: c.enrollKeys || [],
+                    createdAt: c.createdAt
+                }))
+            };
+        } catch (error) {
+            console.error('Get my teaching classes error:', error);
+            return { success: false, message: 'Không thể lấy danh sách lớp giảng dạy', error: error.message };
         }
     }
 

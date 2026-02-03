@@ -85,11 +85,11 @@ class EnrollKeyService {
             const keyValue = customKey || this.generateKey();
 
             // Check key unique within this class only (allow same key for different classes)
-            const existingInClass = await EnrollKey.findOne({ 
-                where: { 
+            const existingInClass = await EnrollKey.findOne({
+                where: {
                     classId,
-                    keyValue 
-                } 
+                    keyValue
+                }
             });
             if (existingInClass) {
                 return { success: false, message: 'Lớp học này đã sử dụng mã này rồi' };
