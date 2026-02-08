@@ -132,7 +132,7 @@ class AuthService {
   // Register instructor
   async registerInstructor(userData) {
     try {
-      const { username, email, password, firstName, lastName, studyMajor } = userData;
+      const { username, email, password, firstName, lastName, studyMajor, departmentId } = userData;
 
       // Check if user already exists
       const existingUser = await User.findOne({
@@ -169,6 +169,7 @@ class AuthService {
         firstName,
         lastName,
         studyMajor,
+        departmentId,
         passwordHash,
         emailVerificationToken,
         emailVerificationExpires,

@@ -1058,8 +1058,13 @@ class CourseService {
             };
 
             // Filter by course department if exists
+            // If course has departmentId, only show instructors with same departmentId
             if (course.departmentId) {
                 where.departmentId = course.departmentId;
+            }
+            // If course has no departmentId but has majorCode, fallback to majorCode matching
+            else if (course.majorCode) {
+                where.studyMajor = { [db.Sequelize.Op.like]: `%${course.majorCode}%` };
             }
 
             // Search filter
@@ -1075,7 +1080,7 @@ class CourseService {
             // Get instructors with Instructor role
             const instructors = await User.findAll({
                 where,
-                attributes: ['userId', 'username', 'firstName', 'lastName', 'email', 'departmentId'],
+                attributes: ['userId', 'username', 'firstName', 'lastName', 'email', 'departmentId', 'studyMajor'],
                 include: [{
                     association: 'userRoles',
                     include: [{
@@ -1105,7 +1110,8 @@ class CourseService {
                 firstName: instructor.firstName,
                 lastName: instructor.lastName,
                 email: instructor.email,
-                departmentId: instructor.departmentId
+                departmentId: instructor.departmentId,
+                studyMajor: instructor.studyMajor
             }));
 
             return {
@@ -1113,6 +1119,7 @@ class CourseService {
                 data: instructorsList,
                 count: instructorsList.length,
                 departmentId: course.departmentId,
+                majorCode: course.majorCode,
                 totalInstructors: instructors.length,
                 alreadyAssigned: assignedIds.length
             };

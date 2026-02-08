@@ -15,24 +15,28 @@ const { Op } = require("sequelize");
 
 class ClassService {
   /**
-   * Create new class (Admin or Lead Instructor)
+   * Create new class with enrollment key (Admin or Lead Instructor)
    * Authorization: Admin OR instructor in course with 'lead' role
    */
   async createClass(classData, userId) {
-    const { courseId, classCode, startDate, endDate, maxStudents } = classData;
+    const { courseId, classCode, startDate, endDate, maxStudents, enrollKey, keyExpiresAt, keyMaxUses } = classData;
+    const transaction = await db.sequelize.transaction();
 
     try {
       // Check course exists
-      const course = await Course.findByPk(courseId);
+      const course = await Course.findByPk(courseId, { transaction });
       if (!course) {
+        await transaction.rollback();
         return { success: false, message: "Không tìm thấy khóa học" };
       }
 
       // Check class code unique within course
       const existing = await Class.findOne({
         where: { courseId, classCode },
+        transaction
       });
       if (existing) {
+        await transaction.rollback();
         return {
           success: false,
           message: "Mã lớp đã tồn tại trong khóa học này",
@@ -48,14 +52,35 @@ class ClassService {
         endDate,
         maxStudents,
         createdBy: userId,
-      });
+      }, { transaction });
+
+      // Create enrollment key for the new class
+      const enrollmentKey = await EnrollKey.create({
+        classId: newClass.classId,
+        keyValue: enrollKey,
+        expiresAt: keyExpiresAt ? new Date(keyExpiresAt) : null,
+        maxUses: keyMaxUses || null,
+        usedCount: 0,
+        isActive: true,
+        createdBy: userId,
+      }, { transaction });
+
+      await transaction.commit();
 
       return {
         success: true,
-        message: "Tạo lớp học thành công",
+        message: "Tạo lớp học và mã đăng ký thành công",
         class: newClass,
+        enrollmentKey: {
+          keyId: enrollmentKey.keyId,
+          keyValue: enrollmentKey.keyValue,
+          expiresAt: enrollmentKey.expiresAt,
+          maxUses: enrollmentKey.maxUses,
+          isActive: enrollmentKey.isActive
+        }
       };
     } catch (error) {
+      await transaction.rollback();
       console.error("Create class error:", error);
       return {
         success: false,

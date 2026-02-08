@@ -389,6 +389,24 @@ export const validateCreateClass = [
       return true;
     }),
 
+  // Enrollment key fields (required)
+  body("enrollKey")
+    .trim()
+    .notEmpty()
+    .withMessage("Mã đăng ký là bắt buộc")
+    .isLength({ min: 6, max: 50 })
+    .withMessage("Mã đăng ký phải từ 6-50 ký tự"),
+
+  body("keyExpiresAt")
+    .optional()
+    .isISO8601()
+    .withMessage("Ngày hết hạn mã phải là định dạng ngày hợp lệ"),
+
+  body("keyMaxUses")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Số lượng sử dụng tối đa phải là số nguyên dương"),
+
   body("maxStudents")
     .optional()
     .isInt({ min: 1 })
