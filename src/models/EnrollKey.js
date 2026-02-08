@@ -14,8 +14,7 @@ module.exports = (sequelize, DataTypes) => {
         },
         keyValue: {
             type: DataTypes.STRING(255),
-            allowNull: false,
-            unique: true
+            allowNull: false
         },
         expiresAt: {
             type: DataTypes.DATE
@@ -52,7 +51,6 @@ module.exports = (sequelize, DataTypes) => {
         tableName: 'enroll_keys',
         timestamps: true,
         indexes: [
-            { unique: true, fields: ['keyValue'] },
             { fields: ['classId'] },
             { fields: ['isActive', 'expiresAt'] }
         ]

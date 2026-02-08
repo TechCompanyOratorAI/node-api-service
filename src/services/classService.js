@@ -65,6 +65,13 @@ class ClassService {
         createdBy: userId,
       }, { transaction });
 
+      // Auto-assign creator as instructor to the class
+      await ClassInstructor.create({
+        classId: newClass.classId,
+        instructorId: userId,
+        assignedBy: userId
+      }, { transaction });
+
       await transaction.commit();
 
       return {
