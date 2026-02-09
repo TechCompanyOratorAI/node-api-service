@@ -42,6 +42,10 @@ module.exports = {
                 type: Sequelize.INTEGER,
                 allowNull: true
             },
+            maxGroupMembers: {
+                type: Sequelize.INTEGER,
+                allowNull: true
+            },
             createdBy: {
                 type: Sequelize.INTEGER,
                 allowNull: false,

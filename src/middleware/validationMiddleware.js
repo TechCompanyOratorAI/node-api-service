@@ -412,6 +412,11 @@ export const validateCreateClass = [
     .isInt({ min: 1 })
     .withMessage("Số lượng sinh viên tối đa phải là số nguyên dương"),
 
+  body("maxGroupMembers")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Số lượng thành viên nhóm tối đa phải là số nguyên dương"),
+
   body("status")
     .optional()
     .isIn(["active", "closed", "archived"])
@@ -444,6 +449,11 @@ export const validateUpdateClass = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("Số lượng sinh viên tối đa phải là số nguyên dương"),
+
+  body("maxGroupMembers")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Số lượng thành viên nhóm tối đa phải là số nguyên dương"),
 
   body("status")
     .optional()

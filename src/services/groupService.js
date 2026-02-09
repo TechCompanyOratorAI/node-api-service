@@ -130,9 +130,18 @@ class GroupService {
         };
       }
 
+      // Kiểm tra số lượng thành viên với maxGroupMembers
       const memberCount = await GroupStudent.count({
         where: { groupId },
       });
+
+      if (group.class.maxGroupMembers && memberCount >= group.class.maxGroupMembers) {
+        return {
+          success: false,
+          message: `Nhóm đã đủ số thành viên tối đa (${group.class.maxGroupMembers} người)`,
+        };
+      }
+
       await GroupStudent.create({
         groupId: group.groupId,
         studentId: userId,
@@ -147,6 +156,7 @@ class GroupService {
         message: "Tham gia nhóm thành công",
         student: user,
         memberCount: memberCount + 1,
+        maxGroupMembers: group.class.maxGroupMembers,
       };
     } catch (error) {
       console.error("Join group error:", error);
@@ -372,7 +382,7 @@ class GroupService {
         };
       });
       const classData = await Class.findByPk(classId, {
-        attributes: ["classId", "classCode"],
+        attributes: ["classId", "classCode", "maxGroupMembers"],
       });
 
       return {
@@ -430,6 +440,7 @@ class GroupService {
           isMember: !!myMembership,
           myRole: myMembership?.GroupStudent?.role || null,
           memberCount: group.students.length,
+          maxGroupMembers: group.class.maxGroupMembers,
         },
       };
     } catch (error) {

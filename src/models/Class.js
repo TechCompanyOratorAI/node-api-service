@@ -32,6 +32,9 @@ module.exports = (sequelize, DataTypes) => {
       maxStudents: {
         type: DataTypes.INTEGER,
       },
+      maxGroupMembers: {
+        type: DataTypes.INTEGER,
+      },
       createdBy: {
         type: DataTypes.INTEGER,
         allowNull: false,
