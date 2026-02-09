@@ -392,15 +392,30 @@ class ClassService {
 
       // Authorization check for non-admin
       if (userRole !== "Admin") {
-        const isInstructor = await ClassInstructor.findOne({
-          where: { classId, instructorId: userId },
-        });
+        if (userRole === "Instructor") {
+          // Instructor must be assigned to the class
+          const isInstructor = await ClassInstructor.findOne({
+            where: { classId, instructorId: userId },
+          });
 
-        if (!isInstructor) {
-          return {
-            success: false,
-            message: "Bạn không có quyền truy cập lớp học này",
-          };
+          if (!isInstructor) {
+            return {
+              success: false,
+              message: "Bạn không có quyền truy cập lớp học này",
+            };
+          }
+        } else if (userRole === "Student") {
+          // Student must be enrolled in the class
+          const isEnrolled = await Enrollment.findOne({
+            where: { classId, studentId: userId, status: "enrolled" },
+          });
+
+          if (!isEnrolled) {
+            return {
+              success: false,
+              message: "Bạn không có quyền truy cập lớp học này",
+            };
+          }
         }
       }
 
