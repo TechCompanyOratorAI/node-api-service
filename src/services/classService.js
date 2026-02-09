@@ -19,7 +19,7 @@ class ClassService {
    * Authorization: Admin OR instructor in course with 'lead' role
    */
   async createClass(classData, userId) {
-    const { courseId, classCode, startDate, endDate, maxStudents, enrollKey, keyExpiresAt, keyMaxUses } = classData;
+    const { courseId, classCode, startDate, endDate, maxStudents, maxGroupMembers, enrollKey, keyExpiresAt, keyMaxUses } = classData;
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -51,6 +51,7 @@ class ClassService {
         startDate,
         endDate,
         maxStudents,
+        maxGroupMembers,
         createdBy: userId,
       }, { transaction });
 
@@ -323,6 +324,7 @@ class ClassService {
           startDate: c.startDate,
           endDate: c.endDate,
           maxStudents: c.maxStudents,
+          maxGroupMembers: c.maxGroupMembers,
           course: c.course,
           instructors: c.instructors,
           enrollmentCount: c.enrollments?.length || 0,
