@@ -10,6 +10,7 @@ const {
   Enrollment,
   Presentation,
   EnrollKey,
+  Topic,
 } = db;
 const { Op } = require("sequelize");
 
@@ -349,7 +350,24 @@ class ClassService {
     try {
       const classData = await Class.findByPk(classId, {
         include: [
-          { model: Course, as: "course" },
+          {
+            model: Course,
+            as: "course",
+            include: [
+              {
+                model: Topic,
+                as: "topics",
+                attributes: [
+                  "topicId",
+                  "topicName",
+                  "description",
+                  "sequenceNumber",
+                  "dueDate",
+                  "maxDurationMinutes",
+                ],
+              },
+            ],
+          },
           {
             model: User,
             as: "instructors",
@@ -440,7 +458,18 @@ class ClassService {
         delete response.enrollKeys;
       }
 
-      return { success: true, class: response };
+      // Add derived fields
+      const totalStudents = response.enrollments?.length || 0;
+      const topics = response.course?.topics || [];
+
+      return {
+        success: true,
+        class: {
+          ...response,
+          totalStudents,
+          topics,
+        },
+      };
     } catch (error) {
       console.error("Get class error:", error);
       return {
