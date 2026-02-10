@@ -756,10 +756,11 @@ class CourseService {
         try {
             const topic = await Topic.findByPk(topicId, {
                 include: [
+                    // No need to select course fields here since we use CourseInstructor for permission
                     {
                         model: Course,
                         as: 'course',
-                        attributes: ['instructorId']
+                        attributes: []
                     }
                 ]
             });
@@ -842,10 +843,11 @@ class CourseService {
         try {
             const topic = await Topic.findByPk(topicId, {
                 include: [
+                    // Keep association for potential future use, but no columns needed
                     {
                         model: Course,
                         as: 'course',
-                        attributes: ['instructorId']
+                        attributes: []
                     }
                 ]
             });
@@ -857,8 +859,12 @@ class CourseService {
                 };
             }
 
-            // Check if user is the course instructor
-            if (topic.course.instructorId !== userId) {
+            // Check if user is an instructor of this course via CourseInstructor M:N table
+            const isInstructor = await CourseInstructor.findOne({
+                where: { courseId: topic.courseId, instructorId: userId }
+            });
+
+            if (!isInstructor) {
                 return {
                     success: false,
                     message: 'You do not have permission to delete this topic'
