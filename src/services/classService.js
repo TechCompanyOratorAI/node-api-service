@@ -383,6 +383,21 @@ class ClassService {
               },
             ],
           },
+          {
+            model: EnrollKey,
+            as: "enrollKeys",
+            attributes: [
+              "keyId",
+              "keyValue",
+              "expiresAt",
+              "maxUses",
+              "usedCount",
+              "isActive",
+              "isRevoked",
+              "createdAt",
+            ],
+            required: false,
+          },
         ],
       });
 
@@ -419,7 +434,13 @@ class ClassService {
         }
       }
 
-      return { success: true, class: classData };
+      // Prepare response - hide enrollment keys from students
+      const response = classData.toJSON();
+      if (userRole === "Student") {
+        delete response.enrollKeys;
+      }
+
+      return { success: true, class: response };
     } catch (error) {
       console.error("Get class error:", error);
       return {
@@ -435,7 +456,7 @@ class ClassService {
    */
   async updateClass(classId, updates, userId, userRole) {
     const transaction = await db.sequelize.transaction();
-    
+
     try {
       const classData = await Class.findByPk(classId, { transaction });
       if (!classData) {
