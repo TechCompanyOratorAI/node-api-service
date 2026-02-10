@@ -443,7 +443,17 @@ export const validateUpdateClass = [
   body("endDate")
     .optional()
     .isISO8601()
-    .withMessage("Ngày kết thúc phải là định dạng ngày hợp lệ"),
+    .withMessage("Ngày kết thúc phải là định dạng ngày hợp lệ")
+    .custom((value, { req }) => {
+      if (req.body.startDate && value) {
+        const start = new Date(req.body.startDate);
+        const end = new Date(value);
+        if (end <= start) {
+          throw new Error("Ngày kết thúc phải sau ngày bắt đầu");
+        }
+      }
+      return true;
+    }),
 
   body("maxStudents")
     .optional()
@@ -459,6 +469,23 @@ export const validateUpdateClass = [
     .optional()
     .isIn(["active", "closed", "archived"])
     .withMessage("Trạng thái phải là: active, closed hoặc archived"),
+
+  // Enrollment key update fields (optional)
+  body("enrollKey")
+    .optional()
+    .trim()
+    .isLength({ min: 6, max: 50 })
+    .withMessage("Mã đăng ký phải từ 6-50 ký tự"),
+
+  body("keyExpiresAt")
+    .optional()
+    .isISO8601()
+    .withMessage("Ngày hết hạn mã đăng ký phải là định dạng ngày hợp lệ"),
+
+  body("keyMaxUses")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Số lần sử dụng tối đa phải là số nguyên dương"),
 ];
 
 // Enrollment key creation validation

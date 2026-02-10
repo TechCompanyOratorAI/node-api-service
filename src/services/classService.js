@@ -434,9 +434,12 @@ class ClassService {
    * Update class (Admin or assigned instructor)
    */
   async updateClass(classId, updates, userId, userRole) {
+    const transaction = await db.sequelize.transaction();
+    
     try {
-      const classData = await Class.findByPk(classId);
+      const classData = await Class.findByPk(classId, { transaction });
       if (!classData) {
+        await transaction.rollback();
         return { success: false, message: "Không tìm thấy lớp học" };
       }
 
@@ -444,8 +447,10 @@ class ClassService {
       if (userRole !== "Admin") {
         const isInstructor = await ClassInstructor.findOne({
           where: { classId, instructorId: userId },
+          transaction
         });
         if (!isInstructor) {
+          await transaction.rollback();
           return {
             success: false,
             message: "Bạn không có quyền chỉnh sửa lớp học này",
@@ -453,15 +458,64 @@ class ClassService {
         }
       }
 
-      // Update
-      await classData.update(updates);
+      // Extract enrollment key fields from updates
+      const { enrollKey, keyExpiresAt, keyMaxUses, ...classUpdates } = updates;
+
+      // Update class info
+      await classData.update(classUpdates, { transaction });
+
+      // Update enrollment key if provided
+      if (enrollKey || keyExpiresAt || keyMaxUses) {
+        // Find active enrollment key for this class
+        const activeKey = await EnrollKey.findOne({
+          where: {
+            classId,
+            isActive: true,
+            isRevoked: false
+          },
+          order: [['createdAt', 'DESC']],
+          transaction
+        });
+
+        if (!activeKey) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Không tìm thấy mã đăng ký active cho lớp này"
+          };
+        }
+
+        // Prepare key updates
+        const keyUpdates = {};
+        if (enrollKey) keyUpdates.keyValue = enrollKey;
+        if (keyExpiresAt !== undefined) keyUpdates.expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : null;
+        if (keyMaxUses !== undefined) keyUpdates.maxUses = keyMaxUses;
+
+        // Update the enrollment key
+        await activeKey.update(keyUpdates, { transaction });
+      }
+
+      await transaction.commit();
+
+      // Fetch updated class with key info
+      const updatedClass = await Class.findByPk(classId, {
+        include: [
+          {
+            model: EnrollKey,
+            as: 'enrollKeys',
+            where: { isActive: true, isRevoked: false },
+            required: false
+          }
+        ]
+      });
 
       return {
         success: true,
         message: "Cập nhật lớp học thành công",
-        class: classData,
+        class: updatedClass,
       };
     } catch (error) {
+      await transaction.rollback();
       console.error("Update class error:", error);
       return {
         success: false,
