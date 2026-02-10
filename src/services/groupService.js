@@ -455,14 +455,38 @@ class GroupService {
 
   async getMyGroups(userId) {
     try {
+      // 1. Get group IDs that user is in
+      const myMemberships = await GroupStudent.findAll({
+        where: { studentId: userId },
+        attributes: ["groupId"],
+      });
+
+      const groupIds = myMemberships.map((m) => m.groupId);
+
+      if (groupIds.length === 0) {
+        return {
+          success: true,
+          data: [],
+        };
+      }
+
+      // 2. Get groups with ALL members
       const groups = await Group.findAll({
+        where: {
+          groupId: groupIds,
+        },
         include: [
           {
             model: User,
             as: "students",
-            where: { userId },
             through: { attributes: ["role", "joinedAt"] },
-            required: true,
+            attributes: [
+              "userId",
+              "username",
+              "firstName",
+              "lastName",
+              "avatar",
+            ],
           },
           {
             model: Class,
@@ -474,10 +498,14 @@ class GroupService {
 
       return {
         success: true,
-        data: groups.map((g) => ({
-          ...g.toJSON(),
-          memberCount: g.students.length,
-        })),
+        data: groups.map((g) => {
+          const myMembership = g.students.find((s) => s.userId === userId);
+          return {
+            ...g.toJSON(),
+            myRole: myMembership?.GroupStudent?.role || null,
+            memberCount: g.students.length,
+          };
+        }),
       };
     } catch (error) {
       console.error("Get my groups error:", error);
