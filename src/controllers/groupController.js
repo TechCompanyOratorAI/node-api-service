@@ -203,6 +203,36 @@ const getGroupById = async (req, res) => {
     }
 };
 
+// [GET] /api/groups/classes/:classId/my-group - Lấy nhóm của tôi trong lớp
+const getMyGroupInClass = async (req, res) => {
+    try {
+        const { classId } = req.params;
+        const currentUser = getCurrentUser(req);
+
+        const result = await groupService.getMyGroupInClass(classId, currentUser.userId);
+
+        if (!result.success) {
+            return res.status(400).json({ error: result.message });
+        }
+
+        if (!result.data) {
+            return res.status(200).json({
+                success: true,
+                group: null,
+                message: result.message
+            });
+        }
+
+        res.json({
+            group: result.data
+        });
+
+    } catch (error) {
+        console.error('Get my group in class error:', error);
+        res.status(500).json({ error: 'Lỗi server: ' + error.message });
+    }
+};
+
 // [GET] /api/my/groups - Lấy danh sách nhóm của user hiện tại
 const getMyGroups = async (req, res) => {
     try {
@@ -232,5 +262,6 @@ module.exports = {
     deleteGroup,
     getGroupsByClass,
     getGroupById,
+    getMyGroupInClass,
     getMyGroups
 };

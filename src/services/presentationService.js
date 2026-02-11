@@ -601,11 +601,17 @@ class PresentationService {
    */
   async getAllPresentations(studentId, options = {}) {
     try {
-      const { status, limit = 50, offset = 0 } = options;
+      const { status, classId, topicId, limit = 50, offset = 0 } = options;
 
       const where = { studentId };
       if (status) {
         where.status = status;
+      }
+      if (classId) {
+        where.classId = parseInt(classId);
+      }
+      if (topicId) {
+        where.topicId = parseInt(topicId);
       }
 
       const presentations = await Presentation.findAndCountAll({
@@ -614,6 +620,11 @@ class PresentationService {
         offset,
         order: [["createdAt", "DESC"]],
         include: [
+          {
+            model: Class,
+            as: "class",
+            attributes: ["classId", "classCode"],
+          },
           {
             model: Topic,
             as: "topic",
@@ -1175,6 +1186,7 @@ class PresentationService {
       };
     }
   }
-}
+
+  }
 
 export default new PresentationService();

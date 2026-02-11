@@ -8,6 +8,7 @@ router.use(authenticateToken);
 router.use(requireEmailVerification);
 
 router.get('/classes/:classId', groupController.getGroupsByClass);
+router.get('/classes/:classId/my-group', groupController.getMyGroupInClass);
 router.get('/my', groupController.getMyGroups);
 router.post('/', groupController.createGroup);
 router.get('/:groupId', groupController.getGroupById);
