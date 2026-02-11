@@ -1,33 +1,33 @@
-import multer from 'multer';
+import multer from "multer";
 
 const SLIDE_MIME_TYPES = new Set([
-  'application/pdf',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'image/jpeg',
-  'image/png'
+  "application/pdf",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "image/jpeg",
+  "image/png",
 ]);
 
 const AVATAR_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/gif',
-  'image/webp'
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
 ]);
 
-const MAX_SLIDE_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+const MAX_SLIDE_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 const MAX_MEDIA_FILE_SIZE_BYTES = 500 * 1024 * 1024;
 const MAX_AVATAR_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 const isAudioVideoMimeType = (mimetype) =>
-  mimetype?.startsWith('audio/') || mimetype?.startsWith('video/');
+  mimetype?.startsWith("audio/") || mimetype?.startsWith("video/");
 
 const createFileFilter = (predicate, errorMessage) => (req, file, cb) => {
   if (predicate(file)) {
     return cb(null, true);
   }
-  const error = new multer.MulterError('LIMIT_UNEXPECTED_FILE', file.fieldname);
+  const error = new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname);
   error.message = errorMessage;
   return cb(error);
 };
@@ -39,8 +39,8 @@ export const uploadSlide = multer({
   limits: { fileSize: MAX_SLIDE_FILE_SIZE_BYTES },
   fileFilter: createFileFilter(
     (file) => SLIDE_MIME_TYPES.has(file.mimetype),
-    'Unsupported slide file type'
-  )
+    "Unsupported slide file type"
+  ),
 });
 
 export const uploadMedia = multer({
@@ -48,8 +48,8 @@ export const uploadMedia = multer({
   limits: { fileSize: MAX_MEDIA_FILE_SIZE_BYTES },
   fileFilter: createFileFilter(
     (file) => isAudioVideoMimeType(file.mimetype),
-    'Unsupported media file type'
-  )
+    "Unsupported media file type"
+  ),
 });
 
 export const uploadAvatar = multer({
@@ -57,8 +57,8 @@ export const uploadAvatar = multer({
   limits: { fileSize: MAX_AVATAR_FILE_SIZE_BYTES },
   fileFilter: createFileFilter(
     (file) => AVATAR_MIME_TYPES.has(file.mimetype),
-    'Unsupported avatar file type. Only JPEG, PNG, GIF, and WebP are allowed'
-  )
+    "Unsupported avatar file type. Only JPEG, PNG, GIF, and WebP are allowed"
+  ),
 });
 
 export const uploadErrorHandler = (err, req, res, next) => {
@@ -67,15 +67,15 @@ export const uploadErrorHandler = (err, req, res, next) => {
   }
 
   if (err instanceof multer.MulterError) {
-    let message = err.message || 'Upload failed';
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      message = 'File size exceeds the allowed limit';
+    let message = err.message || "Upload failed";
+    if (err.code === "LIMIT_FILE_SIZE") {
+      message = "File size exceeds the allowed limit";
     }
     return res.status(400).json({ success: false, message });
   }
 
   return res.status(400).json({
     success: false,
-    message: err.message || 'Upload failed'
+    message: err.message || "Upload failed",
   });
 };
