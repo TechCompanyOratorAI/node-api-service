@@ -27,7 +27,7 @@ module.exports = (sequelize, DataTypes) => {
 
       filePath: { type: DataTypes.TEXT, allowNull: false },
       fileName: { type: DataTypes.TEXT },
-      fileFormat: { type: DataTypes.STRING(20) },
+      fileFormat: { type: DataTypes.STRING(100) },
       fileSizeBytes: { type: DataTypes.BIGINT },
       extractedText: { type: DataTypes.TEXT },
       thumbnailPath: { type: DataTypes.TEXT },
