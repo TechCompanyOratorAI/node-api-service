@@ -147,12 +147,14 @@ class PresentationController {
 
   async getAllPresentations(req, res) {
     try {
-      const { status, limit = 50, offset = 0 } = req.query;
+      const { status, classId, topicId, limit = 50, offset = 0 } = req.query;
 
       const result = await presentationService.getAllPresentations(
         req.user.userId,
         {
           status,
+          classId,
+          topicId,
           limit: parseInt(limit),
           offset: parseInt(offset)
         }

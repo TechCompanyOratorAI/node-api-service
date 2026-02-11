@@ -453,6 +453,65 @@ class GroupService {
     }
   }
 
+  async getMyGroupInClass(classId, userId) {
+    try {
+      // Tìm membership của user trong class này
+      const myMembership = await GroupStudent.findOne({
+        where: { studentId: userId },
+        include: [
+          {
+            model: Group,
+            as: "group",
+            where: { classId },
+            include: [
+              {
+                model: Class,
+                as: "class",
+                attributes: ["classId", "classCode", "maxGroupMembers"],
+              },
+            ],
+          },
+        ],
+      });
+
+      if (!myMembership) {
+        return {
+          success: true,
+          data: null,
+          message: "Bạn chưa thuộc nhóm nào trong lớp này",
+        };
+      }
+
+      const group = myMembership.group;
+      
+      // Đếm số thành viên
+      const memberCount = await GroupStudent.count({
+        where: { groupId: group.groupId },
+      });
+
+      return {
+        success: true,
+        data: {
+          groupId: group.groupId,
+          classId: group.classId,
+          groupName: group.groupName,
+          description: group.description,
+          class: group.class,
+          myRole: myMembership.role,
+          memberCount: memberCount,
+          maxGroupMembers: group.class.maxGroupMembers,
+        },
+      };
+    } catch (error) {
+      console.error("Get my group in class error:", error);
+      return {
+        success: false,
+        message: "Không thể lấy thông tin nhóm của bạn",
+        error: error.message,
+      };
+    }
+  }
+
   async getMyGroups(userId) {
     try {
       // 1. Get group IDs that user is in
