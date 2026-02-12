@@ -412,6 +412,7 @@ class CourseService {
                 startDate,
                 endDate,
                 isActive,
+                departmentId,
                 instructorIds // Array of instructor IDs to update
             } = courseData;
 
@@ -444,11 +445,21 @@ class CourseService {
                 academicYear: academicYear || course.academicYear,
                 startDate: startDate || course.startDate,
                 endDate: endDate || course.endDate,
-                isActive: isActive !== undefined ? isActive : course.isActive
+                isActive: isActive !== undefined ? isActive : course.isActive,
+                departmentId: departmentId !== undefined ? departmentId : course.departmentId
             }, { transaction });
 
             // Update instructors if instructorIds provided
-            if (instructorIds && Array.isArray(instructorIds)) {
+            if (instructorIds !== undefined && Array.isArray(instructorIds)) {
+                // Validate: Cannot remove all instructors from active course
+                if (instructorIds.length === 0 && course.isActive) {
+                    await transaction.rollback();
+                    return {
+                        success: false,
+                        message: 'Cannot remove all instructors from an active course'
+                    };
+                }
+
                 // Remove existing instructor assignments
                 await CourseInstructor.destroy({
                     where: { courseId },
