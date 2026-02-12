@@ -17,6 +17,7 @@ router.post(
   departmentController.createDepartment,
 );
 
+
 // Get all departments - accessible by all authenticated users
 router.get("/", departmentController.getAllDepartments);
 
