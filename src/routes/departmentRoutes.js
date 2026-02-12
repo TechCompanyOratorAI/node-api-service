@@ -12,10 +12,8 @@ router.post('/',
     departmentController.createDepartment
 );
 
-// Get all departments - accessible by all authenticated users
+// Get all departments - public access (for registration)
 router.get('/',
-    authenticateToken,
-    requireEmailVerification,
     departmentController.getAllDepartments
 );
 
