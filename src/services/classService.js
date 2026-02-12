@@ -215,7 +215,7 @@ class ClassService {
           {
             model: EnrollKey,
             as: "enrollKeys",
-            attributes: ["keyId", "isActive"],
+            attributes: ["keyId", "keyValue", "isActive", "expiresAt"],
           },
         ],
         limit: parseInt(limit),
@@ -226,11 +226,21 @@ class ClassService {
 
       return {
         success: true,
-        data: classes.map((c) => ({
-          ...c.toJSON(),
-          enrollmentCount: c.enrollments?.length || 0,
-          activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
-        })),
+        data: classes.map((c) => {
+          const classData = {
+            ...c.toJSON(),
+            enrollmentCount: c.enrollments?.length || 0,
+            activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
+          };
+
+          // Only include enrollkey for Admin users
+          if (userRole === "Admin") {
+            const activeKey = c.enrollKeys?.find((k) => k.isActive);
+            classData.enrollkey = activeKey?.keyValue || null;
+          }
+
+          return classData;
+        }),
         pagination: {
           total: count,
           page: parseInt(page),
