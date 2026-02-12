@@ -515,7 +515,7 @@ class ClassService {
       await classData.update(classUpdates, { transaction });
 
       // Update enrollment key if provided
-      if (enrollKey || keyExpiresAt || keyMaxUses) {
+      if (enrollKey !== undefined || keyExpiresAt !== undefined || keyMaxUses !== undefined) {
         // Find active enrollment key for this class
         const activeKey = await EnrollKey.findOne({
           where: {
@@ -527,22 +527,17 @@ class ClassService {
           transaction
         });
 
-        if (!activeKey) {
-          await transaction.rollback();
-          return {
-            success: false,
-            message: "Không tìm thấy mã đăng ký active cho lớp này"
-          };
+        if (activeKey) {
+          // Update existing key
+          const keyUpdates = {};
+          if (enrollKey !== undefined) keyUpdates.keyValue = enrollKey;
+          if (keyExpiresAt !== undefined) keyUpdates.expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : null;
+          if (keyMaxUses !== undefined) keyUpdates.maxUses = keyMaxUses;
+
+          await activeKey.update(keyUpdates, { transaction });
         }
-
-        // Prepare key updates
-        const keyUpdates = {};
-        if (enrollKey) keyUpdates.keyValue = enrollKey;
-        if (keyExpiresAt !== undefined) keyUpdates.expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : null;
-        if (keyMaxUses !== undefined) keyUpdates.maxUses = keyMaxUses;
-
-        // Update the enrollment key
-        await activeKey.update(keyUpdates, { transaction });
+        // If no active key exists, just skip enrollment key update
+        // Class info update still succeeds
       }
 
       await transaction.commit();

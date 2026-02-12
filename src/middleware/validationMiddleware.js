@@ -235,6 +235,21 @@ export const validateCourseUpdate = [
     .optional()
     .isBoolean()
     .withMessage("isActive must be a boolean value"),
+
+  body("departmentId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Department ID must be a positive integer"),
+
+  body("instructorIds")
+    .optional()
+    .isArray()
+    .withMessage("Instructor IDs must be an array"),
+
+  body("instructorIds.*")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Each instructor ID must be a positive integer"),
 ];
 
 // Topic validation
