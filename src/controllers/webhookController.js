@@ -380,10 +380,12 @@ const analysisComplete = async (req, res) => {
                     // Create SemanticSimilarity
                     if (segAnalysis.semanticScore !== undefined) {
                         await SemanticSimilarity.create({
-                            segmentId: segAnalysis.segmentId,
+                            segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+                            resultId: null, // Will be linked later if needed
                             similarityScore: segAnalysis.semanticScore,
-                            matchedSlides: null,
-                            embeddingVector: null
+                            embeddingModel: analysis.metadata?.embeddingModel || null,
+                            cosineDistance: 1 - segAnalysis.semanticScore, // Convert similarity to distance
+                            comparisonMethod: 'cosine_similarity'
                         }, { transaction });
                     }
 
