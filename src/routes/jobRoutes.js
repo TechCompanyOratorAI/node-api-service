@@ -42,6 +42,12 @@ router.get('/presentation/:presentationId/history',
     jobController.getJobHistory
 );
 
+// Get analysis progress for presentation
+router.get('/presentation/:presentationId/progress',
+    generalRateLimit,
+    jobController.getAnalysisProgress
+);
+
 // Get job by ID
 router.get('/:jobId',
     generalRateLimit,

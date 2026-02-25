@@ -2,8 +2,15 @@
  * Webhook Routes - Python worker callbacks
  */
 
-import express from 'express';
-import { verifyWebhookAuth, asrComplete, analysisComplete, reportComplete, slidesComplete, health } from '../controllers/webhookController.js';
+import express from "express";
+import {
+  verifyWebhookAuth,
+  asrComplete,
+  analysisComplete,
+  reportComplete,
+  slidesComplete,
+  health,
+} from "../controllers/webhookController.js";
 
 const router = express.Router();
 
@@ -11,18 +18,18 @@ const router = express.Router();
 router.use(verifyWebhookAuth);
 
 // Health check
-router.get('/health', health);
+router.get("/health", health);
 
 // ASR worker callback
-router.post('/asr-complete', asrComplete);
+router.post("/asr-complete", asrComplete);
 
 // Analysis worker callback
-router.post('/analysis-complete', analysisComplete);
+router.post("/analysis-complete", analysisComplete);
 
 // Report worker callback
-router.post('/report-complete', reportComplete);
+router.post("/report-complete", reportComplete);
 
 // Slides worker callback
-router.post('/slides-complete', slidesComplete);
+router.post("/slides-complete", slidesComplete);
 
 export default router;
