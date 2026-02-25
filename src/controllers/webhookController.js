@@ -256,6 +256,23 @@ const asrComplete = async (req, res) => {
 
         console.log(`✅ ASR webhook processed successfully for job ${jobId}`);
 
+        // Enqueue analysis job for py-analyst-worker
+        try {
+            const analysisJob = await jobService.createJob(
+                presentationId,
+                'analysis',
+                {
+                    transcriptSegments: transcript?.segments?.length || 0,
+                    uniqueSpeakers: diarization?.speakers?.length || 0,
+                    asrJobId: jobId
+                }
+            );
+            console.log(`✅ Analysis job ${analysisJob.jobId} enqueued for presentation ${presentationId}`);
+        } catch (enqueueError) {
+            console.error('⚠️ Failed to enqueue analysis job:', enqueueError);
+            // Don't fail the request - ASR completed successfully
+        }
+
         return res.json({
             success: true,
             message: 'ASR results saved successfully',
