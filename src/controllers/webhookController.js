@@ -394,6 +394,30 @@ const analysisComplete = async (req, res) => {
       console.log(
         `📊 Saving analysis results for presentation ${presentationId}`,
       );
+      
+      // First, delete existing segment analyses for this presentation to avoid duplicates
+      const segmentIds = await db.sequelize.query(`
+        SELECT ts.segmentId 
+        FROM TranscriptSegments ts 
+        JOIN Transcripts t ON ts.transcriptId = t.transcriptId 
+        WHERE t.presentationId = :presentationId
+      `, {
+        replacements: { presentationId },
+        type: db.sequelize.QueryTypes.SELECT,
+        transaction
+      });
+      
+      if (segmentIds.length > 0) {
+        const segmentIdList = segmentIds.map(s => s.segmentId);
+        await SegmentAnalysis.destroy({
+          where: {
+            segmentId: segmentIdList
+          },
+          transaction
+        });
+        console.log(`🗑️ Deleted existing segment analyses for presentation ${presentationId}`);
+      }
+      
       // Save segment-level analyses
       if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
         for (const segAnalysis of analysis.segmentAnalyses) {
@@ -409,8 +433,8 @@ const analysisComplete = async (req, res) => {
             slideId = slide ? slide.slideId : null;
           }
 
-          // Use upsert to handle duplicate entries
-          const [segmentAnalysisRecord, created] = await SegmentAnalysis.upsert(
+          // Create new segment analysis record (old ones already deleted above)
+          const segmentAnalysisRecord = await SegmentAnalysis.create(
             {
               segmentId: segAnalysis.segmentId,
               slideId: slideId, // Can be null if no matching slide found
@@ -426,10 +450,7 @@ const analysisComplete = async (req, res) => {
               topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
               analyzedAt: new Date(),
             },
-            {
-              transaction,
-              conflictFields: ["segmentId", "slideId"], // Specify conflict fields for upsert
-            },
+            { transaction },
           );
         }
         console.log(
