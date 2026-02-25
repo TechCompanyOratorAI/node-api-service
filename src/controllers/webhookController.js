@@ -217,17 +217,12 @@ const asrComplete = async (req, res) => {
     }
 
     // Process diarization if available (outside main transaction)
-    if (
-      transcript &&
-      transcript.segments &&
-      diarization &&
-      diarization.speakers
-    ) {
+    if (transcript && transcript.segments && diarization && diarization.speakers) {
       try {
         // Create speakers from diarization
         const speakers = await speakerService.createSpeakersFromDiarization(
           presentationId,
-          diarization.speakers,
+          diarization.speakers
         );
 
         console.log(`✅ Created ${speakers.length} speakers from diarization`);
@@ -237,39 +232,51 @@ const asrComplete = async (req, res) => {
           // Get transcript to get segment IDs
           const transcriptRecord = await Transcript.findOne({
             where: { presentationId },
-            include: [{ model: TranscriptSegment, as: "segments" }],
+            include: [{ model: TranscriptSegment, as: 'segments' }]
           });
 
           if (transcriptRecord && transcriptRecord.segments) {
             // Map segment order to segmentId
             const segmentIdMap = {};
-            transcriptRecord.segments.forEach((seg) => {
+            transcriptRecord.segments.forEach(seg => {
               segmentIdMap[seg.segmentNumber] = seg.segmentId;
             });
 
             // Convert mappings to use segmentId instead of order
-            const mappingsWithIds = diarization.segmentSpeakerMappings
-              .map((m) => ({
-                segmentId: segmentIdMap[m.order] || m.segmentId,
-                aiSpeakerLabel: m.aiSpeakerLabel,
-              }))
-              .filter((m) => m.segmentId); // Filter out invalid mappings
+            const mappingsWithIds = diarization.segmentSpeakerMappings.map(m => ({
+              segmentId: segmentIdMap[m.order] || m.segmentId,
+              aiSpeakerLabel: m.aiSpeakerLabel
+            })).filter(m => m.segmentId); // Filter out invalid mappings
 
             await speakerService.linkSegmentsToSpeakers(
               presentationId,
-              mappingsWithIds,
+              mappingsWithIds
             );
 
             console.log(`✅ Linked segments to speakers`);
           }
         }
       } catch (diarizationError) {
-        console.error(
-          "⚠️ Diarization processing error (transcript saved):",
-          diarizationError,
-        );
+        console.error('⚠️ Diarization processing error (transcript saved):', diarizationError);
         // Don't fail the whole request - transcript is already saved
       }
+    }
+
+    // Enqueue analysis job for py-analyst-worker
+    try {
+      const analysisJob = await jobService.createJob(
+        presentationId,
+        'analysis',
+        {
+          transcriptSegments: transcript?.segments?.length || 0,
+          uniqueSpeakers: diarization?.speakers?.length || 0,
+          asrJobId: jobId
+        }
+      );
+      console.log(`✅ Analysis job ${analysisJob.jobId} enqueued for presentation ${presentationId}`);
+    } catch (enqueueError) {
+      console.error('⚠️ Failed to enqueue analysis job:', enqueueError);
+      // Don't fail the request - ASR completed successfully
     }
 
     // Mark job as completed
