@@ -230,12 +230,17 @@ const asrComplete = async (req, res) => {
     }
 
     // Process diarization if available (outside main transaction)
-    if (transcript && transcript.segments && diarization && diarization.speakers) {
+    if (
+      transcript &&
+      transcript.segments &&
+      diarization &&
+      diarization.speakers
+    ) {
       try {
         // Create speakers from diarization
         const speakers = await speakerService.createSpeakersFromDiarization(
           presentationId,
-          diarization.speakers
+          diarization.speakers,
         );
 
         console.log(`✅ Created ${speakers.length} speakers from diarization`);
@@ -245,50 +250,57 @@ const asrComplete = async (req, res) => {
           // Get transcript to get segment IDs
           const transcriptRecord = await Transcript.findOne({
             where: { presentationId },
-            include: [{ model: TranscriptSegment, as: 'segments' }]
+            include: [{ model: TranscriptSegment, as: "segments" }],
           });
 
           if (transcriptRecord && transcriptRecord.segments) {
             // Map segment order to segmentId
             const segmentIdMap = {};
-            transcriptRecord.segments.forEach(seg => {
+            transcriptRecord.segments.forEach((seg) => {
               segmentIdMap[seg.segmentNumber] = seg.segmentId;
             });
 
             // Convert mappings to use segmentId instead of order
-            const mappingsWithIds = diarization.segmentSpeakerMappings.map(m => ({
-              segmentId: segmentIdMap[m.order] || m.segmentId,
-              aiSpeakerLabel: m.aiSpeakerLabel
-            })).filter(m => m.segmentId); // Filter out invalid mappings
+            const mappingsWithIds = diarization.segmentSpeakerMappings
+              .map((m) => ({
+                segmentId: segmentIdMap[m.order] || m.segmentId,
+                aiSpeakerLabel: m.aiSpeakerLabel,
+              }))
+              .filter((m) => m.segmentId); // Filter out invalid mappings
 
             await speakerService.linkSegmentsToSpeakers(
               presentationId,
-              mappingsWithIds
+              mappingsWithIds,
             );
 
             console.log(`✅ Linked segments to speakers`);
           }
         }
       } catch (diarizationError) {
-        console.error('⚠️ Diarization processing error (transcript saved):', diarizationError);
+        console.error(
+          "⚠️ Diarization processing error (transcript saved):",
+          diarizationError,
+        );
         // Don't fail the whole request - transcript is already saved
       }
     }
 
-    // Enqueue analysis job for py-analyst-worker
+    // Enqueue semantic job for py-semantic-worker
     try {
-      const analysisJob = await jobService.createJob(
+      const semanticJob = await jobService.createJob(
         presentationId,
-        'analysis',
+        "semantic",
         {
           transcriptSegments: transcript?.segments?.length || 0,
           uniqueSpeakers: diarization?.speakers?.length || 0,
-          asrJobId: jobId
-        }
+          asrJobId: jobId,
+        },
       );
-      console.log(`✅ Analysis job ${analysisJob.jobId} enqueued for presentation ${presentationId}`);
+      console.log(
+        `✅ Semantic job ${semanticJob.jobId} enqueued for presentation ${presentationId}`,
+      );
     } catch (enqueueError) {
-      console.error('⚠️ Failed to enqueue analysis job:', enqueueError);
+      console.error("⚠️ Failed to enqueue semantic job:", enqueueError);
       // Don't fail the request - ASR completed successfully
     }
 
@@ -372,15 +384,26 @@ const asrComplete = async (req, res) => {
  *   }
  * }
  */
+// Cache for processed requests (in-memory for simplicity)
+const processedRequests = new Map();
+
 const analysisComplete = async (req, res) => {
   const transaction = await db.sequelize.transaction();
 
   try {
     const { jobId, presentationId, status, error, analysis } = req.body;
+    const idempotencyKey = req.headers['idempotency-key'];
 
     console.log(
       `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
     );
+
+    // Check for idempotency key to prevent duplicate processing
+    if (idempotencyKey && processedRequests.has(idempotencyKey)) {
+      console.log(`🔄 Duplicate request detected for key: ${idempotencyKey}, returning cached response`);
+      await transaction.rollback();
+      return res.json(processedRequests.get(idempotencyKey));
+    }
 
     if (!jobId || !presentationId || !status) {
       return res.status(400).json({
@@ -395,6 +418,25 @@ const analysisComplete = async (req, res) => {
         success: false,
         message: `Job not found: ${jobId}`,
       });
+    }
+
+    // Check if job is already completed to prevent duplicate processing
+    if (job.status === 'completed') {
+      console.log(`⚠️ Job ${jobId} is already completed, skipping processing`);
+      const response = {
+        success: true,
+        message: "Job already completed",
+        data: { jobId, presentationId },
+      };
+      
+      // Cache response for idempotency
+      if (idempotencyKey) {
+        processedRequests.set(idempotencyKey, response);
+        setTimeout(() => processedRequests.delete(idempotencyKey), 3600000);
+      }
+      
+      await transaction.rollback();
+      return res.json(response);
     }
 
     // Handle failure
@@ -413,12 +455,12 @@ const analysisComplete = async (req, res) => {
       console.log(
         `📊 Saving analysis results for presentation ${presentationId}`,
       );
-      
+
       // Save segment-level analyses using findOrCreate to handle duplicates
       if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
         let createdCount = 0;
         let updatedCount = 0;
-        
+
         for (const segAnalysis of analysis.segmentAnalyses) {
           // Find slideId based on bestMatchingSlide
           let slideId = null;
@@ -433,49 +475,53 @@ const analysisComplete = async (req, res) => {
           }
 
           // Use findOrCreate to handle duplicates - update if exists, create if not
-          const [segmentAnalysisRecord, created] = await SegmentAnalysis.findOrCreate({
-            where: {
-              segmentId: segAnalysis.segmentId,
-            },
-            defaults: {
-              slideId: slideId,
-              configId: null,
-              relevanceScore: segAnalysis.relevanceScore,
-              semanticScore: segAnalysis.semanticScore,
-              alignmentScore: segAnalysis.alignmentScore,
-              bestMatchingSlide: segAnalysis.bestMatchingSlide,
-              expectedSlideNumber: segAnalysis.expectedSlideNumber,
-              timingDeviation: segAnalysis.timingDeviation,
-              issues: segAnalysis.issues || [],
-              suggestions: segAnalysis.suggestions || [],
-              topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
-              analyzedAt: new Date(),
-            },
-            transaction,
-          });
+          const [segmentAnalysisRecord, created] =
+            await SegmentAnalysis.findOrCreate({
+              where: {
+                segmentId: segAnalysis.segmentId,
+              },
+              defaults: {
+                slideId: slideId,
+                configId: null,
+                relevanceScore: segAnalysis.relevanceScore,
+                semanticScore: segAnalysis.semanticScore,
+                alignmentScore: segAnalysis.alignmentScore,
+                bestMatchingSlide: segAnalysis.bestMatchingSlide,
+                expectedSlideNumber: segAnalysis.expectedSlideNumber,
+                timingDeviation: segAnalysis.timingDeviation,
+                issues: segAnalysis.issues || [],
+                suggestions: segAnalysis.suggestions || [],
+                topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
+                analyzedAt: new Date(),
+              },
+              transaction,
+            });
 
           // If record already exists, update it with new values
           if (!created) {
-            await segmentAnalysisRecord.update({
-              slideId: slideId,
-              configId: null,
-              relevanceScore: segAnalysis.relevanceScore,
-              semanticScore: segAnalysis.semanticScore,
-              alignmentScore: segAnalysis.alignmentScore,
-              bestMatchingSlide: segAnalysis.bestMatchingSlide,
-              expectedSlideNumber: segAnalysis.expectedSlideNumber,
-              timingDeviation: segAnalysis.timingDeviation,
-              issues: segAnalysis.issues || [],
-              suggestions: segAnalysis.suggestions || [],
-              topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
-              analyzedAt: new Date(),
-            }, { transaction });
+            await segmentAnalysisRecord.update(
+              {
+                slideId: slideId,
+                configId: null,
+                relevanceScore: segAnalysis.relevanceScore,
+                semanticScore: segAnalysis.semanticScore,
+                alignmentScore: segAnalysis.alignmentScore,
+                bestMatchingSlide: segAnalysis.bestMatchingSlide,
+                expectedSlideNumber: segAnalysis.expectedSlideNumber,
+                timingDeviation: segAnalysis.timingDeviation,
+                issues: segAnalysis.issues || [],
+                suggestions: segAnalysis.suggestions || [],
+                topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
+                analyzedAt: new Date(),
+              },
+              { transaction },
+            );
             updatedCount++;
           } else {
             createdCount++;
           }
         }
-        
+
         console.log(
           `✅ Processed ${analysis.segmentAnalyses.length} segment analyses (${createdCount} created, ${updatedCount} updated)`,
         );
@@ -508,7 +554,7 @@ const analysisComplete = async (req, res) => {
 
     console.log(`✅ Analysis webhook processed successfully for job ${jobId}`);
 
-    return res.json({
+    const response = {
       success: true,
       message: "Analysis results saved successfully",
       data: {
@@ -516,7 +562,16 @@ const analysisComplete = async (req, res) => {
         presentationId,
         segmentAnalyses: analysis?.segmentAnalyses?.length || 0,
       },
-    });
+    };
+
+    // Cache the response for idempotency
+    if (idempotencyKey) {
+      processedRequests.set(idempotencyKey, response);
+      // Clean up old entries after 1 hour to prevent memory leaks
+      setTimeout(() => processedRequests.delete(idempotencyKey), 3600000);
+    }
+
+    return res.json(response);
   } catch (error) {
     await transaction.rollback();
     console.error("❌ Analysis webhook error:", error);
