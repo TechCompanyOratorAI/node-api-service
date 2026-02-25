@@ -105,24 +105,37 @@ const asrComplete = async (req, res) => {
 
     // Validate required fields
     if (!jobId || !presentationId || !status) {
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: "Missing required fields: jobId, presentationId, status",
       });
     }
 
-    // Get job
-    const job = await jobService.getJobById(jobId);
-    if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: `Job not found: ${jobId}`,
-      });
+    // Get job (getJobById throws error if not found, so wrap in try-catch)
+    let job;
+    try {
+      job = await jobService.getJobById(jobId);
+    } catch (jobError) {
+      await transaction.rollback();
+      console.error(`⚠️ Job not found: ${jobId}`);
+      
+      // Still process the webhook data even if job record is missing
+      // This handles cases where job was created but not yet synced
+      console.log(`⚠️ Processing webhook without job validation for presentation ${presentationId}`);
+      job = null; // Continue processing
     }
 
     // Handle failure
     if (status === "failed") {
-      await jobService.markJobFailed(jobId, error || "ASR failed", true);
+      // Try to mark job as failed, but don't fail if job doesn't exist
+      if (job) {
+        try {
+          await jobService.markJobFailed(jobId, error || "ASR failed", true);
+        } catch (jobError) {
+          console.error(`⚠️ Failed to mark job ${jobId} as failed:`, jobError.message);
+        }
+      }
 
       await Presentation.update(
         { status: "failed" },
@@ -279,12 +292,18 @@ const asrComplete = async (req, res) => {
       // Don't fail the request - ASR completed successfully
     }
 
-    // Mark job as completed
-    await jobService.markJobCompleted(jobId, {
-      transcriptCreated: true,
-      segmentCount: transcript?.segments?.length || 0,
-      speakerCount: diarization?.speakers?.length || 0,
-    });
+    // Mark job as completed (skip if job doesn't exist)
+    if (job) {
+      try {
+        await jobService.markJobCompleted(jobId, {
+          transcriptCreated: true,
+          segmentCount: transcript?.segments?.length || 0,
+          speakerCount: diarization?.speakers?.length || 0,
+        });
+      } catch (jobError) {
+        console.error(`⚠️ Failed to mark job ${jobId} as completed:`, jobError.message);
+      }
+    }
 
     console.log(`✅ ASR webhook processed successfully for job ${jobId}`);
 
