@@ -179,17 +179,57 @@ class PresentationService {
   }
 
   async uploadSlide({ presentationId, studentId, slideNumber, file }) {
+    const transaction = await db.sequelize.transaction();
+    
     try {
       const accessResult = await this.getPresentationForStudent(
         presentationId,
         studentId
       );
       if (!accessResult.success) {
+        await transaction.rollback();
         return accessResult;
       }
 
       const presentation = accessResult.presentation;
 
+      // Step 1: Clean up existing slides and related analysis data
+      console.log(`🧹 Cleaning up existing slides for presentation ${presentationId}`);
+      
+      // Get existing slides for file cleanup
+      const existingSlides = await Slide.findAll({
+        where: { presentationId },
+        attributes: ["slideId", "filePath"],
+        transaction
+      });
+
+      // Delete existing slide analysis data
+      if (existingSlides.length > 0) {
+        const slideIds = existingSlides.map(s => s.slideId);
+        
+        // Delete segment analyses related to these slides
+        await db.SegmentAnalysis.destroy({
+          where: { slideId: { [db.Sequelize.Op.in]: slideIds } },
+          transaction
+        });
+        console.log(`✅ Deleted segment analyses for ${slideIds.length} slides`);
+      }
+
+      // Delete overall analysis results for this presentation
+      await db.AnalysisResult.destroy({
+        where: { presentationId },
+        transaction
+      });
+      console.log(`✅ Deleted analysis results for presentation ${presentationId}`);
+
+      // Delete existing slides from database
+      await Slide.destroy({
+        where: { presentationId },
+        transaction
+      });
+      console.log(`✅ Deleted ${existingSlides.length} existing slides from database`);
+
+      // Step 2: Upload new slide file
       // Detect number of pages in the file
       const pageCount = await detectPageCount(file.buffer, file.mimetype);
 
@@ -214,6 +254,7 @@ class PresentationService {
         contentType: file.mimetype,
       });
 
+      // Step 3: Create new slide record
       const slide = await Slide.create({
         presentationId: presentation.presentationId,
         slideNumber: finalSlideNumber,
@@ -222,9 +263,27 @@ class PresentationService {
         fileFormat: file.mimetype,
         fileSizeBytes: file.size,
         uploadedAt: new Date(),
-      });
+      }, { transaction });
 
-      // Create job and send to slides queue for OCR + embeddings processing
+      // Commit transaction before creating job
+      await transaction.commit();
+      console.log(`✅ Successfully uploaded new slide ${slide.slideId}`);
+
+      // Step 4: Clean up old slide files from storage (async, don't wait)
+      if (existingSlides.length > 0) {
+        const filesToDelete = existingSlides
+          .map(slide => storageService.extractKeyFromUrl(slide.filePath))
+          .filter(key => key);
+        
+        if (filesToDelete.length > 0) {
+          storageService.deleteMultipleFiles(filesToDelete).catch((error) => {
+            console.error("⚠️ Error deleting old slide files from storage:", error);
+          });
+          console.log(`🗑️ Scheduled deletion of ${filesToDelete.length} old slide files`);
+        }
+      }
+
+      // Step 5: Create job and send to slides queue for OCR + embeddings processing
       try {
         const job = await jobService.createJob(
           presentation.presentationId,
@@ -248,6 +307,9 @@ class PresentationService {
 
       return { success: true, slide };
     } catch (error) {
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
       console.error("Upload slide error:", error);
       return {
         success: false,

@@ -385,6 +385,29 @@ const analysisComplete = async (req, res) => {
     // Handle success - Save analysis results
     if (analysis) {
       console.log(`📊 Saving analysis results for presentation ${presentationId}`);
+      
+      // Clear existing analysis results for this presentation first
+      await SegmentAnalysis.destroy({
+        where: { 
+          segmentId: {
+            [db.Sequelize.Op.in]: db.sequelize.literal(`(
+              SELECT ts.segmentId 
+              FROM TranscriptSegments ts 
+              JOIN Transcripts t ON ts.transcriptId = t.transcriptId 
+              WHERE t.presentationId = ${presentationId}
+            )`)
+          }
+        },
+        transaction
+      });
+      
+      await AnalysisResult.destroy({
+        where: { presentationId },
+        transaction
+      });
+      
+      console.log(`🧹 Cleared existing analysis results for presentation ${presentationId}`);
+      
       // Save segment-level analyses
       if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
         for (const segAnalysis of analysis.segmentAnalyses) {
@@ -400,34 +423,28 @@ const analysisComplete = async (req, res) => {
             slideId = slide ? slide.slideId : null;
           }
 
-          // Use upsert to handle duplicate entries
-          const [segmentAnalysisRecord, created] = await SegmentAnalysis.upsert(
-            {
-              segmentId: segAnalysis.segmentId,
-              slideId: slideId, // Can be null if no matching slide found
-              configId: null,
-              relevanceScore: segAnalysis.relevanceScore,
-              semanticScore: segAnalysis.semanticScore,
-              alignmentScore: segAnalysis.alignmentScore,
-              bestMatchingSlide: segAnalysis.bestMatchingSlide,
-              expectedSlideNumber: segAnalysis.expectedSlideNumber,
-              timingDeviation: segAnalysis.timingDeviation,
-              issues: segAnalysis.issues || [],
-              suggestions: segAnalysis.suggestions || [],
-              topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
-              analyzedAt: new Date()
-            },
-            { 
-              transaction,
-              conflictFields: ['segmentId', 'slideId'] // Specify conflict fields for upsert
-            }
-          );
+          // Create new segment analysis record
+          await SegmentAnalysis.create({
+            segmentId: segAnalysis.segmentId,
+            slideId: slideId, // Can be null if no matching slide found
+            configId: null,
+            relevanceScore: segAnalysis.relevanceScore,
+            semanticScore: segAnalysis.semanticScore,
+            alignmentScore: segAnalysis.alignmentScore,
+            bestMatchingSlide: segAnalysis.bestMatchingSlide,
+            expectedSlideNumber: segAnalysis.expectedSlideNumber,
+            timingDeviation: segAnalysis.timingDeviation,
+            issues: segAnalysis.issues || [],
+            suggestions: segAnalysis.suggestions || [],
+            topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
+            analyzedAt: new Date()
+          }, { transaction });
         }
         console.log(`✅ Saved ${analysis.segmentAnalyses.length} segment analyses`);
       }
 
-      // Save overall analysis result using upsert
-      const [analysisResult, created] = await AnalysisResult.upsert({
+      // Save overall analysis result
+      await AnalysisResult.create({
         presentationId, 
         configId: null, 
         overallScore: analysis.overallScores?.overallScore || 0,
@@ -435,7 +452,7 @@ const analysisComplete = async (req, res) => {
         status: 'done'
       }, { transaction });
       
-      console.log(`✅ ${created ? 'Created' : 'Updated'} overall analysis result`);
+      console.log(`✅ Created new overall analysis result`);
     }
 
     // Mark job as completed
@@ -760,6 +777,38 @@ const slidesComplete = async (req, res) => {
     await transaction.commit();
 
     console.log(`✅ Slides webhook processed successfully for job ${jobId}`);
+
+    // Check if we should trigger analysis job (if transcript exists and no active analysis job)
+    try {
+      const transcript = await Transcript.findOne({
+        where: { presentationId },
+        include: [{ model: TranscriptSegment, as: "segments" }]
+      });
+
+      if (transcript && transcript.segments && transcript.segments.length > 0) {
+        // Check if there's already an active analysis job
+        const activeAnalysisJob = await jobService.getJobByPresentation(presentationId, "analysis");
+        
+        if (!activeAnalysisJob || activeAnalysisJob.status === "failed" || activeAnalysisJob.status === "completed") {
+          console.log(`🔄 Triggering analysis job for presentation ${presentationId} after slide processing`);
+          
+          const analysisJob = await jobService.createJob(presentationId, "analysis", {
+            triggeredBy: "slide_update",
+            slideId: slideId,
+            transcriptSegments: transcript.segments.length
+          });
+          
+          console.log(`✅ Created analysis job ${analysisJob.jobId} after slide processing`);
+        } else {
+          console.log(`⏳ Analysis job already active for presentation ${presentationId}, skipping`);
+        }
+      } else {
+        console.log(`📝 No transcript found for presentation ${presentationId}, skipping analysis trigger`);
+      }
+    } catch (analysisError) {
+      console.error("⚠️ Error triggering analysis after slide processing:", analysisError);
+      // Don't fail the webhook - slide processing was successful
+    }
 
     return res.json({
       success: true,
