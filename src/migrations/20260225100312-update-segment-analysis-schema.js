@@ -1,12 +1,14 @@
 'use strict';
 
-/** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    // First, allow slideId to be nullable
+  up: async (queryInterface, Sequelize) => {
+    // Allow slideId to be null
     await queryInterface.changeColumn('SegmentAnalyses', 'slideId', {
       type: Sequelize.INTEGER,
-      allowNull: true
+      allowNull: true,
+      references: { model: 'Slides', key: 'slideId' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     });
 
     // Add new columns for semantic analysis results
@@ -56,7 +58,7 @@ module.exports = {
     });
   },
 
-  async down(queryInterface, Sequelize) {
+  down: async (queryInterface, Sequelize) => {
     // Remove added columns
     await queryInterface.removeColumn('SegmentAnalyses', 'topicKeywordsFound');
     await queryInterface.removeColumn('SegmentAnalyses', 'suggestions');
@@ -71,7 +73,10 @@ module.exports = {
     // Revert slideId to not null
     await queryInterface.changeColumn('SegmentAnalyses', 'slideId', {
       type: Sequelize.INTEGER,
-      allowNull: false
+      allowNull: false,
+      references: { model: 'Slides', key: 'slideId' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     });
   }
 };

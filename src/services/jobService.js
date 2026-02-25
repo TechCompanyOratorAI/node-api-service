@@ -270,132 +270,32 @@ class JobService {
 
     /**
      * Kích hoạt job tiếp theo trong pipeline
-     * Pipeline: ASR + SLIDES → ANALYSIS → REPORT
+     * Pipeline: ASR → Analysis → Report
      * @private
      */
     async _triggerNextJobInPipeline(completedJob) {
         try {
             const { presentationId, jobType } = completedJob;
 
-            if (jobType === JOB_TYPES.ASR || jobType === JOB_TYPES.SLIDES) {
-                // Check if both ASR and all SLIDES jobs are completed
-                const canTriggerAnalysis = await this._canTriggerAnalysisJob(presentationId);
-                
-                if (canTriggerAnalysis) {
-                    console.log(`⏭️ Both ASR and SLIDES completed, triggering ANALYSIS for presentation ${presentationId}`);
-                    await this.createJob(presentationId, JOB_TYPES.ANALYSIS, {
-                        triggeredBy: completedJob.jobId,
-                        previousJobType: jobType,
-                        triggerReason: 'asr_and_slides_completed'
-                    });
-                } else {
-                    console.log(`⏳ Waiting for other jobs to complete before triggering ANALYSIS for presentation ${presentationId}`);
-                }
+            let nextJobType = null;
+
+            if (jobType === JOB_TYPES.ASR) {
+                nextJobType = JOB_TYPES.ANALYSIS;
             } else if (jobType === JOB_TYPES.ANALYSIS) {
-                console.log(`⏭️ Triggering REPORT for presentation ${presentationId}`);
-                await this.createJob(presentationId, JOB_TYPES.REPORT, {
+                nextJobType = JOB_TYPES.REPORT;
+            }
+            // Report is final step, no next job
+
+            if (nextJobType) {
+                console.log(`⏭️ Triggering next job in pipeline: ${nextJobType} for presentation ${presentationId}`);
+                await this.createJob(presentationId, nextJobType, {
                     triggeredBy: completedJob.jobId,
                     previousJobType: jobType
                 });
             }
-            // Report is final step, no next job
         } catch (error) {
             console.error('❌ Error triggering next job in pipeline:', error);
             // Don't throw, just log - pipeline continuation failure shouldn't fail current job
-        }
-    }
-
-    /**
-     * Kiểm tra xem có thể trigger ANALYSIS job không
-     * Điều kiện: ASR completed + tất cả SLIDES jobs completed
-     * @private
-     */
-    async _canTriggerAnalysisJob(presentationId) {
-        try {
-            // Check if ASR job is completed
-            const asrJob = await Job.findOne({
-                where: {
-                    presentationId,
-                    jobType: JOB_TYPES.ASR,
-                    status: JOB_STATUS.COMPLETED
-                }
-            });
-
-            if (!asrJob) {
-                console.log(`❌ ASR job not completed for presentation ${presentationId}`);
-                return false;
-            }
-
-            // Check if there are any pending/running SLIDES jobs
-            const pendingSlidesJobs = await Job.findAll({
-                where: {
-                    presentationId,
-                    jobType: JOB_TYPES.SLIDES,
-                    status: {
-                        [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING]
-                    }
-                }
-            });
-
-            if (pendingSlidesJobs.length > 0) {
-                console.log(`⏳ ${pendingSlidesJobs.length} SLIDES jobs still pending/running for presentation ${presentationId}`);
-                return false;
-            }
-
-            // Check if there are any completed SLIDES jobs
-            const completedSlidesJobs = await Job.findAll({
-                where: {
-                    presentationId,
-                    jobType: JOB_TYPES.SLIDES,
-                    status: JOB_STATUS.COMPLETED
-                }
-            });
-
-            // Get total number of slides for this presentation
-            const presentation = await Presentation.findByPk(presentationId, {
-                include: [{
-                    model: db.Slide,
-                    as: 'slides'
-                }]
-            });
-
-            const totalSlides = presentation?.slides?.length || 0;
-            const completedSlides = completedSlidesJobs.length;
-
-            console.log(`📊 Slides progress for presentation ${presentationId}: ${completedSlides}/${totalSlides} completed`);
-
-            if (totalSlides === 0) {
-                console.log(`⚠️ No slides found for presentation ${presentationId}, proceeding with analysis`);
-                return true;
-            }
-
-            if (completedSlides < totalSlides) {
-                console.log(`⏳ Not all slides completed yet (${completedSlides}/${totalSlides}) for presentation ${presentationId}`);
-                return false;
-            }
-
-            // Check if ANALYSIS job already exists
-            const existingAnalysisJob = await Job.findOne({
-                where: {
-                    presentationId,
-                    jobType: JOB_TYPES.ANALYSIS,
-                    status: {
-                        [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING, JOB_STATUS.COMPLETED]
-                    }
-                }
-            });
-
-            if (existingAnalysisJob) {
-                console.log(`⚠️ ANALYSIS job already exists for presentation ${presentationId} (status: ${existingAnalysisJob.status})`);
-                return false;
-            }
-
-            console.log(`✅ All conditions met for ANALYSIS job: ASR completed + all ${totalSlides} slides completed`);
-            return true;
-
-        } catch (error) {
-            console.error('❌ Error checking if can trigger analysis job:', error);
-            return false;
         }
     }
 
