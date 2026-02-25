@@ -247,7 +247,6 @@ const asrComplete = async (req, res) => {
               segmentIdMap[seg.segmentNumber] = seg.segmentId;
             });
 
-
             // Convert mappings to use segmentId instead of order
             const mappingsWithIds = diarization.segmentSpeakerMappings
               .map((m) => ({
@@ -260,97 +259,6 @@ const asrComplete = async (req, res) => {
               presentationId,
               mappingsWithIds,
             );
-
-            console.log(`✅ Created transcript with ${createdSegments.length} segments`);
-            
-            // Commit transcript and segments immediately to avoid timeout rollback
-            await transaction.commit();
-            console.log(`✅ Transcript transaction committed`);
-        }
-
-        // Process diarization if available (outside main transaction)
-        if (transcript && transcript.segments && diarization && diarization.speakers) {
-            try {
-                // Create speakers from diarization
-                const speakers = await speakerService.createSpeakersFromDiarization(
-                    presentationId,
-                    diarization.speakers
-                );
-
-                console.log(`✅ Created ${speakers.length} speakers from diarization`);
-
-                // Link segments to speakers
-                if (diarization.segmentSpeakerMappings) {
-                    // Get transcript to get segment IDs
-                    const transcriptRecord = await Transcript.findOne({
-                        where: { presentationId },
-                        include: [{ model: TranscriptSegment, as: 'segments' }]
-                    });
-
-                    if (transcriptRecord && transcriptRecord.segments) {
-                        // Map segment order to segmentId
-                        const segmentIdMap = {};
-                        transcriptRecord.segments.forEach(seg => {
-                            segmentIdMap[seg.segmentNumber] = seg.segmentId;
-                        });
-
-                        // Convert mappings to use segmentId instead of order
-                        const mappingsWithIds = diarization.segmentSpeakerMappings.map(m => ({
-                            segmentId: segmentIdMap[m.order] || m.segmentId,
-                            aiSpeakerLabel: m.aiSpeakerLabel
-                        })).filter(m => m.segmentId); // Filter out invalid mappings
-
-                        await speakerService.linkSegmentsToSpeakers(
-                            presentationId,
-                            mappingsWithIds
-                        );
-
-                        console.log(`✅ Linked segments to speakers`);
-                    }
-                }
-            } catch (diarizationError) {
-                console.error('⚠️ Diarization processing error (transcript saved):', diarizationError);
-                // Don't fail the whole request - transcript is already saved
-            }
-        }
-
-        // Mark job as completed
-        await jobService.markJobCompleted(jobId, {
-            transcriptCreated: true,
-            segmentCount: transcript?.segments?.length || 0,
-            speakerCount: diarization?.speakers?.length || 0
-        });
-
-        console.log(`✅ ASR webhook processed successfully for job ${jobId}`);
-
-        // Enqueue analysis job for py-analyst-worker
-        try {
-            const analysisJob = await jobService.createJob(
-                presentationId,
-                'analysis',
-                {
-                    transcriptSegments: transcript?.segments?.length || 0,
-                    uniqueSpeakers: diarization?.speakers?.length || 0,
-                    asrJobId: jobId
-                }
-            );
-            console.log(`✅ Analysis job ${analysisJob.jobId} enqueued for presentation ${presentationId}`);
-        } catch (enqueueError) {
-            console.error('⚠️ Failed to enqueue analysis job:', enqueueError);
-            // Don't fail the request - ASR completed successfully
-        }
-
-        return res.json({
-            success: true,
-            message: 'ASR results saved successfully',
-            data: {
-                jobId,
-                presentationId,
-                transcriptSegments: transcript?.segments?.length || 0,
-                speakers: diarization?.speakers?.length || 0
-            }
-        });
-
 
             console.log(`✅ Linked segments to speakers`);
           }
@@ -476,7 +384,9 @@ const analysisComplete = async (req, res) => {
 
     // Handle success - Save analysis results
     if (analysis) {
-      console.log(`📊 Saving analysis results for presentation ${presentationId}`);
+      console.log(
+        `📊 Saving analysis results for presentation ${presentationId}`,
+      );
       // Save segment-level analyses
       if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
         for (const segAnalysis of analysis.segmentAnalyses) {
@@ -486,8 +396,8 @@ const analysisComplete = async (req, res) => {
             const slide = await Slide.findOne({
               where: {
                 presentationId: presentationId,
-                slideNumber: segAnalysis.bestMatchingSlide
-              }
+                slideNumber: segAnalysis.bestMatchingSlide,
+              },
             });
             slideId = slide ? slide.slideId : null;
           }
@@ -507,27 +417,34 @@ const analysisComplete = async (req, res) => {
               issues: segAnalysis.issues || [],
               suggestions: segAnalysis.suggestions || [],
               topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
-              analyzedAt: new Date()
+              analyzedAt: new Date(),
             },
-            { 
+            {
               transaction,
-              conflictFields: ['segmentId', 'slideId'] // Specify conflict fields for upsert
-            }
+              conflictFields: ["segmentId", "slideId"], // Specify conflict fields for upsert
+            },
           );
         }
-        console.log(`✅ Saved ${analysis.segmentAnalyses.length} segment analyses`);
+        console.log(
+          `✅ Saved ${analysis.segmentAnalyses.length} segment analyses`,
+        );
       }
 
       // Save overall analysis result using upsert
-      const [analysisResult, created] = await AnalysisResult.upsert({
-        presentationId, 
-        configId: null, 
-        overallScore: analysis.overallScores?.overallScore || 0,
-        analyzedAt: new Date(), 
-        status: 'done'
-      }, { transaction });
-      
-      console.log(`✅ ${created ? 'Created' : 'Updated'} overall analysis result`);
+      const [analysisResult, created] = await AnalysisResult.upsert(
+        {
+          presentationId,
+          configId: null,
+          overallScore: analysis.overallScores?.overallScore || 0,
+          analyzedAt: new Date(),
+          status: "done",
+        },
+        { transaction },
+      );
+
+      console.log(
+        `✅ ${created ? "Created" : "Updated"} overall analysis result`,
+      );
     }
 
     // Mark job as completed
