@@ -45,11 +45,12 @@ class SpeakerService {
                 }
 
                 // Calculate total duration and segment count
-                const totalDurationSeconds = segments.reduce((sum, seg) => {
+                // Prefer metadata values (from py-asr-worker), fallback to segments calculation
+                const totalDurationSeconds = metadata.totalDuration || segments.reduce((sum, seg) => {
                     return sum + ((seg.endTime || 0) - (seg.startTime || 0));
                 }, 0);
 
-                const segmentCount = segments.length;
+                const segmentCount = metadata.segmentCount || segments.length;
 
                 // Check if speaker already exists
                 let speaker = await Speaker.findOne({
