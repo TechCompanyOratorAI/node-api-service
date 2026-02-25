@@ -17,6 +17,7 @@ const {
   Speaker,
   Feedback,
   AnalysisResult,
+  SegmentAnalysis,
   User,
   Course,
   Class,
@@ -179,16 +180,80 @@ class PresentationService {
   }
 
   async uploadSlide({ presentationId, studentId, slideNumber, file }) {
+    const transaction = await db.sequelize.transaction();
+    
     try {
       const accessResult = await this.getPresentationForStudent(
         presentationId,
         studentId
       );
       if (!accessResult.success) {
+        await transaction.rollback();
         return accessResult;
       }
 
       const presentation = accessResult.presentation;
+
+      // When uploading a new slide for existing presentation, 
+      // clear old slides and analysis data to keep only the latest
+      console.log(`🧹 Clearing old slides and analysis data for presentation ${presentationId} to keep only latest`);
+      
+      // Get existing slides to delete their files from storage
+      const existingSlides = await Slide.findAll({
+        where: { presentationId },
+        transaction
+      });
+
+      // Delete old slide files from storage
+      for (const oldSlide of existingSlides) {
+        try {
+          if (oldSlide.filePath) {
+            // Extract key from S3 URL for deletion
+            // URL format: https://bucket.s3.region.amazonaws.com/key/path
+            const url = new URL(oldSlide.filePath);
+            const key = url.pathname.substring(1); // Remove leading slash
+            await storageService.deleteFile(key);
+            console.log(`🗑️ Deleted old slide file: ${key}`);
+          }
+        } catch (deleteError) {
+          console.warn(`⚠️ Failed to delete old slide file ${oldSlide.filePath}:`, deleteError);
+          // Continue even if file deletion fails
+        }
+      }
+
+      // Clear segment analyses related to this presentation
+      await SegmentAnalysis.destroy({
+        where: { 
+          segmentId: {
+            [db.Sequelize.Op.in]: db.sequelize.literal(`
+              (SELECT ts.segmentId FROM TranscriptSegments ts 
+               JOIN Transcripts t ON ts.transcriptId = t.transcriptId 
+               WHERE t.presentationId = ${presentationId})
+            `)
+          }
+        },
+        transaction
+      });
+
+      // Clear analysis results for this presentation
+      await AnalysisResult.destroy({
+        where: { presentationId },
+        transaction
+      });
+
+      // Clear feedback for this presentation
+      await Feedback.destroy({
+        where: { presentationId },
+        transaction
+      });
+
+      // Delete old slides from database
+      await Slide.destroy({
+        where: { presentationId },
+        transaction
+      });
+
+      console.log(`✅ Cleared old slides and analysis data for presentation ${presentationId}`);
 
       // Detect number of pages in the file
       const pageCount = await detectPageCount(file.buffer, file.mimetype);
@@ -222,7 +287,9 @@ class PresentationService {
         fileFormat: file.mimetype,
         fileSizeBytes: file.size,
         uploadedAt: new Date(),
-      });
+      }, { transaction });
+
+      await transaction.commit();
 
       // Create job and send to slides queue for OCR + embeddings processing
       try {
@@ -239,7 +306,7 @@ class PresentationService {
           }
         );
         console.log(
-          `✅ Created slides job ${job.jobId} for slide ${slide.slideId} (${pageCount} pages)`
+          `✅ Created slides job ${job.jobId} for slide ${slide.slideId} (${pageCount} pages) - old data cleared`
         );
       } catch (jobError) {
         // Log error but don't fail the upload
@@ -248,6 +315,7 @@ class PresentationService {
 
       return { success: true, slide };
     } catch (error) {
+      await transaction.rollback();
       console.error("Upload slide error:", error);
       return {
         success: false,
