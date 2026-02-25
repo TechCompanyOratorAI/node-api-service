@@ -333,7 +333,7 @@ const analysisComplete = async (req, res) => {
             });
         }
 
-        const job = await jobService.getJobById(jobId);
+        const job = await jobService.getJobById(parseInt(jobId));
         if (!job) {
             return res.status(404).json({
                 success: false,
@@ -354,67 +354,54 @@ const analysisComplete = async (req, res) => {
 
         // Handle success - Save analysis results
         if (analysis) {
-            // Save segment-level analyses
+            console.log(`📊 Saving analysis results for presentation ${presentationId}`);
+            
+            // Save segment-level analyses with proper slideId mapping
             if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
                 for (const segAnalysis of analysis.segmentAnalyses) {
-                    // Create SegmentAnalysis
-                    const segmentAnalysisRecord = await SegmentAnalysis.create({
+                    // Find the actual slideId from slide number
+                    let slideId = null;
+                    if (segAnalysis.bestMatchingSlide) {
+                        const slide = await Slide.findOne({
+                            where: { 
+                                presentationId: presentationId,
+                                slideNumber: segAnalysis.bestMatchingSlide 
+                            }
+                        });
+                        slideId = slide ? slide.slideId : null;
+                    }
+                    
+                    // Create SegmentAnalysis with all the data from semantic worker
+                    await SegmentAnalysis.create({
                         segmentId: segAnalysis.segmentId,
-                        analysisType: 'content',
-                        score: segAnalysis.relevanceScore || 0,
-                        issues: JSON.stringify(segAnalysis.issues || []),
-                        suggestions: null,
+                        slideId: slideId, // Can be null if no matching slide found
+                        configId: null,
+                        relevanceScore: segAnalysis.relevanceScore,
+                        semanticScore: segAnalysis.semanticScore,
+                        alignmentScore: segAnalysis.alignmentScore,
+                        bestMatchingSlide: segAnalysis.bestMatchingSlide,
+                        expectedSlideNumber: segAnalysis.expectedSlideNumber,
+                        timingDeviation: segAnalysis.timingDeviation,
+                        issues: segAnalysis.issues || [],
+                        suggestions: segAnalysis.suggestions || [],
+                        topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
                         analyzedAt: new Date()
                     }, { transaction });
-
-                    // Create ContentRelevance
-                    if (segAnalysis.relevanceScore !== undefined) {
-                        await ContentRelevance.create({
-                            segmentId: segAnalysis.segmentId,
-                            relevanceScore: segAnalysis.relevanceScore,
-                            keyTopics: null,
-                            offTopicIndicators: null
-                        }, { transaction });
-                    }
-
-                    // Create SemanticSimilarity
-                    if (segAnalysis.semanticScore !== undefined) {
-                        await SemanticSimilarity.create({
-                            segAnalysisId: segmentAnalysisRecord.segAnalysisId,
-                            resultId: null, // Will be linked later if needed
-                            similarityScore: segAnalysis.semanticScore,
-                            embeddingModel: analysis.metadata?.embeddingModel || null,
-                            cosineDistance: 1 - segAnalysis.semanticScore, // Convert similarity to distance
-                            comparisonMethod: 'cosine_similarity'
-                        }, { transaction });
-                    }
-
-                    // Create AlignmentCheck
-                    if (segAnalysis.alignmentScore !== undefined) {
-                        await AlignmentCheck.create({
-                            segmentId: segAnalysis.segmentId,
-                            alignmentScore: segAnalysis.alignmentScore,
-                            expectedSlide: null,
-                            actualSlide: null,
-                            timingDeviation: null
-                        }, { transaction });
-                    }
                 }
-
+                
                 console.log(`✅ Saved ${analysis.segmentAnalyses.length} segment analyses`);
             }
-
-            // Save overall analysis result
-            const analysisResult = await AnalysisResult.create({
+            
+            // Save overall analysis result (upsert since presentationId might have unique constraint)
+            const [analysisResult, created] = await AnalysisResult.upsert({
                 presentationId,
-                analysisType: 'content',
-                overallScore: analysis.overallScores?.contentRelevance || 0,
-                detailedScores: JSON.stringify(analysis.overallScores || {}),
-                insights: JSON.stringify(analysis.metadata || {}),
-                analyzedAt: new Date()
+                configId: null,
+                overallScore: analysis.overallScores?.overallScore || 0,
+                analyzedAt: new Date(),
+                status: 'done'
             }, { transaction });
 
-            console.log(`✅ Saved overall analysis result: ${analysisResult.resultId}`);
+            console.log(`✅ ${created ? 'Created' : 'Updated'} overall analysis result`);
         }
 
         // Mark job as completed
@@ -438,7 +425,10 @@ const analysisComplete = async (req, res) => {
         });
 
     } catch (error) {
-        await transaction.rollback();
+        // Only rollback if transaction hasn't been committed yet
+        if (!transaction.finished) {
+            await transaction.rollback();
+        }
         console.error('❌ Analysis webhook error:', error);
 
         try {

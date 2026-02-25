@@ -11,7 +11,9 @@
  */
 
 import db from '../models/index.js';
-import { Op } from 'sequelize';
+import Sequelize from 'sequelize';
+
+const { Op } = Sequelize;
 
 const { Speaker, TranscriptSegment, User, Presentation } = db;
 
