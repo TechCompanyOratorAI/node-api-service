@@ -874,9 +874,9 @@ class PresentationService {
         presentationId,
         "asr"
       );
-      const analysisJob = await jobService.getJobByPresentation(
+      const semanticJob = await jobService.getJobByPresentation(
         presentationId,
-        "analysis"
+        "semantic"
       );
       const reportJob = await jobService.getJobByPresentation(
         presentationId,
@@ -892,12 +892,12 @@ class PresentationService {
               error: asrJob.errorMessage,
             }
           : null,
-        analysis: analysisJob
+        semantic: semanticJob
           ? {
-              status: analysisJob.status,
-              startedAt: analysisJob.startedAt,
-              completedAt: analysisJob.completedAt,
-              error: analysisJob.errorMessage,
+              status: semanticJob.status,
+              startedAt: semanticJob.startedAt,
+              completedAt: semanticJob.completedAt,
+              error: semanticJob.errorMessage,
             }
           : null,
         report: reportJob

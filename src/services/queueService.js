@@ -43,7 +43,7 @@ class QueueService {
   }
 
   /**
-   * Send message to Analysis queue (for semantic analysis)
+   * Send message to Semantic queue (for semantic analysis)
    * @param {Object} data - Message data
    * @param {number} data.presentationId - Presentation ID
    * @param {number} data.jobId - Job ID
@@ -52,8 +52,8 @@ class QueueService {
    * @param {Object} data.metadata - Additional metadata
    * @returns {Promise<Object>} - SQS message response
    */
-  async sendToAnalysisQueue(data) {
-    return this._sendMessage(QUEUE_URLS.analysis, "analysis", data);
+  async sendToSemanticQueue(data) {
+    return this._sendMessage(QUEUE_URLS.analysis, "semantic", data);
   }
 
   /**
