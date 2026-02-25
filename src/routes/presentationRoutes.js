@@ -76,6 +76,12 @@ router.get('/:presentationId/results',
   presentationController.getAnalysisResults
 );
 
+// Get analysis progress (detailed)
+router.get('/:presentationId/progress',
+  generalRateLimit,
+  presentationController.getAnalysisProgress
+);
+
 // Get presentations by course (for teachers)
 router.get('/course/:courseId',
   generalRateLimit,

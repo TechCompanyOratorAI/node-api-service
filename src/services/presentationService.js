@@ -1255,6 +1255,38 @@ class PresentationService {
     }
   }
 
+  /**
+   * Get detailed analysis progress for presentation
+   * @param {number} presentationId
+   * @param {number} userId
+   * @returns {Promise<object>}
+   */
+  async getAnalysisProgress(presentationId, userId) {
+    try {
+      // Check access
+      const hasAccess = await this.checkPresentationAccess(
+        presentationId,
+        userId
+      );
+      if (!hasAccess) {
+        return { success: false, message: "Access denied" };
+      }
+
+      const progress = await jobService.getAnalysisProgress(presentationId);
+
+      return {
+        success: true,
+        progress,
+      };
+    } catch (error) {
+      console.error("Get analysis progress error:", error);
+      return {
+        success: false,
+        message: "Failed to get analysis progress",
+        error: error.message,
+      };
+    }
   }
+}
 
 export default new PresentationService();

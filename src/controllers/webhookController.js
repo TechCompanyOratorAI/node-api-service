@@ -119,10 +119,12 @@ const asrComplete = async (req, res) => {
     } catch (jobError) {
       await transaction.rollback();
       console.error(`⚠️ Job not found: ${jobId}`);
-      
+
       // Still process the webhook data even if job record is missing
       // This handles cases where job was created but not yet synced
-      console.log(`⚠️ Processing webhook without job validation for presentation ${presentationId}`);
+      console.log(
+        `⚠️ Processing webhook without job validation for presentation ${presentationId}`,
+      );
       job = null; // Continue processing
     }
 
@@ -133,7 +135,10 @@ const asrComplete = async (req, res) => {
         try {
           await jobService.markJobFailed(jobId, error || "ASR failed", true);
         } catch (jobError) {
-          console.error(`⚠️ Failed to mark job ${jobId} as failed:`, jobError.message);
+          console.error(
+            `⚠️ Failed to mark job ${jobId} as failed:`,
+            jobError.message,
+          );
         }
       }
 
@@ -313,7 +318,10 @@ const asrComplete = async (req, res) => {
           speakerCount: diarization?.speakers?.length || 0,
         });
       } catch (jobError) {
-        console.error(`⚠️ Failed to mark job ${jobId} as completed:`, jobError.message);
+        console.error(
+          `⚠️ Failed to mark job ${jobId} as completed:`,
+          jobError.message,
+        );
       }
     }
 
@@ -392,7 +400,7 @@ const analysisComplete = async (req, res) => {
 
   try {
     const { jobId, presentationId, status, error, analysis } = req.body;
-    const idempotencyKey = req.headers['idempotency-key'];
+    const idempotencyKey = req.headers["idempotency-key"];
 
     console.log(
       `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
@@ -400,7 +408,9 @@ const analysisComplete = async (req, res) => {
 
     // Check for idempotency key to prevent duplicate processing
     if (idempotencyKey && processedRequests.has(idempotencyKey)) {
-      console.log(`🔄 Duplicate request detected for key: ${idempotencyKey}, returning cached response`);
+      console.log(
+        `🔄 Duplicate request detected for key: ${idempotencyKey}, returning cached response`,
+      );
       await transaction.rollback();
       return res.json(processedRequests.get(idempotencyKey));
     }
@@ -421,20 +431,20 @@ const analysisComplete = async (req, res) => {
     }
 
     // Check if job is already completed to prevent duplicate processing
-    if (job.status === 'completed') {
+    if (job.status === "completed") {
       console.log(`⚠️ Job ${jobId} is already completed, skipping processing`);
       const response = {
         success: true,
         message: "Job already completed",
         data: { jobId, presentationId },
       };
-      
+
       // Cache response for idempotency
       if (idempotencyKey) {
         processedRequests.set(idempotencyKey, response);
         setTimeout(() => processedRequests.delete(idempotencyKey), 3600000);
       }
-      
+
       await transaction.rollback();
       return res.json(response);
     }

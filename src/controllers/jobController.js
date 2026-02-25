@@ -262,6 +262,38 @@ class JobController {
             });
         }
     }
+
+    /**
+     * GET /api/v1/jobs/presentation/:presentationId/progress
+     * Get detailed analysis progress for presentation
+     */
+    async getAnalysisProgress(req, res) {
+        try {
+            const { presentationId } = req.params;
+            const parsedPresentationId = parseInt(presentationId);
+
+            if (Number.isNaN(parsedPresentationId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'presentationId must be a number'
+                });
+            }
+
+            const progress = await jobService.getAnalysisProgress(parsedPresentationId);
+
+            return res.json({
+                success: true,
+                progress
+            });
+        } catch (error) {
+            console.error('Get analysis progress error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error',
+                error: error.message
+            });
+        }
+    }
 }
 
 export default new JobController();

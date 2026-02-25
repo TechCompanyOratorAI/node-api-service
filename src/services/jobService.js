@@ -706,6 +706,268 @@ class JobService {
       throw error;
     }
   }
+
+  /**
+   * Get detailed analysis progress for presentation
+   * @param {number} presentationId
+   * @returns {Promise<object>}
+   */
+  async getAnalysisProgress(presentationId) {
+    try {
+      // Get all jobs for this presentation
+      const jobs = await Job.findAll({
+        where: { presentationId },
+        order: [["createdAt", "DESC"]],
+        include: [
+          {
+            model: Presentation,
+            as: "presentation",
+            attributes: ["presentationId", "title", "status", "submissionDate"],
+          },
+        ],
+      });
+
+      // Get latest job for each type (for single-job types)
+      const jobsByType = {};
+      for (const job of jobs) {
+        // Slides has multiple jobs per presentation, collect separately
+        if (job.jobType !== JOB_TYPES.SLIDES && !jobsByType[job.jobType]) {
+          jobsByType[job.jobType] = job;
+        }
+      }
+      const slidesJobs = jobs.filter((j) => j.jobType === JOB_TYPES.SLIDES);
+
+      // Calculate overall progress
+      const totalSteps = 4; // ASR -> Semantic -> Report -> Slides
+      let completedSteps = 0;
+      let currentStep = null;
+      let currentStepProgress = 0;
+
+      // Define step order and names
+      const stepOrder = [
+        { type: JOB_TYPES.SLIDES, name: "Phân tích slides", order: 1 },
+        {
+          type: JOB_TYPES.ASR,
+          name: "Chuyển đổi giọng nói thành văn bản",
+          order: 2,
+        },
+        {
+          type: JOB_TYPES.SEMANTIC,
+          name: "Phân tích ngữ nghĩa và nội dung",
+          order: 3,
+        },
+        { type: JOB_TYPES.REPORT, name: "Tạo báo cáo đánh giá", order: 4 },
+      ];
+
+      const stepDetails = [];
+
+      for (const step of stepOrder) {
+        const isSlides = step.type === JOB_TYPES.SLIDES;
+        const job = isSlides ? null : jobsByType[step.type];
+        const jobsForStep = isSlides ? slidesJobs : job ? [job] : [];
+        let stepStatus = "pending";
+        let stepProgress = 0;
+        let estimatedDuration = null;
+        let actualDuration = null;
+        let errorMessage = null;
+        let representativeJob = job || jobsForStep[0] || null;
+
+        if (isSlides) {
+          if (slidesJobs.length === 0) {
+            // No slides to process - treat as completed (N/A)
+            stepStatus = "completed";
+            stepProgress = 100;
+            completedSteps++;
+          } else {
+            const completed = slidesJobs.filter(
+              (j) => j.status === JOB_STATUS.COMPLETED,
+            ).length;
+            const running = slidesJobs.filter(
+              (j) => j.status === JOB_STATUS.RUNNING,
+            );
+            const queued = slidesJobs.filter(
+              (j) => j.status === JOB_STATUS.QUEUED,
+            );
+            const failed = slidesJobs.filter(
+              (j) => j.status === JOB_STATUS.FAILED,
+            );
+            const total = slidesJobs.length;
+            stepProgress =
+              total > 0 ? Math.floor((completed / total) * 100) : 0;
+            estimatedDuration =
+              this._getEstimatedDuration(step.type) *
+              Math.max(1, total - completed);
+            if (failed.length > 0) {
+              stepStatus = "failed";
+              errorMessage = failed[0].errorMessage;
+            } else if (running.length > 0) {
+              stepStatus = "running";
+              currentStep = step.name;
+              currentStepProgress = stepProgress;
+              representativeJob = running[0];
+              if (representativeJob.startedAt) {
+                actualDuration = Math.floor(
+                  (Date.now() -
+                    new Date(representativeJob.startedAt).getTime()) /
+                    1000,
+                );
+              }
+            } else if (queued.length > 0) {
+              stepStatus = "queued";
+              stepProgress = stepProgress || 10;
+              representativeJob = queued[0];
+            } else if (completed === total) {
+              stepStatus = "completed";
+              stepProgress = 100;
+              completedSteps++;
+              representativeJob = slidesJobs[0];
+            }
+          }
+        } else if (job) {
+          switch (job.status) {
+            case JOB_STATUS.QUEUED:
+              stepStatus = "queued";
+              stepProgress = 10;
+              estimatedDuration = this._getEstimatedDuration(step.type);
+              break;
+            case JOB_STATUS.RUNNING:
+              stepStatus = "running";
+              stepProgress = 50;
+              currentStep = step.name;
+              currentStepProgress = 50;
+              estimatedDuration = this._getEstimatedDuration(step.type);
+              if (job.startedAt) {
+                const elapsed = Date.now() - new Date(job.startedAt).getTime();
+                actualDuration = Math.floor(elapsed / 1000);
+              }
+              break;
+            case JOB_STATUS.COMPLETED:
+              stepStatus = "completed";
+              stepProgress = 100;
+              completedSteps++;
+              if (job.startedAt && job.completedAt) {
+                actualDuration = Math.floor(
+                  (new Date(job.completedAt) - new Date(job.startedAt)) / 1000,
+                );
+              }
+              break;
+            case JOB_STATUS.FAILED:
+              stepStatus = "failed";
+              stepProgress = 0;
+              errorMessage = job.errorMessage;
+              if (job.startedAt && job.completedAt) {
+                actualDuration = Math.floor(
+                  (new Date(job.completedAt) - new Date(job.startedAt)) / 1000,
+                );
+              }
+              break;
+          }
+        }
+
+        stepDetails.push({
+          type: step.type,
+          name: step.name,
+          order: step.order,
+          status: stepStatus,
+          progress: stepProgress,
+          estimatedDuration,
+          actualDuration,
+          errorMessage,
+          jobId: representativeJob?.jobId || null,
+          jobCount: isSlides ? slidesJobs.length : null,
+          completedCount: isSlides
+            ? slidesJobs.filter((j) => j.status === JOB_STATUS.COMPLETED).length
+            : null,
+          startedAt: representativeJob?.startedAt || null,
+          completedAt: representativeJob?.completedAt || null,
+          retryCount: representativeJob?.retryCount || 0,
+        });
+      }
+
+      // Calculate overall progress percentage
+      const overallProgress = Math.floor((completedSteps / totalSteps) * 100);
+
+      // Determine overall status
+      let overallStatus = "pending";
+      const hasFailedJob = stepDetails.some((step) => step.status === "failed");
+      const hasRunningJob = stepDetails.some(
+        (step) => step.status === "running",
+      );
+      const allCompleted = stepDetails.every(
+        (step) => step.status === "completed",
+      );
+
+      if (hasFailedJob) {
+        overallStatus = "failed";
+      } else if (allCompleted) {
+        overallStatus = "completed";
+      } else if (hasRunningJob) {
+        overallStatus = "running";
+      } else if (stepDetails.some((step) => step.status === "queued")) {
+        overallStatus = "queued";
+      }
+
+      // Get presentation info
+      const presentation =
+        jobs[0]?.presentation ||
+        (await Presentation.findByPk(presentationId, {
+          attributes: ["presentationId", "title", "status", "submissionDate"],
+        }));
+
+      // Calculate estimated completion time
+      let estimatedCompletionTime = null;
+      if (overallStatus === "running" || overallStatus === "queued") {
+        const remainingSteps = stepDetails.filter(
+          (step) =>
+            step.status === "pending" ||
+            step.status === "queued" ||
+            step.status === "running",
+        );
+        const totalEstimatedSeconds = remainingSteps.reduce((sum, step) => {
+          return sum + (step.estimatedDuration || 0);
+        }, 0);
+
+        if (totalEstimatedSeconds > 0) {
+          estimatedCompletionTime = new Date(
+            Date.now() + totalEstimatedSeconds * 1000,
+          );
+        }
+      }
+
+      return {
+        presentationId,
+        presentationTitle: presentation?.title || "Unknown",
+        presentationStatus: presentation?.status || "unknown",
+        submittedAt: presentation?.submissionDate || null,
+        overallStatus,
+        overallProgress,
+        currentStep,
+        currentStepProgress,
+        estimatedCompletionTime,
+        totalSteps,
+        completedSteps,
+        steps: stepDetails,
+        lastUpdated: new Date(),
+      };
+    } catch (error) {
+      console.error("❌ Error getting analysis progress:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get estimated duration for job type (in seconds)
+   * @private
+   */
+  _getEstimatedDuration(jobType) {
+    const estimations = {
+      [JOB_TYPES.ASR]: 120, // 2 minutes
+      [JOB_TYPES.SEMANTIC]: 180, // 3 minutes
+      [JOB_TYPES.REPORT]: 60, // 1 minute
+      [JOB_TYPES.SLIDES]: 30, // ~30 seconds per slide
+    };
+    return estimations[jobType] || 60;
+  }
 }
 
 // Export singleton instance
