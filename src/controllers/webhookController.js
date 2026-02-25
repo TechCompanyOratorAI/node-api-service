@@ -395,31 +395,11 @@ const analysisComplete = async (req, res) => {
         `📊 Saving analysis results for presentation ${presentationId}`,
       );
       
-      // First, delete existing segment analyses for this presentation to avoid duplicates
-      const segmentIds = await db.sequelize.query(`
-        SELECT ts.segmentId 
-        FROM TranscriptSegments ts 
-        JOIN Transcripts t ON ts.transcriptId = t.transcriptId 
-        WHERE t.presentationId = :presentationId
-      `, {
-        replacements: { presentationId },
-        type: db.sequelize.QueryTypes.SELECT,
-        transaction
-      });
-      
-      if (segmentIds.length > 0) {
-        const segmentIdList = segmentIds.map(s => s.segmentId);
-        await SegmentAnalysis.destroy({
-          where: {
-            segmentId: segmentIdList
-          },
-          transaction
-        });
-        console.log(`🗑️ Deleted existing segment analyses for presentation ${presentationId}`);
-      }
-      
-      // Save segment-level analyses
+      // Save segment-level analyses using findOrCreate to handle duplicates
       if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
+        let createdCount = 0;
+        let updatedCount = 0;
+        
         for (const segAnalysis of analysis.segmentAnalyses) {
           // Find slideId based on bestMatchingSlide
           let slideId = null;
@@ -433,11 +413,13 @@ const analysisComplete = async (req, res) => {
             slideId = slide ? slide.slideId : null;
           }
 
-          // Create new segment analysis record (old ones already deleted above)
-          const segmentAnalysisRecord = await SegmentAnalysis.create(
-            {
+          // Use findOrCreate to handle duplicates - update if exists, create if not
+          const [segmentAnalysisRecord, created] = await SegmentAnalysis.findOrCreate({
+            where: {
               segmentId: segAnalysis.segmentId,
-              slideId: slideId, // Can be null if no matching slide found
+            },
+            defaults: {
+              slideId: slideId,
               configId: null,
               relevanceScore: segAnalysis.relevanceScore,
               semanticScore: segAnalysis.semanticScore,
@@ -450,11 +432,33 @@ const analysisComplete = async (req, res) => {
               topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
               analyzedAt: new Date(),
             },
-            { transaction },
-          );
+            transaction,
+          });
+
+          // If record already exists, update it with new values
+          if (!created) {
+            await segmentAnalysisRecord.update({
+              slideId: slideId,
+              configId: null,
+              relevanceScore: segAnalysis.relevanceScore,
+              semanticScore: segAnalysis.semanticScore,
+              alignmentScore: segAnalysis.alignmentScore,
+              bestMatchingSlide: segAnalysis.bestMatchingSlide,
+              expectedSlideNumber: segAnalysis.expectedSlideNumber,
+              timingDeviation: segAnalysis.timingDeviation,
+              issues: segAnalysis.issues || [],
+              suggestions: segAnalysis.suggestions || [],
+              topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
+              analyzedAt: new Date(),
+            }, { transaction });
+            updatedCount++;
+          } else {
+            createdCount++;
+          }
         }
+        
         console.log(
-          `✅ Saved ${analysis.segmentAnalyses.length} segment analyses`,
+          `✅ Processed ${analysis.segmentAnalyses.length} segment analyses (${createdCount} created, ${updatedCount} updated)`,
         );
       }
 
