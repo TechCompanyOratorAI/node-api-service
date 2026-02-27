@@ -119,7 +119,7 @@ const asrComplete = async (req, res) => {
     } catch (jobError) {
       await transaction.rollback();
       console.error(`⚠️ Job not found: ${jobId}`);
-      
+
       // Still process the webhook data even if job record is missing
       // This handles cases where job was created but not yet synced
       console.log(`⚠️ Processing webhook without job validation for presentation ${presentationId}`);
