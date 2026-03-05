@@ -1287,6 +1287,60 @@ class PresentationService {
       };
     }
   }
+
+  // Get AI feedback for a presentation
+  async getAIFeedback(presentationId, userId) {
+    try {
+      // Check access
+      const hasAccess = await this.checkPresentationAccess(
+        presentationId,
+        userId
+      );
+      if (!hasAccess) {
+        return { success: false, message: "Access denied" };
+      }
+
+      // Get AI feedback (feedbackType = 'general' from py-report-worker)
+      const feedbacks = await Feedback.findAll({
+        where: {
+          presentationId: presentationId,
+          feedbackType: 'general'
+        },
+        order: [['createdAtFeedback', 'DESC']]
+      });
+
+      if (!feedbacks || feedbacks.length === 0) {
+        return {
+          success: true,
+          message: "No AI feedback found for this presentation",
+          feedback: null
+        };
+      }
+
+      // Return the most recent AI feedback
+      const aiFeedback = feedbacks[0];
+
+      return {
+        success: true,
+        feedback: {
+          feedbackId: aiFeedback.feedbackId,
+          presentationId: aiFeedback.presentationId,
+          rating: aiFeedback.rating,
+          comments: aiFeedback.comments,
+          feedbackType: aiFeedback.feedbackType,
+          isVisibleToStudent: aiFeedback.isVisibleToStudent,
+          createdAtFeedback: aiFeedback.createdAtFeedback
+        }
+      };
+    } catch (error) {
+      console.error("Get AI feedback error:", error);
+      return {
+        success: false,
+        message: "Failed to get AI feedback",
+        error: error.message,
+      };
+    }
+  }
 }
 
 export default new PresentationService();
