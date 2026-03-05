@@ -88,4 +88,10 @@ router.get('/course/:courseId',
   presentationController.getPresentationsByCourse
 );
 
+// Get AI feedback for a presentation
+router.get('/:presentationId/feedback',
+  generalRateLimit,
+  presentationController.getAIFeedback
+);
+
 export default router;
