@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 // General API rate limit
 export const generalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 100000, // Disabled: no effective limit
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.'
@@ -15,7 +15,7 @@ export const generalRateLimit = rateLimit({
 // Strict rate limit for authentication endpoints
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: 100000, // Disabled: no effective limit
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.'
@@ -24,10 +24,10 @@ export const authRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
-// Rate limit for password reset
+// Rate limit for password reset (DISABLED)
 export const passwordResetRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // Limit each IP to 3 password reset requests per hour
+  max: 100000, // Disabled: no effective limit
   message: {
     success: false,
     message: 'Too many password reset attempts, please try again later.'
@@ -36,10 +36,10 @@ export const passwordResetRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
-// Rate limit for email verification
+// Rate limit for email verification (DISABLED)
 export const emailVerificationRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // Limit each IP to 3 email verification requests per hour
+  max: 100000, // Disabled: no effective limit
   message: {
     success: false,
     message: 'Too many email verification attempts, please try again later.'
