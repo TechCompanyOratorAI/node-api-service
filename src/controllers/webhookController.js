@@ -109,7 +109,13 @@ const asrComplete = async (req, res) => {
 
     // Validate required fields
     if (!jobId || !presentationId || !status) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error("❌ Transaction rollback failed:", rollbackError);
+        }
+      }
       return res.status(400).json({
         success: false,
         message: "Missing required fields: jobId, presentationId, status",
@@ -121,7 +127,13 @@ const asrComplete = async (req, res) => {
     try {
       job = await jobService.getJobById(jobId);
     } catch (jobError) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error("❌ Transaction rollback failed:", rollbackError);
+        }
+      }
       console.error(`⚠️ Job not found: ${jobId}`);
 
       // Still process the webhook data even if job record is missing
@@ -344,7 +356,13 @@ const asrComplete = async (req, res) => {
   } catch (error) {
     // Only rollback if transaction is still pending (not committed yet)
     if (!transaction.finished) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error("❌ Transaction rollback failed:", rollbackError);
+        }
+      }
     }
     console.error("❌ ASR webhook error:", error);
 
@@ -415,7 +433,13 @@ const analysisComplete = async (req, res) => {
       console.log(
         `🔄 Duplicate request detected for key: ${idempotencyKey}, returning cached response`,
       );
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error("❌ Transaction rollback failed:", rollbackError);
+        }
+      }
       return res.json(processedRequests.get(idempotencyKey));
     }
 
@@ -449,7 +473,13 @@ const analysisComplete = async (req, res) => {
         setTimeout(() => processedRequests.delete(idempotencyKey), 3600000);
       }
 
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error("❌ Transaction rollback failed:", rollbackError);
+        }
+      }
       return res.json(response);
     }
 
@@ -614,7 +644,20 @@ const analysisComplete = async (req, res) => {
 
     return res.json(response);
   } catch (error) {
-    await transaction.rollback();
+    // Only rollback if transaction is still active
+    if (transaction && !transaction.finished) {
+      try {
+        if (transaction && !transaction.finished) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error("❌ Transaction rollback failed:", rollbackError);
+        }
+      }
+      } catch (rollbackError) {
+        console.error("❌ Transaction rollback failed:", rollbackError);
+      }
+    }
     console.error("❌ Analysis webhook error:", error);
 
     try {
@@ -831,7 +874,13 @@ const reportComplete = async (req, res) => {
     });
   } catch (error) {
     if (!transaction.finished) {
-      await transaction.rollback();
+      if (transaction && !transaction.finished) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error("❌ Transaction rollback failed:", rollbackError);
+        }
+      }
     }
     console.error("❌ Report webhook error:", error);
 
