@@ -16,6 +16,7 @@ import classRoutes from "./classRoutes.js";
 import groupRoutes from "./groupRoutes.js";
 import enrollKeyRoutes from "./enrollKeyRoutes.js";
 import departmentRoutes from "./departmentRoutes.js";
+import speechQualityRoutes from "./speechQualityRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -52,6 +53,9 @@ router.use("/groups", groupRoutes);
 
 // Department Routes - mounted at /departments
 router.use("/departments", departmentRoutes);
+
+// Speech Quality Routes - mounted at /speech-quality
+router.use("/speech-quality", speechQualityRoutes);
 
 // Student quick access routes
 router.get(
