@@ -372,7 +372,7 @@ class SpeakerService {
                 include: [{
                     model: User,
                     as: 'mappedStudent',
-                    attributes: ['userId', 'fullName']
+                    attributes: ['userId', 'firstName', 'lastName']
                 }]
             });
 
@@ -386,7 +386,7 @@ class SpeakerService {
             const speakerBreakdown = speakers.map(speaker => ({
                 speakerId: speaker.speakerId,
                 aiSpeakerLabel: speaker.aiSpeakerLabel,
-                studentName: speaker.mappedStudent?.fullName || 'Unmapped',
+                studentName: speaker.mappedStudent ? `${speaker.mappedStudent.firstName} ${speaker.mappedStudent.lastName}` : 'Unmapped',
                 isMapped: speaker.isMapped,
                 totalDurationSeconds: speaker.totalDurationSeconds,
                 segmentCount: speaker.segmentCount,
@@ -602,7 +602,8 @@ class SpeakerService {
                     aiSpeakerLabel: unmappedSpeakers[i].aiSpeakerLabel,
                     suggestedStudent: {
                         userId: availableStudents[i].userId,
-                        fullName: availableStudents[i].fullName,
+                        firstName: availableStudents[i].firstName,
+                        lastName: availableStudents[i].lastName,
                         email: availableStudents[i].email
                     },
                     confidence: 'low', // Simple matching, low confidence

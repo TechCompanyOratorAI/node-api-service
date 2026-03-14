@@ -581,6 +581,251 @@ export const validateAssignInstructor = [
   }),
 ];
 
+// ============================================================
+// Rubric-based AI Reporting Validators
+// ============================================================
+
+// RubricTemplate validation
+export const validateRubricTemplate = [
+  body("templateName")
+    .notEmpty()
+    .withMessage("Tên template là bắt buộc")
+    .isLength({ max: 200 })
+    .withMessage("Tên template không được quá 200 ký tự")
+    .trim(),
+
+  body("description")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("Mô tả không được quá 2000 ký tự"),
+
+  body("assignmentType")
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage("Loại assignment không được quá 50 ký tự"),
+
+  body("isDefault")
+    .optional()
+    .isBoolean()
+    .withMessage("isDefault phải là giá trị boolean"),
+];
+
+// RubricCriteria validation
+export const validateRubricCriteria = [
+  body("criteriaName")
+    .notEmpty()
+    .withMessage("Tên criteria là bắt buộc")
+    .isLength({ max: 200 })
+    .withMessage("Tên criteria không được quá 200 ký tự")
+    .trim(),
+
+  body("criteriaDescription")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("Mô tả criteria không được quá 2000 ký tự"),
+
+  body("weight")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Weight phải lớn hơn hoặc bằng 0"),
+
+  body("maxScore")
+    .optional()
+    .isFloat({ min: 0.01 })
+    .withMessage("maxScore phải lớn hơn 0"),
+
+  body("displayOrder")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("displayOrder phải lớn hơn hoặc bằng 1"),
+
+  body("evaluationGuide")
+    .optional()
+    .isLength({ max: 5000 })
+    .withMessage("Hướng dẫn đánh giá không được quá 5000 ký tự"),
+];
+
+// ClassAISettings validation
+export const validateClassAISetting = [
+  body("rubricTemplateId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("ID rubric template phải là số nguyên hợp lệ"),
+
+  body("configId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("ID config phải là số nguyên hợp lệ"),
+
+  body("enableAiReport")
+    .optional()
+    .isBoolean()
+    .withMessage("enableAiReport phải là giá trị boolean"),
+
+  body("requireInstructorConfirmation")
+    .optional()
+    .isBoolean()
+    .withMessage("requireInstructorConfirmation phải là giá trị boolean"),
+
+  body("allowInstructorEdit")
+    .optional()
+    .isBoolean()
+    .withMessage("allowInstructorEdit phải là giá trị boolean"),
+
+  body("enableSlideLayoutScoring")
+    .optional()
+    .isBoolean()
+    .withMessage("enableSlideLayoutScoring phải là giá trị boolean"),
+
+  body("slideLayoutWeight")
+    .optional()
+    .isFloat({ min: 0, max: 1 })
+    .withMessage("slideLayoutWeight phải từ 0 đến 1"),
+
+  body("feedbackLanguage")
+    .optional()
+    .isLength({ max: 10 })
+    .withMessage("Ngôn ngữ feedback không được quá 10 ký tự"),
+
+  body("reportFormat")
+    .optional()
+    .isIn(["brief", "detailed", "comprehensive"])
+    .withMessage("reportFormat phải là brief, detailed hoặc comprehensive"),
+
+  body("includeCriterionComments")
+    .optional()
+    .isBoolean()
+    .withMessage("includeCriterionComments phải là giá trị boolean"),
+
+  body("includeOverallSummary")
+    .optional()
+    .isBoolean()
+    .withMessage("includeOverallSummary phải là giá trị boolean"),
+
+  body("includeSuggestions")
+    .optional()
+    .isBoolean()
+    .withMessage("includeSuggestions phải là giá trị boolean"),
+];
+
+// ClassRubricCriteria validation (for copied or edited criteria)
+export const validateClassRubricCriteria = [
+  body("criteriaName")
+    .notEmpty()
+    .withMessage("Tên criteria là bắt buộc")
+    .isLength({ max: 150 })
+    .withMessage("Tên criteria không được quá 150 ký tự")
+    .trim(),
+
+  body("criteriaDescription")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("Mô tả criteria không được quá 2000 ký tự"),
+
+  body("weight")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Weight phải lớn hơn hoặc bằng 0"),
+
+  body("maxScore")
+    .optional()
+    .isFloat({ min: 0.01 })
+    .withMessage("maxScore phải lớn hơn 0"),
+
+  body("displayOrder")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("displayOrder phải lớn hơn hoặc bằng 1"),
+
+  body("evaluationGuide")
+    .optional()
+    .isLength({ max: 5000 })
+    .withMessage("Hướng dẫn đánh giá không được quá 5000 ký tự"),
+
+  body("isActive")
+    .optional()
+    .isInt({ min: 0, max: 1 })
+    .withMessage("isActive phải là 0 hoặc 1"),
+];
+
+// Custom class criterion validation (for manually created criteria)
+export const validateClassRubricCustomCriteria = [
+  body("criteriaName")
+    .notEmpty()
+    .withMessage("Tên criteria là bắt buộc")
+    .isLength({ max: 150 })
+    .withMessage("Tên criteria không được quá 150 ký tự")
+    .trim(),
+
+  body("criteriaDescription")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("Mô tả criteria không được quá 2000 ký tự"),
+
+  body("weight")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Weight phải lớn hơn hoặc bằng 0"),
+
+  body("maxScore")
+    .optional()
+    .isFloat({ min: 0.01 })
+    .withMessage("maxScore phải lớn hơn 0"),
+
+  body("displayOrder")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("displayOrder phải lớn hơn hoặc bằng 1"),
+
+  body("evaluationGuide")
+    .optional()
+    .isLength({ max: 5000 })
+    .withMessage("Hướng dẫn đánh giá không được quá 5000 ký tự"),
+
+  body("rubricTemplateId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("ID rubric template phải là số nguyên hợp lệ"),
+];
+
+// Generate AI Report validation
+export const validateGenerateAIReport = [
+  body("submissionId")
+    .notEmpty()
+    .withMessage("submissionId là bắt buộc")
+    .isInt({ min: 1 })
+    .withMessage("submissionId phải là số nguyên hợp lệ"),
+
+  body("classId")
+    .notEmpty()
+    .withMessage("classId là bắt buộc")
+    .isInt({ min: 1 })
+    .withMessage("classId phải là số nguyên hợp lệ"),
+];
+
+// Edit AI Report validation
+export const validateEditAIReport = [
+  body("overallScore")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("overallScore phải lớn hơn hoặc bằng 0"),
+
+  body("criterionScores")
+    .optional()
+    .isObject()
+    .withMessage("criterionScores phải là object"),
+
+  body("reportContent")
+    .optional()
+    .isLength({ max: 10000 })
+    .withMessage("Nội dung report không được quá 10000 ký tự"),
+
+  body("reportStatus")
+    .optional()
+    .isIn(["draft", "pending_review", "generating", "completed", "failed", "confirmed", "rejected"])
+    .withMessage("reportStatus không hợp lệ"),
+];
+
 export default {
   validateRegistration,
   validateInstructorRegistration,
@@ -599,4 +844,11 @@ export default {
   validateCreateKey,
   validateJoinClass,
   validateAssignInstructor,
+  validateRubricTemplate,
+  validateRubricCriteria,
+  validateClassAISetting,
+  validateClassRubricCriteria,
+  validateClassRubricCustomCriteria,
+  validateGenerateAIReport,
+  validateEditAIReport,
 };
