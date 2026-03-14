@@ -422,12 +422,13 @@ const analysisComplete = async (req, res) => {
 
   try {
     const { jobId, presentationId, status, error, analysis } = req.body;
-    
+
     // Check for speech quality data early (outside transaction scope)
-    const hasSpeechQuality = analysis?.overallScores && 
-        (analysis.overallScores.speechFluency !== undefined || 
-         analysis.overallScores.speechClarity !== undefined || 
-         analysis.overallScores.speechConfidence !== undefined);
+    const hasSpeechQuality =
+      analysis?.overallScores &&
+      (analysis.overallScores.speechFluency !== undefined ||
+        analysis.overallScores.speechClarity !== undefined ||
+        analysis.overallScores.speechConfidence !== undefined);
     const idempotencyKey = req.headers["idempotency-key"];
 
     console.log(
@@ -525,11 +526,11 @@ const analysisComplete = async (req, res) => {
           }
 
           // Use findOrCreate to handle duplicates - update if exists, create if not
+          // Only use segmentId as unique key since slideId can change between analyses
           const [segmentAnalysisRecord, created] =
             await SegmentAnalysis.findOrCreate({
               where: {
                 segmentId: segAnalysis.segmentId,
-                slideId: slideId,
               },
               defaults: {
                 slideId: slideId,
@@ -596,7 +597,9 @@ const analysisComplete = async (req, res) => {
 
       // Note: Speech quality analysis will be saved after main transaction
       if (hasSpeechQuality) {
-        console.log(`🎤 Speech quality data detected for presentation ${presentationId}`);
+        console.log(
+          `🎤 Speech quality data detected for presentation ${presentationId}`,
+        );
       }
     }
 
@@ -612,16 +615,28 @@ const analysisComplete = async (req, res) => {
 
     // Process speech quality analysis in separate transaction (non-blocking)
     if (hasSpeechQuality) {
-      console.log(`🎤 Starting speech quality analysis processing for presentation ${presentationId}`);
-      
+      console.log(
+        `🎤 Starting speech quality analysis processing for presentation ${presentationId}`,
+      );
+
       // Use separate transaction for speech quality to avoid blocking main response
       try {
         await db.sequelize.transaction(async (speechTransaction) => {
-          await saveSpeechQualityAnalysis(presentationId, jobId, analysis, speechTransaction);
+          await saveSpeechQualityAnalysis(
+            presentationId,
+            jobId,
+            analysis,
+            speechTransaction,
+          );
         });
-        console.log(`✅ Speech quality analysis completed for presentation ${presentationId}`);
+        console.log(
+          `✅ Speech quality analysis completed for presentation ${presentationId}`,
+        );
       } catch (speechError) {
-        console.error(`❌ Speech quality analysis failed for presentation ${presentationId}:`, speechError);
+        console.error(
+          `❌ Speech quality analysis failed for presentation ${presentationId}:`,
+          speechError,
+        );
         // Don't fail the main response - speech quality is supplementary data
       }
     }
@@ -650,12 +665,12 @@ const analysisComplete = async (req, res) => {
     if (transaction && !transaction.finished) {
       try {
         if (transaction && !transaction.finished) {
-        try {
-          await transaction.rollback();
-        } catch (rollbackError) {
-          console.error("❌ Transaction rollback failed:", rollbackError);
+          try {
+            await transaction.rollback();
+          } catch (rollbackError) {
+            console.error("❌ Transaction rollback failed:", rollbackError);
+          }
         }
-      }
       } catch (rollbackError) {
         console.error("❌ Transaction rollback failed:", rollbackError);
       }
@@ -760,7 +775,8 @@ const reportComplete = async (req, res) => {
 
     // Verify job exists (skip in test/dev mode or if explicitly disabled)
     let job = null;
-    const skipJobCheck = process.env.SKIP_JOB_VERIFICATION === "true" || !process.env.NODE_ENV;
+    const skipJobCheck =
+      process.env.SKIP_JOB_VERIFICATION === "true" || !process.env.NODE_ENV;
     if (!skipJobCheck) {
       job = await jobService.getJobById(jobId);
       if (!job) {
@@ -835,7 +851,11 @@ const reportComplete = async (req, res) => {
       };
     } else if (reportFormat === "legacy") {
       // Process legacy format with feedback items
-      await reportService.processLegacyReport(presentationId, report, transaction);
+      await reportService.processLegacyReport(
+        presentationId,
+        report,
+        transaction,
+      );
       responseData.feedbackCount = report?.feedbackItems?.length || 0;
       responseData.overallScore = report?.summary?.overallScore;
     }
@@ -1081,13 +1101,20 @@ const health = async (req, res) => {
 /**
  * Save speech quality analysis data
  */
-async function saveSpeechQualityAnalysis(presentationId, jobId, analysis, transaction) {
+async function saveSpeechQualityAnalysis(
+  presentationId,
+  jobId,
+  analysis,
+  transaction,
+) {
   try {
     const startTime = Date.now();
-    console.log(`🎤 Starting speech quality analysis save for presentation ${presentationId}`);
-    
+    console.log(
+      `🎤 Starting speech quality analysis save for presentation ${presentationId}`,
+    );
+
     const { overallScores, segmentAnalyses, metadata } = analysis;
-    
+
     // Create main speech quality analysis record
     const speechAnalysisData = {
       presentationId: presentationId,
@@ -1098,12 +1125,12 @@ async function saveSpeechQualityAnalysis(presentationId, jobId, analysis, transa
       overallScore: overallScores.speechOverall,
       analyzedAt: new Date(),
       processingTime: metadata?.processingTime,
-      opensmileConfig: metadata?.opensmileConfig || 'eGeMAPSv02',
+      opensmileConfig: metadata?.opensmileConfig || "eGeMAPSv02",
       sampleRate: metadata?.sampleRate || 16000,
     };
 
     // Remove undefined values
-    Object.keys(speechAnalysisData).forEach(key => {
+    Object.keys(speechAnalysisData).forEach((key) => {
       if (speechAnalysisData[key] === undefined) {
         delete speechAnalysisData[key];
       }
@@ -1112,14 +1139,16 @@ async function saveSpeechQualityAnalysis(presentationId, jobId, analysis, transa
     const step1Time = Date.now();
     const [speechAnalysis, created] = await SpeechQualityAnalysis.upsert(
       speechAnalysisData,
-      { 
+      {
         transaction,
-        returning: true
-      }
+        returning: true,
+      },
     );
 
     const speechAnalysisId = speechAnalysis.id;
-    console.log(`${created ? 'Created' : 'Updated'} speech quality analysis with ID: ${speechAnalysisId} (${Date.now() - step1Time}ms)`);
+    console.log(
+      `${created ? "Created" : "Updated"} speech quality analysis with ID: ${speechAnalysisId} (${Date.now() - step1Time}ms)`,
+    );
 
     // Prepare batch data for hesitation patterns and segment quality
     const hesitationPatternsData = [];
@@ -1128,8 +1157,10 @@ async function saveSpeechQualityAnalysis(presentationId, jobId, analysis, transa
     let totalHesitationTime = 0;
 
     if (segmentAnalyses && segmentAnalyses.length > 0) {
-      console.log(`📊 Processing ${segmentAnalyses.length} segments for batch insert`);
-      
+      console.log(
+        `📊 Processing ${segmentAnalyses.length} segments for batch insert`,
+      );
+
       for (const segment of segmentAnalyses) {
         // Collect hesitation patterns for batch insert
         if (segment.speechQuality && segment.speechQuality.hesitationPatterns) {
@@ -1157,73 +1188,88 @@ async function saveSpeechQualityAnalysis(presentationId, jobId, analysis, transa
             speechAnalysisId: speechAnalysisId,
             segmentId: segment.segmentId,
             segmentHesitationCount: segment.speechQuality.hesitationCount || 0,
-            segmentHesitationTime: segment.speechQuality.totalHesitationTime || 0,
+            segmentHesitationTime:
+              segment.speechQuality.totalHesitationTime || 0,
           };
 
           // Add speech quality issues and suggestions
-          const speechIssues = segment.issues ? segment.issues.filter(issue => 
-            issue.toLowerCase().includes('hesitation') || 
-            issue.toLowerCase().includes('speech') ||
-            issue.toLowerCase().includes('fluency')
-          ) : [];
-          
-          const speechSuggestions = segment.suggestions ? segment.suggestions.filter(suggestion => 
-            suggestion.toLowerCase().includes('hesitation') || 
-            suggestion.toLowerCase().includes('speech') ||
-            suggestion.toLowerCase().includes('fluency')
-          ) : [];
+          const speechIssues = segment.issues
+            ? segment.issues.filter(
+                (issue) =>
+                  issue.toLowerCase().includes("hesitation") ||
+                  issue.toLowerCase().includes("speech") ||
+                  issue.toLowerCase().includes("fluency"),
+              )
+            : [];
+
+          const speechSuggestions = segment.suggestions
+            ? segment.suggestions.filter(
+                (suggestion) =>
+                  suggestion.toLowerCase().includes("hesitation") ||
+                  suggestion.toLowerCase().includes("speech") ||
+                  suggestion.toLowerCase().includes("fluency"),
+              )
+            : [];
 
           if (speechIssues.length > 0) {
             segmentSpeechData.qualityIssues = JSON.stringify(speechIssues);
           }
           if (speechSuggestions.length > 0) {
-            segmentSpeechData.qualitySuggestions = JSON.stringify(speechSuggestions);
+            segmentSpeechData.qualitySuggestions =
+              JSON.stringify(speechSuggestions);
           }
 
           segmentQualityData.push(segmentSpeechData);
         }
       }
-      
+
       // Batch insert hesitation patterns
       const step2Time = Date.now();
       if (hesitationPatternsData.length > 0) {
-        console.log(`📥 Batch inserting ${hesitationPatternsData.length} hesitation patterns`);
-        await HesitationPattern.bulkCreate(hesitationPatternsData, { 
+        console.log(
+          `📥 Batch inserting ${hesitationPatternsData.length} hesitation patterns`,
+        );
+        await HesitationPattern.bulkCreate(hesitationPatternsData, {
           transaction,
-          ignoreDuplicates: true 
+          ignoreDuplicates: true,
         });
-        console.log(`✅ Hesitation patterns inserted (${Date.now() - step2Time}ms)`);
+        console.log(
+          `✅ Hesitation patterns inserted (${Date.now() - step2Time}ms)`,
+        );
       }
 
       // Batch process segment quality data with timing info
       const step3Time = Date.now();
       if (segmentQualityData.length > 0) {
-        console.log(`📥 Processing ${segmentQualityData.length} segment quality records`);
-        
+        console.log(
+          `📥 Processing ${segmentQualityData.length} segment quality records`,
+        );
+
         // Get segment timing data in batch
-        const segmentIds = segmentQualityData.map(data => data.segmentId);
+        const segmentIds = segmentQualityData.map((data) => data.segmentId);
         const segmentRecords = await TranscriptSegment.findAll({
           where: { segmentId: segmentIds },
-          attributes: ['segmentId', 'startTimestamp', 'endTimestamp'],
-          transaction
+          attributes: ["segmentId", "startTimestamp", "endTimestamp"],
+          transaction,
         });
-        
+
         // Create lookup map for segment timing
         const segmentTimingMap = {};
-        segmentRecords.forEach(record => {
+        segmentRecords.forEach((record) => {
           segmentTimingMap[record.segmentId] = {
             startTimestamp: record.startTimestamp,
-            endTimestamp: record.endTimestamp
+            endTimestamp: record.endTimestamp,
           };
         });
-        
+
         // Update segment quality data with timing info and upsert
         for (const data of segmentQualityData) {
           const timing = segmentTimingMap[data.segmentId];
           if (timing && timing.endTimestamp && timing.startTimestamp) {
             const segmentDuration = timing.endTimestamp - timing.startTimestamp;
             if (segmentDuration > 0) {
-              data.hesitationRatio = data.segmentHesitationTime / segmentDuration;
+              data.hesitationRatio =
+                data.segmentHesitationTime / segmentDuration;
               data.segmentStartTime = timing.startTimestamp;
               data.segmentEndTime = timing.endTimestamp;
               data.segmentDuration = segmentDuration;
@@ -1231,7 +1277,9 @@ async function saveSpeechQualityAnalysis(presentationId, jobId, analysis, transa
           }
           await SegmentSpeechQuality.upsert(data, { transaction });
         }
-        console.log(`✅ Segment quality data processed (${Date.now() - step3Time}ms)`);
+        console.log(
+          `✅ Segment quality data processed (${Date.now() - step3Time}ms)`,
+        );
       }
     }
 
@@ -1239,29 +1287,39 @@ async function saveSpeechQualityAnalysis(presentationId, jobId, analysis, transa
     const step4Time = Date.now();
     if (totalHesitationCount > 0) {
       const audioDuration = metadata?.audioDuration;
-      const hesitationRate = audioDuration ? (totalHesitationCount / audioDuration) * 60 : null; // per minute
+      const hesitationRate = audioDuration
+        ? (totalHesitationCount / audioDuration) * 60
+        : null; // per minute
 
-      await speechAnalysis.update({
-        totalHesitationCount: totalHesitationCount,
-        totalHesitationTime: totalHesitationTime,
-        hesitationRate: hesitationRate,
-        audioDuration: audioDuration,
-      }, { transaction });
-      console.log(`✅ Main record updated with statistics (${Date.now() - step4Time}ms)`);
+      await speechAnalysis.update(
+        {
+          totalHesitationCount: totalHesitationCount,
+          totalHesitationTime: totalHesitationTime,
+          hesitationRate: hesitationRate,
+          audioDuration: audioDuration,
+        },
+        { transaction },
+      );
+      console.log(
+        `✅ Main record updated with statistics (${Date.now() - step4Time}ms)`,
+      );
     }
 
     const totalTime = Date.now() - startTime;
-    console.log(`✅ Speech quality analysis saved successfully for presentation ${presentationId}`);
+    console.log(
+      `✅ Speech quality analysis saved successfully for presentation ${presentationId}`,
+    );
     console.log(`   - Total processing time: ${totalTime}ms`);
     console.log(`   - Segments processed: ${segmentAnalyses?.length || 0}`);
     console.log(`   - Hesitation patterns: ${totalHesitationCount}`);
-    console.log(`   - Total hesitation time: ${totalHesitationTime.toFixed(2)}s`);
-    
-    return speechAnalysis;
+    console.log(
+      `   - Total hesitation time: ${totalHesitationTime.toFixed(2)}s`,
+    );
 
+    return speechAnalysis;
   } catch (error) {
-    console.error('❌ Error saving speech quality analysis:', error);
-    console.error('Error details:', error.message);
+    console.error("❌ Error saving speech quality analysis:", error);
+    console.error("Error details:", error.message);
     throw error;
   }
 }
