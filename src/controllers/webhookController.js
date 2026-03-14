@@ -616,7 +616,7 @@ const analysisComplete = async (req, res) => {
       
       // Use separate transaction for speech quality to avoid blocking main response
       try {
-        await sequelize.transaction(async (speechTransaction) => {
+        await db.sequelize.transaction(async (speechTransaction) => {
           await saveSpeechQualityAnalysis(presentationId, jobId, analysis, speechTransaction);
         });
         console.log(`✅ Speech quality analysis completed for presentation ${presentationId}`);
