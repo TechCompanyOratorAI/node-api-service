@@ -422,6 +422,12 @@ const analysisComplete = async (req, res) => {
 
   try {
     const { jobId, presentationId, status, error, analysis } = req.body;
+    
+    // Check for speech quality data early (outside transaction scope)
+    const hasSpeechQuality = analysis?.overallScores && 
+        (analysis.overallScores.speechFluency !== undefined || 
+         analysis.overallScores.speechClarity !== undefined || 
+         analysis.overallScores.speechConfidence !== undefined);
     const idempotencyKey = req.headers["idempotency-key"];
 
     console.log(
@@ -523,6 +529,7 @@ const analysisComplete = async (req, res) => {
             await SegmentAnalysis.findOrCreate({
               where: {
                 segmentId: segAnalysis.segmentId,
+                slideId: slideId,
               },
               defaults: {
                 slideId: slideId,
@@ -588,11 +595,6 @@ const analysisComplete = async (req, res) => {
       );
 
       // Note: Speech quality analysis will be saved after main transaction
-      const hasSpeechQuality = analysis.overallScores && 
-          (analysis.overallScores.speechFluency !== undefined || 
-           analysis.overallScores.speechClarity !== undefined || 
-           analysis.overallScores.speechConfidence !== undefined);
-      
       if (hasSpeechQuality) {
         console.log(`🎤 Speech quality data detected for presentation ${presentationId}`);
       }
