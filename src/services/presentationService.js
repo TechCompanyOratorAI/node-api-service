@@ -964,7 +964,7 @@ class PresentationService {
                       {
                         model: User,
                         as: "mappedStudent",
-                        attributes: ["userId", "fullName"],
+                        attributes: ["userId", "firstName", "lastName"],
                       },
                     ],
                   },
@@ -979,7 +979,7 @@ class PresentationService {
               {
                 model: User,
                 as: "mappedStudent",
-                attributes: ["userId", "fullName"],
+                attributes: ["userId", "firstName", "lastName"],
               },
             ],
           },

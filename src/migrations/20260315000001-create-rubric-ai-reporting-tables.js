@@ -368,9 +368,9 @@ module.exports = {
                 comment: 'Generated report content in full text'
             },
             reportStatus: {
-                type: Sequelize.ENUM('pending', 'generating', 'completed', 'failed', 'confirmed', 'rejected'),
+                type: Sequelize.ENUM('draft', 'pending_review', 'generating', 'completed', 'failed', 'confirmed', 'rejected'),
                 allowNull: false,
-                defaultValue: 'pending',
+                defaultValue: 'draft',
                 comment: 'Status of the AI report'
             },
             confirmedByInstructorId: {
@@ -395,6 +395,12 @@ module.exports = {
                 type: Sequelize.DATE,
                 allowNull: true,
                 comment: 'Timestamp when report was generated'
+            },
+            createdAt: {
+                type: Sequelize.DATE,
+                allowNull: false,
+                defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+                comment: 'Timestamp when report was created'
             },
             updatedAt: {
                 type: Sequelize.DATE,

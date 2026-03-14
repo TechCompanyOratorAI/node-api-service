@@ -63,8 +63,26 @@ module.exports = (sequelize, DataTypes) => {
       departmentId: { type: DataTypes.INTEGER, allowNull: true, comment: 'Department for instructors' },
       isCensored: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     },
-    { sequelize, modelName: 'User', tableName: 'Users' }
+    {
+      sequelize,
+      modelName: 'User',
+      tableName: 'Users',
+      getterMethods: {
+        fullName() {
+          return `${this.firstName || ''} ${this.lastName || ''}`.trim();
+        }
+      }
+    }
   );
+
+  // Add fullName to JSON serialization
+  User.prototype.toJSON = function() {
+    const values = Object.assign({}, this.get());
+    if (values.firstName || values.lastName) {
+      values.fullName = `${values.firstName || ''} ${values.lastName || ''}`.trim();
+    }
+    return values;
+  };
 
   return User;
 };

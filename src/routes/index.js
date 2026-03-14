@@ -17,6 +17,11 @@ import groupRoutes from "./groupRoutes.js";
 import enrollKeyRoutes from "./enrollKeyRoutes.js";
 import departmentRoutes from "./departmentRoutes.js";
 import speechQualityRoutes from "./speechQualityRoutes.js";
+import rubricTemplateRoutes from "./rubricTemplateRoutes.js";
+import rubricCriteriaRoutes from "./rubricCriteriaRoutes.js";
+import classAISettingRoutes from "./classAISettingRoutes.js";
+import classRubricCriteriaRoutes from "./classRubricCriteriaRoutes.js";
+import aiReportRoutes from "./aiReportRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -45,6 +50,12 @@ router.use("/storage", storageRoutes);
 // Class Routes - mounted at /classes
 router.use("/classes", classRoutes);
 
+// ClassAISettings - mounted at /classes (nested)
+router.use("/classesAISettings", classAISettingRoutes);
+
+// ClassRubricCriteria - mounted at /classes (nested)
+router.use("/classes", classRubricCriteriaRoutes);
+
 // Enrollment Key Routes - mounted at /enroll-keys
 router.use("/enroll-keys", enrollKeyRoutes);
 
@@ -56,6 +67,20 @@ router.use("/departments", departmentRoutes);
 
 // Speech Quality Routes - mounted at /speech-quality
 router.use("/speech-quality", speechQualityRoutes);
+
+// Rubric-based AI Reporting Routes
+// RubricTemplates - mounted at /rubric-templates
+router.use("/rubric-templates", rubricTemplateRoutes);
+
+// RubricCriteria - mounted at /rubric-templates (nested)
+router.use("/rubric-templates", rubricCriteriaRoutes);
+
+// ClassAISettings - mounted at /classes (nested under classRoutes)
+
+// ClassRubricCriteria - mounted at /classes (nested under classRoutes)
+
+// AIReports - mounted at /ai-reports
+router.use("/ai-reports", aiReportRoutes);
 
 // Student quick access routes
 router.get(
