@@ -26,6 +26,9 @@ const {
   SemanticSimilarity,
   AlignmentCheck,
   Slide,
+  SpeechQualityAnalysis,
+  HesitationPattern,
+  SegmentSpeechQuality,
 } = db;
 
 /**
@@ -553,6 +556,19 @@ const analysisComplete = async (req, res) => {
       console.log(
         `✅ ${created ? "Created" : "Updated"} overall analysis result`,
       );
+
+      // Save speech quality analysis if available
+      if (analysis.overallScores && 
+          (analysis.overallScores.speechFluency !== undefined || 
+           analysis.overallScores.speechClarity !== undefined ||
+           analysis.overallScores.speechConfidence !== undefined)) {
+        
+        console.log(`🎤 Saving speech quality analysis for presentation ${presentationId}`);
+        
+        await saveSpeechQualityAnalysis(presentationId, jobId, analysis, transaction);
+        
+        console.log(`✅ Speech quality analysis saved successfully`);
+      }
     }
 
     // Mark job as completed
@@ -996,6 +1012,139 @@ const health = async (req, res) => {
     });
   }
 };
+
+/**
+ * Save speech quality analysis data
+ */
+async function saveSpeechQualityAnalysis(presentationId, jobId, analysis, transaction) {
+  try {
+    const { overallScores, segmentAnalyses, metadata } = analysis;
+    
+    // Create main speech quality analysis record
+    const speechAnalysisData = {
+      presentationId: presentationId,
+      jobId: jobId,
+      fluencyScore: overallScores.speechFluency,
+      clarityScore: overallScores.speechClarity,
+      confidenceScore: overallScores.speechConfidence,
+      overallScore: overallScores.speechOverall,
+      analyzedAt: new Date(),
+      processingTime: metadata?.processingTime,
+      opensmileConfig: metadata?.opensmileConfig || 'eGeMAPSv02',
+      sampleRate: metadata?.sampleRate || 16000,
+    };
+
+    // Remove undefined values
+    Object.keys(speechAnalysisData).forEach(key => {
+      if (speechAnalysisData[key] === undefined) {
+        delete speechAnalysisData[key];
+      }
+    });
+
+    const [speechAnalysis, created] = await SpeechQualityAnalysis.upsert(
+      speechAnalysisData,
+      { 
+        transaction,
+        returning: true
+      }
+    );
+
+    const speechAnalysisId = speechAnalysis.id;
+    console.log(`${created ? 'Created' : 'Updated'} speech quality analysis with ID: ${speechAnalysisId}`);
+
+    // Save hesitation patterns
+    let totalHesitationCount = 0;
+    let totalHesitationTime = 0;
+
+    if (segmentAnalyses && segmentAnalyses.length > 0) {
+      for (const segment of segmentAnalyses) {
+        if (segment.speechQuality && segment.speechQuality.hesitationPatterns) {
+          for (const pattern of segment.speechQuality.hesitationPatterns) {
+            await HesitationPattern.create({
+              speechAnalysisId: speechAnalysisId,
+              segmentId: segment.segmentId,
+              startTime: pattern.startTime,
+              endTime: pattern.endTime,
+              duration: pattern.duration,
+              patternType: pattern.type,
+              confidence: pattern.confidence,
+              description: pattern.description,
+              segmentText: segment.segmentText || null,
+            }, { transaction });
+
+            totalHesitationCount++;
+            totalHesitationTime += pattern.duration;
+          }
+        }
+
+        // Save segment-level speech quality if detailed analysis is available
+        if (segment.speechQuality) {
+          const segmentSpeechData = {
+            speechAnalysisId: speechAnalysisId,
+            segmentId: segment.segmentId,
+            segmentHesitationCount: segment.speechQuality.hesitationCount || 0,
+            segmentHesitationTime: segment.speechQuality.totalHesitationTime || 0,
+          };
+
+          // Calculate hesitation ratio if we have segment timing
+          const segmentRecord = await TranscriptSegment.findByPk(segment.segmentId);
+          if (segmentRecord && segmentRecord.endTimestamp && segmentRecord.startTimestamp) {
+            const segmentDuration = segmentRecord.endTimestamp - segmentRecord.startTimestamp;
+            if (segmentDuration > 0) {
+              segmentSpeechData.hesitationRatio = segmentSpeechData.segmentHesitationTime / segmentDuration;
+              segmentSpeechData.segmentStartTime = segmentRecord.startTimestamp;
+              segmentSpeechData.segmentEndTime = segmentRecord.endTimestamp;
+              segmentSpeechData.segmentDuration = segmentDuration;
+            }
+          }
+
+          // Add speech quality issues and suggestions
+          const speechIssues = segment.issues ? segment.issues.filter(issue => 
+            issue.toLowerCase().includes('hesitation') || 
+            issue.toLowerCase().includes('speech') ||
+            issue.toLowerCase().includes('fluency')
+          ) : [];
+          
+          const speechSuggestions = segment.suggestions ? segment.suggestions.filter(suggestion => 
+            suggestion.toLowerCase().includes('hesitation') || 
+            suggestion.toLowerCase().includes('speech') ||
+            suggestion.toLowerCase().includes('fluency')
+          ) : [];
+
+          if (speechIssues.length > 0) {
+            segmentSpeechData.qualityIssues = speechIssues;
+          }
+          if (speechSuggestions.length > 0) {
+            segmentSpeechData.qualitySuggestions = speechSuggestions;
+          }
+
+          await SegmentSpeechQuality.upsert(segmentSpeechData, { transaction });
+        }
+      }
+    }
+
+    // Update main record with hesitation statistics
+    if (totalHesitationCount > 0) {
+      const audioDuration = metadata?.audioDuration;
+      const hesitationRate = audioDuration ? (totalHesitationCount / audioDuration) * 60 : null; // per minute
+
+      await speechAnalysis.update({
+        totalHesitationCount: totalHesitationCount,
+        totalHesitationTime: totalHesitationTime,
+        hesitationRate: hesitationRate,
+        audioDuration: audioDuration,
+      }, { transaction });
+
+      console.log(`Saved ${totalHesitationCount} hesitation patterns (${totalHesitationTime.toFixed(2)}s total)`);
+    }
+
+    return speechAnalysis;
+
+  } catch (error) {
+    console.error('Error saving speech quality analysis:', error);
+    throw error;
+  }
+}
 
 export {
   verifyWebhookAuth,
