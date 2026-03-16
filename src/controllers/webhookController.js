@@ -794,16 +794,18 @@ const reportComplete = async (req, res) => {
     const {
       jobId,
       presentationId,
+      reportId,
       status,
       error,
       report,
       segmentAnalyses,
       overallScores,
+      rubricScores,
       metadata,
     } = req.body;
 
     console.log(
-      `📥 Webhook: Report complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
+      `📥 Webhook: Report complete for job ${jobId}, presentation ${presentationId}, report ${reportId}, status: ${status}`,
     );
 
     // Validate required fields
@@ -890,6 +892,51 @@ const reportComplete = async (req, res) => {
         totalSlides: metadata?.totalSlides,
         processedAt: metadata?.processedAt,
       };
+
+      // ============================================================
+      // Update AIReport with rubric scores if reportId provided
+      // ============================================================
+      if (reportId && rubricScores) {
+        try {
+          const aiReport = await db.AIReport.findOne({
+            where: { reportId: reportId }
+          });
+
+          if (aiReport) {
+            // Prepare report content from rubric scores
+            let reportContent = "";
+            if (rubricScores && Object.keys(rubricScores).length > 0) {
+              reportContent = "BÁO CÁO ĐÁNH GIÁ AI\n\n";
+              reportContent += `Điểm tổng: ${overallScores.weightedOverallScore || overallScores.overallScore || 0}\n\n`;
+
+              for (const [criteriaId, cs] of Object.entries(rubricScores)) {
+                reportContent += `${cs.criteriaName}: ${cs.score}/${cs.maxScore}\n`;
+                if (cs.comment) {
+                  reportContent += `  - Nhận xét: ${cs.comment}\n`;
+                }
+                if (cs.suggestions && cs.suggestions.length > 0) {
+                  reportContent += `  - Gợi ý: ${cs.suggestions.join(', ')}\n`;
+                }
+                reportContent += "\n";
+              }
+            }
+
+            await aiReport.update({
+              overallScore: overallScores.weightedOverallScore || overallScores.overallScore || 0,
+              criterionScores: rubricScores,
+              reportContent: reportContent,
+              reportStatus: "completed",
+              generatedAt: new Date()
+            });
+
+            responseData.aiReportId = reportId;
+            console.log(`✅ Updated AIReport ${reportId} with rubric scores`);
+          }
+        } catch (aiReportError) {
+          console.error(`⚠️ Failed to update AIReport:`, aiReportError.message);
+          // Don't fail the request - report is already saved
+        }
+      }
     } else if (reportFormat === "legacy") {
       // Process legacy format with feedback items
       await reportService.processLegacyReport(
