@@ -30,7 +30,7 @@ router.post(
 // GET /rubric-templates/:templateId/criteria - Get all active criteria of a template
 router.get(
   "/:templateId/criteria",
-  //requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "Instructor"]),
   rubricCriteriaController.getCriteriaByTemplate
 );
 

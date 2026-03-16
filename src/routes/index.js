@@ -54,7 +54,7 @@ router.use("/classes", classRoutes);
 router.use("/classesAISettings", classAISettingRoutes);
 
 // ClassRubricCriteria - mounted at /classes (nested)
-router.use("/classes", classRubricCriteriaRoutes);
+router.use("/classesRubricCriteria", classRubricCriteriaRoutes);
 
 // Enrollment Key Routes - mounted at /enroll-keys
 router.use("/enroll-keys", enrollKeyRoutes);
@@ -73,7 +73,7 @@ router.use("/speech-quality", speechQualityRoutes);
 router.use("/rubric-templates", rubricTemplateRoutes);
 
 // RubricCriteria - mounted at /rubric-templates (nested)
-router.use("/rubric-templates", rubricCriteriaRoutes);
+router.use("/rubric-criteria", rubricCriteriaRoutes);
 
 // ClassAISettings - mounted at /classes (nested under classRoutes)
 
