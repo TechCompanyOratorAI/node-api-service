@@ -9,6 +9,7 @@ const {
 } = require("../models");
 const { Op } = require("sequelize");
 const db = require("../models");
+const queueService = require("../services/queueService");
 
 class AIReportService {
   /**
@@ -152,6 +153,190 @@ class AIReportService {
         message: "Lỗi khi tạo AI report",
         error: error.message,
       };
+    }
+  }
+
+  /**
+   * Trigger AI report generation after semantic analysis completes
+   * Called from webhook when semantic worker finishes
+   * 
+   * @param {number} presentationId - Presentation ID
+   * @param {number} jobId - Semantic analysis job ID
+   * @returns {Promise<Object>} - Result with report ID and status
+   */
+  async triggerReportAfterAnalysis(presentationId, jobId) {
+    try {
+      // Get presentation to find classId
+      const presentation = await Presentation.findByPk(presentationId, {
+        attributes: ["presentationId", "classId", "title", "status"],
+      });
+
+      if (!presentation) {
+        return {
+          success: false,
+          message: "Presentation không tìm thấy",
+        };
+      }
+
+      const classId = presentation.classId;
+
+      if (!classId) {
+        return {
+          success: false,
+          message: "Presentation không thuộc lớp nào",
+        };
+      }
+
+      // Check if AI report is enabled for this class
+      const aiSettings = await ClassAISetting.findOne({
+        where: {
+          classId: classId,
+          isActive: true,
+        },
+      });
+
+      if (!aiSettings || !aiSettings.enableAiReport) {
+        console.log(`[AIReportService] AI report is disabled for class ${classId}, skipping report generation`);
+        return {
+          success: true,
+          skipped: true,
+          message: "AI report không được bật cho lớp này",
+        };
+      }
+
+      // Check if class has rubric criteria
+      const classCriteria = await ClassRubricCriteria.findAll({
+        where: {
+          classId: classId,
+          isActive: 1,
+        },
+        order: [["displayOrder", "ASC"]],
+      });
+
+      if (classCriteria.length === 0) {
+        console.log(`[AIReportService] Class ${classId} has no rubric criteria, skipping report generation`);
+        return {
+          success: true,
+          skipped: true,
+          message: "Lớp chưa có rubric criteria",
+        };
+      }
+
+      // Check if there's already a report for this submission
+      const existingReport = await AIReport.findOne({
+        where: { submissionId: presentationId },
+      });
+
+      if (existingReport) {
+        // Update existing report and trigger regeneration
+        await existingReport.update({
+          reportStatus: "generating",
+        });
+        
+        console.log(`[AIReportService] Triggering report regeneration for presentation ${presentationId}`);
+        
+        // Trigger Python report worker via SQS
+        await this._sendToReportQueue(presentationId, existingReport.reportId, classId, jobId, classCriteria, aiSettings);
+        
+        return {
+          success: true,
+          reportId: existingReport.reportId,
+          message: "Đã kích hoạt tạo lại AI report",
+        };
+      }
+
+      // Prepare rubric data
+      const rubricData = classCriteria.map((c) => ({
+        criteriaId: c.classRubricCriteriaId,
+        criteriaName: c.criteriaName,
+        criteriaDescription: c.criteriaDescription,
+        weight: parseFloat(c.weight),
+        maxScore: parseFloat(c.maxScore),
+        evaluationGuide: c.evaluationGuide,
+      }));
+
+      // Create new report record
+      const initialStatus = aiSettings.requireInstructorConfirmation 
+        ? "pending_review" 
+        : "confirmed";
+
+      const report = await AIReport.create({
+        submissionId: presentationId,
+        classId: classId,
+        configId: aiSettings.configId,
+        rubricTemplateId: aiSettings.rubricTemplateId,
+        classAiSettingId: aiSettings.classAiSettingId,
+        reportStatus: "generating",
+      });
+
+      console.log(`[AIReportService] Created report ${report.reportId} for presentation ${presentationId}`);
+
+      // Trigger Python report worker via SQS
+      await this._sendToReportQueue(presentationId, report.reportId, classId, jobId, classCriteria, aiSettings);
+
+      return {
+        success: true,
+        reportId: report.reportId,
+        message: "Đã kích hoạt tạo AI report",
+      };
+    } catch (error) {
+      console.error("Trigger report after analysis error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi kích hoạt report",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Send job to Report Worker via SQS Queue
+   * @private
+   */
+  async _sendToReportQueue(presentationId, reportId, classId, jobId, classCriteria, aiSettings) {
+    try {
+      // Prepare rubric data
+      const rubricData = classCriteria.map((c) => ({
+        criteriaId: c.classRubricCriteriaId,
+        criteriaName: c.criteriaName,
+        criteriaDescription: c.criteriaDescription,
+        weight: parseFloat(c.weight),
+        maxScore: parseFloat(c.maxScore),
+        evaluationGuide: c.evaluationGuide,
+      }));
+
+      // Prepare message for Report Worker
+      const queueMessage = {
+        presentationId: presentationId,
+        reportId: reportId,
+        classId: classId,
+        jobId: jobId,
+        rubricData: rubricData,
+        settings: {
+          feedbackLanguage: aiSettings.feedbackLanguage || "en",
+          reportFormat: aiSettings.reportFormat || "detailed",
+          includeCriterionComments: aiSettings.includeCriterionComments ?? true,
+          includeOverallSummary: aiSettings.includeOverallSummary ?? true,
+          includeSuggestions: aiSettings.includeSuggestions ?? true,
+          enableSlideLayoutScoring: aiSettings.enableSlideLayoutScoring ?? false,
+          slideLayoutWeight: aiSettings.slideLayoutWeight ? parseFloat(aiSettings.slideLayoutWeight) : 0.1,
+        },
+      };
+
+      // Send to SQS Report Queue
+      const result = await queueService.sendToReportQueue(queueMessage);
+
+      console.log(`[AIReportService] Sent job to Report Queue:`, {
+        reportId,
+        presentationId,
+        messageId: result.messageId,
+      });
+
+      return result;
+    } catch (error) {
+      console.error("[AIReportService] Failed to send to Report Queue:", error);
+      // Don't throw - report record is already created, worker can be triggered manually if needed
+      return { success: false, error: error.message };
     }
   }
 

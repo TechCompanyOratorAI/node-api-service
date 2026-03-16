@@ -12,6 +12,7 @@
 import jobService from "../services/jobService.js";
 import speakerService from "../services/speakerService.js";
 import reportService from "../services/reportService.js";
+import aiReportService from "../services/aiReportService.js";
 import db from "../models/index.js";
 
 const {
@@ -639,6 +640,46 @@ const analysisComplete = async (req, res) => {
         );
         // Don't fail the main response - speech quality is supplementary data
       }
+    }
+
+    // ============================================================
+    // Trigger AI Report Generation (Rubric-based)
+    // After semantic analysis completes, check if we should generate AI report
+    // ============================================================
+    try {
+      console.log(
+        `🤖 Checking if AI report should be generated for presentation ${presentationId}`,
+      );
+
+      const reportResult = await aiReportService.triggerReportAfterAnalysis(
+        presentationId,
+        jobId,
+      );
+
+      if (reportResult.success && !reportResult.skipped) {
+        console.log(
+          `✅ AI report generation triggered for presentation ${presentationId}, reportId: ${reportResult.reportId}`,
+        );
+        response.data.aiReportId = reportResult.reportId;
+        response.data.aiReportTriggered = true;
+      } else if (reportResult.skipped) {
+        console.log(
+          `ℹ️ AI report skipped for presentation ${presentationId}: ${reportResult.message}`,
+        );
+        response.data.aiReportSkipped = true;
+        response.data.aiReportSkipReason = reportResult.message;
+      } else {
+        console.error(
+          `⚠️ Failed to trigger AI report for presentation ${presentationId}:`,
+          reportResult.message,
+        );
+      }
+    } catch (reportError) {
+      // Don't fail the main response - report generation is optional
+      console.error(
+        `❌ Error triggering AI report for presentation ${presentationId}:`,
+        reportError,
+      );
     }
 
     const response = {
