@@ -577,6 +577,138 @@ class AIReportService {
       };
     }
   }
+
+  /**
+   * Get AI report by submission ID
+   * @param {number} submissionId - Presentation/Submission ID
+   * @returns {Promise<Object>} - Result with report data
+   */
+  async getReportBySubmission(submissionId) {
+    try {
+      const report = await AIReport.findOne({
+        where: { submissionId: submissionId },
+        include: [
+          { model: Presentation, as: "submission", attributes: ["presentationId", "title", "status"] },
+          { model: Class, as: "class", attributes: ["classId", "classCode"] },
+          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+          { model: User, as: "confirmer", attributes: ["userId", "firstName", "lastName", "email"] },
+        ],
+      });
+
+      if (!report) {
+        return {
+          success: false,
+          message: "AI report không tìm thấy cho bài nộp này",
+          code: "NOT_FOUND",
+        };
+      }
+
+      return {
+        success: true,
+        data: report,
+      };
+    } catch (error) {
+      console.error("Get AI report by submission error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy AI report theo submission",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Delete AI report by ID
+   * @param {number} reportId - AI Report ID
+   * @returns {Promise<Object>} - Result of deletion
+   */
+  async deleteReport(reportId) {
+    try {
+      const report = await AIReport.findByPk(reportId);
+
+      if (!report) {
+        return {
+          success: false,
+          message: "AI report không tìm thấy",
+          code: "NOT_FOUND",
+        };
+      }
+
+      // Check if report can be deleted (only draft or rejected reports)
+      if (!["draft", "rejected", "failed"].includes(report.reportStatus)) {
+        return {
+          success: false,
+          message: "Chỉ có thể xóa report ở trạng thái draft, rejected hoặc failed",
+          code: "INVALID_STATUS",
+        };
+      }
+
+      await report.destroy();
+
+      return {
+        success: true,
+        message: "Đã xóa AI report",
+      };
+    } catch (error) {
+      console.error("Delete AI report error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi xóa AI report",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get all AI reports (admin/instructor)
+   * @param {Object} options - Pagination and filter options
+   * @returns {Promise<Object>} - Result with reports list
+   */
+  async getAllReports(options = {}) {
+    try {
+      const { page = 1, limit = 20, classId, status } = options;
+
+      const where = {};
+      if (classId) {
+        where.classId = classId;
+      }
+      if (status) {
+        where.reportStatus = status;
+      }
+
+      const { count, rows: reports } = await AIReport.findAndCountAll({
+        where,
+        limit,
+        offset: (page - 1) * limit,
+        order: [["createdAt", "DESC"]],
+        include: [
+          { model: Presentation, as: "submission", attributes: ["presentationId", "title", "status"] },
+          { model: Class, as: "class", attributes: ["classId", "classCode"] },
+          { model: User, as: "confirmer", attributes: ["userId", "firstName", "lastName"] },
+        ],
+      });
+
+      return {
+        success: true,
+        data: {
+          reports,
+          pagination: {
+            page,
+            limit,
+            total: count,
+            totalPages: Math.ceil(count / limit),
+          },
+        },
+      };
+    } catch (error) {
+      console.error("Get all AI reports error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy danh sách AI reports",
+        error: error.message,
+      };
+    }
+  }
 }
 
 module.exports = new AIReportService();
