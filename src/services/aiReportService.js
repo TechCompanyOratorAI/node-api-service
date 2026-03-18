@@ -1,15 +1,15 @@
-const { 
-  AIReport, 
-  ClassAISetting, 
-  ClassRubricCriteria, 
-  Presentation, 
-  Class, 
+import {
+  AIReport,
+  ClassAISetting,
+  ClassRubricCriteria,
+  Presentation,
+  Class,
   RubricTemplate,
-  User 
-} = require("../models");
-const { Op } = require("sequelize");
-const db = require("../models");
-const queueService = require("../services/queueService");
+  User
+} from "../models";
+import { Op } from "sequelize";
+import db from "../models";
+import queueService from "../services/queueService";
 
 class AIReportService {
   /**
