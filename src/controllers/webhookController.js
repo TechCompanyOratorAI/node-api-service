@@ -646,6 +646,15 @@ const analysisComplete = async (req, res) => {
     // Trigger AI Report Generation (Rubric-based)
     // After semantic analysis completes, check if we should generate AI report
     // ============================================================
+    
+    // Initialize response object early to avoid undefined errors
+    let responseData = {
+      jobId,
+      presentationId,
+      segmentAnalyses: analysis?.segmentAnalyses?.length || 0,
+      speechQualityProcessed: hasSpeechQuality,
+    };
+    
     try {
       console.log(
         `🤖 Checking if AI report should be generated for presentation ${presentationId}`,
@@ -660,14 +669,14 @@ const analysisComplete = async (req, res) => {
         console.log(
           `✅ AI report generation triggered for presentation ${presentationId}, reportId: ${reportResult.reportId}`,
         );
-        response.data.aiReportId = reportResult.reportId;
-        response.data.aiReportTriggered = true;
+        responseData.aiReportId = reportResult.reportId;
+        responseData.aiReportTriggered = true;
       } else if (reportResult.skipped) {
         console.log(
           `ℹ️ AI report skipped for presentation ${presentationId}: ${reportResult.message}`,
         );
-        response.data.aiReportSkipped = true;
-        response.data.aiReportSkipReason = reportResult.message;
+        responseData.aiReportSkipped = true;
+        responseData.aiReportSkipReason = reportResult.message;
       } else {
         console.error(
           `⚠️ Failed to trigger AI report for presentation ${presentationId}:`,
@@ -685,12 +694,7 @@ const analysisComplete = async (req, res) => {
     const response = {
       success: true,
       message: "Analysis results saved successfully",
-      data: {
-        jobId,
-        presentationId,
-        segmentAnalyses: analysis?.segmentAnalyses?.length || 0,
-        speechQualityProcessed: hasSpeechQuality,
-      },
+      data: responseData,
     };
 
     // Cache the response for idempotency
@@ -857,6 +861,12 @@ const reportComplete = async (req, res) => {
     });
 
     console.log(`📋 Processing report format: ${reportFormat}`);
+
+    // Debug: Log segmentAnalyses info
+    console.log(`📊 segmentAnalyses: ${segmentAnalyses ? segmentAnalyses.length : 0} items`);
+    if (segmentAnalyses && segmentAnalyses.length > 0) {
+      console.log(`   - First segmentId: ${segmentAnalyses[0].segmentId}`);
+    }
 
     let responseData = {
       jobId,

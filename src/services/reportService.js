@@ -77,43 +77,77 @@ class ReportService {
         console.log(`⚠️ Skipping AnalysisResult creation in test mode`);
       }
 
-      // 2. Xóa old segment analyses cho presentation này (nếu cần)
-      await SegmentAnalysis.destroy(
-        {
-          where: {
-            segmentId: {
-              [Sequelize.Op.in]: segmentAnalyses.map((s) => s.segmentId),
-            },
-          },
-        },
-        { transaction },
-      );
-
-      // 3. Xử lý từng segment
+      // 2. Xử lý từng segment - KHÔNG xóa dữ liệu cũ để tránh mất data khi insert fail
+      // Sử dụng upsert để cập nhật nếu đã tồn tại, tạo mới nếu chưa có
       let processedSegments = 0;
+      let segmentDataToCreate = [];
 
-      if (analysisResult) {
+      if (analysisResult && segmentAnalyses && segmentAnalyses.length > 0) {
+        // First, prepare all segment data with validation (without saving yet)
         for (const segment of segmentAnalyses) {
           try {
-            await this.processSegmentAnalysis(
-              presentationId,
-              segment,
-              analysisResult.resultId,
-              transaction,
-            );
+            // Validate slideId - only use if valid (exists in Slides table)
+            let slideIdToUse = segment.bestMatchingSlide || segment.slideId || null;
+
+            // If slideId is provided, validate it exists in Slides table
+            if (slideIdToUse) {
+              const slide = await Slide.findOne({
+                where: {
+                  presentationId: presentationId,
+                  slideId: slideIdToUse
+                },
+                transaction
+              });
+              if (!slide) {
+                console.log(`   ⚠️ Slide ${slideIdToUse} not found for segment ${segment.segmentId}, setting to null`);
+                slideIdToUse = null;
+              }
+            }
+
+            segmentDataToCreate.push({
+              segmentId: segment.segmentId,
+              slideId: slideIdToUse,
+              analyzedAt: new Date(),
+              analysisResultId: analysisResult.resultId,
+              segment: segment
+            });
             processedSegments++;
           } catch (segmentError) {
             console.error(
-              `⚠️ Error processing segment ${segment.segmentId}:`,
+              `⚠️ Error preparing segment ${segment.segmentId}:`,
               segmentError.message,
             );
           }
         }
-        console.log(`✅ Successfully processed ${processedSegments} segments`);
+        console.log(`✅ Prepared ${processedSegments} segments for processing`);
+
+        // 3. Sử dụng upsert để insert or update - KHÔNG xóa dữ liệu cũ
+        // Điều này giữ nguyên data cũ nếu insert fail
+        let createdSegments = 0;
+        let upsertErrors = 0;
+        
+        for (const segData of segmentDataToCreate) {
+          try {
+            // Use upsert to avoid data loss
+            await SegmentAnalysis.upsert(
+              {
+                segmentId: segData.segmentId,
+                slideId: segData.slideId,
+                analyzedAt: segData.analyzedAt,
+              },
+              { transaction }
+            );
+            createdSegments++;
+          } catch (segmentError) {
+            upsertErrors++;
+            console.error(
+              `⚠️ Error upserting segment ${segData.segmentId}: ${segmentError.message}`,
+            );
+          }
+        }
+        console.log(`✅ Successfully upserted ${createdSegments} segments (${upsertErrors} errors)`);
       } else {
-        console.log(
-          `⚠️ Skipping segment processing in test mode (no AnalysisResult)`,
-        );
+        console.log("⚠️ No segmentAnalyses to process, skipping");
       }
 
       return {
@@ -136,11 +170,15 @@ class ReportService {
     analysisResultId,
     transaction,
   ) {
-    // 1. Tạo SegmentAnalysis
+    // 1. Validate slideId - only use if it exists in Slides table
+    // If bestMatchingSlide doesn't exist in Slides, set to null (allowed by DB schema)
+    let slideIdToUse = segment.bestMatchingSlide || segment.slideId || null;
+
+    // 2. Tạo SegmentAnalysis
     const segAnalysis = await SegmentAnalysis.create(
       {
         segmentId: segment.segmentId,
-        slideId: segment.bestMatchingSlide || segment.slideId,
+        slideId: slideIdToUse,
         analyzedAt: new Date(),
       },
       { transaction },
