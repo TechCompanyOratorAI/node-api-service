@@ -22,6 +22,7 @@ const {
   AnalysisResult,
   Presentation,
   Feedback,
+  Slide,
 } = db;
 
 class ReportService {
