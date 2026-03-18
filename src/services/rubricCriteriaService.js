@@ -121,6 +121,89 @@ class RubricCriteriaService {
       };
     }
   }
+
+  /**
+   * Get all rubric criteria (admin only)
+   * @param {Object} options - Pagination and filter options
+   * @returns {Promise<Object>} - Result with criteria list
+   */
+  async getAllCriteria(options = {}) {
+    try {
+      const { page = 1, limit = 50, templateId, isActive } = options;
+
+      const where = {};
+      if (templateId) {
+        where.rubricTemplateId = templateId;
+      }
+      if (isActive !== undefined) {
+        where.isActive = isActive;
+      }
+
+      const { count, rows: criteria } = await RubricCriteria.findAndCountAll({
+        where,
+        limit,
+        offset: (page - 1) * limit,
+        order: [["displayOrder", "ASC"]],
+        include: [
+          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+        ],
+      });
+
+      return {
+        success: true,
+        data: {
+          criteria,
+          pagination: {
+            page,
+            limit,
+            total: count,
+            totalPages: Math.ceil(count / limit),
+          },
+        },
+      };
+    } catch (error) {
+      console.error("Get all rubric criteria error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy danh sách criteria",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get rubric criteria by ID
+   * @param {number} criteriaId - Rubric Criteria ID
+   * @returns {Promise<Object>} - Result with criteria data
+   */
+  async getCriteriaById(criteriaId) {
+    try {
+      const criteria = await RubricCriteria.findByPk(criteriaId, {
+        include: [
+          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+        ],
+      });
+
+      if (!criteria) {
+        return {
+          success: false,
+          message: "Rubric criteria không tìm thấy",
+        };
+      }
+
+      return {
+        success: true,
+        data: criteria,
+      };
+    } catch (error) {
+      console.error("Get rubric criteria by ID error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy criteria",
+        error: error.message,
+      };
+    }
+  }
 }
 
 module.exports = new RubricCriteriaService();

@@ -145,6 +145,134 @@ class ClassAISettingService {
       };
     }
   }
+
+  /**
+   * Delete (deactivate) class AI setting
+   * @param {number} classId - Class ID
+   * @returns {Promise<Object>} - Result of deletion
+   */
+  async deleteClassAISetting(classId) {
+    try {
+      const setting = await ClassAISetting.findOne({
+        where: {
+          classId: classId,
+          isActive: true,
+        },
+      });
+
+      if (!setting) {
+        return {
+          success: false,
+          message: "Cài đặt AI cho lớp không tìm thấy",
+        };
+      }
+
+      // Soft delete - set isActive to false
+      await setting.update({ isActive: false });
+
+      return {
+        success: true,
+        message: "Đã xóa cài đặt AI cho lớp",
+      };
+    } catch (error) {
+      console.error("Delete class AI setting error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi xóa cài đặt AI",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get all class AI settings (for admin)
+   * @param {Object} options - Pagination and filter options
+   * @returns {Promise<Object>} - Result with settings list
+   */
+  async getAllClassAISettings(options = {}) {
+    try {
+      const { page = 1, limit = 20, classId, isActive } = options;
+
+      const where = {};
+      if (classId) {
+        where.classId = classId;
+      }
+      if (isActive !== undefined) {
+        where.isActive = isActive;
+      }
+
+      const { count, rows: settings } = await ClassAISetting.findAndCountAll({
+        where,
+        limit,
+        offset: (page - 1) * limit,
+        order: [["createdAt", "DESC"]],
+        include: [
+          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+          { model: AIConfig, as: "aiConfig", attributes: ["configId", "configName"] },
+          { model: Class, as: "class", attributes: ["classId", "classCode"] },
+          { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
+        ],
+      });
+
+      return {
+        success: true,
+        data: {
+          settings,
+          pagination: {
+            page,
+            limit,
+            total: count,
+            totalPages: Math.ceil(count / limit),
+          },
+        },
+      };
+    } catch (error) {
+      console.error("Get all class AI settings error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy danh sách cài đặt AI",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get class AI setting by ID
+   * @param {number} settingId - Class AISetting ID
+   * @returns {Promise<Object>} - Result with setting data
+   */
+  async getClassAISettingById(settingId) {
+    try {
+      const setting = await ClassAISetting.findByPk(settingId, {
+        include: [
+          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+          { model: AIConfig, as: "aiConfig", attributes: ["configId", "configName"] },
+          { model: Class, as: "class", attributes: ["classId", "classCode"] },
+          { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: User, as: "updater", attributes: ["userId", "firstName", "lastName", "email"] },
+        ],
+      });
+
+      if (!setting) {
+        return {
+          success: false,
+          message: "Cài đặt AI không tìm thấy",
+        };
+      }
+
+      return {
+        success: true,
+        data: setting,
+      };
+    } catch (error) {
+      console.error("Get class AI setting by ID error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy cài đặt AI",
+        error: error.message,
+      };
+    }
+  }
 }
 
 module.exports = new ClassAISettingService();

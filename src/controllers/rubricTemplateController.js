@@ -57,6 +57,38 @@ class RubricTemplateController {
   }
 
   /**
+   * GET /rubric-templates/all
+   * Get all rubric templates with pagination and filters (admin only)
+   */
+  async getAllTemplatesAdmin(req, res) {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const isActive = req.query.isActive !== undefined ? req.query.isActive === "true" : undefined;
+      const search = req.query.search || undefined;
+
+      const result = await rubricTemplateService.getAllTemplates({
+        page,
+        limit,
+        isActive,
+        search,
+      });
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Get all rubric templates admin controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
    * GET /rubric-templates/:templateId
    * Get rubric template detail
    */

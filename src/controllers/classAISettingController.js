@@ -124,6 +124,100 @@ class ClassAISettingController {
       });
     }
   }
+
+  /**
+   * DELETE /classes/:classId/ai-settings
+   * Delete (deactivate) class AI settings
+   */
+  async deleteClassAISetting(req, res) {
+    try {
+      const { classId } = req.params;
+
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const result = await classAISettingService.deleteClassAISetting(parseInt(classId));
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(404).json(result);
+      }
+    } catch (error) {
+      console.error("Delete class AI setting controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * GET /classesAISettings
+   * Get all class AI settings (admin only)
+   */
+  async getAllClassAISettings(req, res) {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const classId = req.query.classId ? parseInt(req.query.classId) : undefined;
+      const isActive = req.query.isActive !== undefined ? req.query.isActive === "true" : undefined;
+
+      const result = await classAISettingService.getAllClassAISettings({
+        page,
+        limit,
+        classId,
+        isActive,
+      });
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Get all class AI settings controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * GET /classesAISettings/:settingId
+   * Get class AI setting by ID
+   */
+  async getClassAISettingById(req, res) {
+    try {
+      const { settingId } = req.params;
+
+      if (!settingId || isNaN(parseInt(settingId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID setting không hợp lệ",
+        });
+      }
+
+      const result = await classAISettingService.getClassAISettingById(parseInt(settingId));
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(404).json(result);
+      }
+    } catch (error) {
+      console.error("Get class AI setting by ID controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
 }
 
 module.exports = new ClassAISettingController();
