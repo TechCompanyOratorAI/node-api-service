@@ -230,6 +230,106 @@ class AIReportController {
       });
     }
   }
+
+  /**
+   * GET /ai-reports/submission/:submissionId
+   * Get AI report by submission ID
+   */
+  async getReportBySubmission(req, res) {
+    try {
+      const { submissionId } = req.params;
+
+      if (!submissionId || isNaN(parseInt(submissionId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID submission không hợp lệ",
+        });
+      }
+
+      const result = await aiReportService.getReportBySubmission(parseInt(submissionId));
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else if (result.code === "NOT_FOUND") {
+        return res.status(404).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Get AI report by submission controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * DELETE /ai-reports/:reportId
+   * Delete AI report
+   */
+  async deleteReport(req, res) {
+    try {
+      const { reportId } = req.params;
+
+      if (!reportId || isNaN(parseInt(reportId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID report không hợp lệ",
+        });
+      }
+
+      const result = await aiReportService.deleteReport(parseInt(reportId));
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else if (result.code === "NOT_FOUND") {
+        return res.status(404).json(result);
+      } else if (result.code === "INVALID_STATUS") {
+        return res.status(400).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Delete AI report controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * GET /ai-reports
+   * Get all AI reports (admin/instructor)
+   */
+  async getAllReports(req, res) {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const classId = req.query.classId ? parseInt(req.query.classId) : undefined;
+      const status = req.query.status;
+
+      const result = await aiReportService.getAllReports({
+        page,
+        limit,
+        classId,
+        status,
+      });
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Get all AI reports controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
 }
 
 module.exports = new AIReportController();

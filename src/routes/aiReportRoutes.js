@@ -63,4 +63,25 @@ router.put(
   aiReportController.rejectReport
 );
 
+// GET /ai-reports/submission/:submissionId - Get AI report by submission ID
+router.get(
+  "/submission/:submissionId",
+  requireRole(["Admin", "Instructor", "Student"]),
+  aiReportController.getReportBySubmission
+);
+
+// DELETE /ai-reports/:reportId - Delete AI report
+router.delete(
+  "/:reportId",
+  requireRole(["Admin", "Instructor"]),
+  aiReportController.deleteReport
+);
+
+// GET /ai-reports - Get all AI reports (with pagination)
+router.get(
+  "/",
+  requireRole(["Admin", "Instructor"]),
+  aiReportController.getAllReports
+);
+
 export default router;
