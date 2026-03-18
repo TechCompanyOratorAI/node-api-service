@@ -33,6 +33,13 @@ router.get(
   rubricTemplateController.getAllTemplates
 );
 
+// GET /rubric-templates/all - Get all rubric templates with pagination (admin only)
+router.get(
+  "/all",
+  requireRole(["Admin"]),
+  rubricTemplateController.getAllTemplatesAdmin
+);
+
 // GET /rubric-templates/:templateId - Get rubric template detail
 router.get(
   "/:templateId",

@@ -29,7 +29,7 @@ router.post(
 // GET /classes/:classId/ai-settings - Get active AI settings of a class
 router.get(
   "/:classId/ai-settings",
-  //requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "Instructor"]),
   classAISettingController.getClassAISetting
 );
 
@@ -39,6 +39,27 @@ router.put(
   requireRole(["Admin", "Instructor"]),
   validateClassAISetting,
   classAISettingController.updateClassAISetting
+);
+
+// DELETE /classes/:classId/ai-settings - Delete (deactivate) class AI settings
+router.delete(
+  "/:classId/ai-settings",
+  requireRole(["Admin", "Instructor"]),
+  classAISettingController.deleteClassAISetting
+);
+
+// GET /classesAISettings - Get all class AI settings (admin only)
+router.get(
+  "/",
+  requireRole(["Admin"]),
+  classAISettingController.getAllClassAISettings
+);
+
+// GET /classesAISettings/:settingId - Get class AI setting by ID
+router.get(
+  "/:settingId",
+  requireRole(["Admin", "Instructor"]),
+  classAISettingController.getClassAISettingById
 );
 
 export default router;

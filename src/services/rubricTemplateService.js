@@ -47,6 +47,56 @@ class RubricTemplateService {
     }
   }
 
+  /**
+   * Get all rubric templates with pagination and filters (admin only)
+   * @param {Object} options - Pagination and filter options
+   * @returns {Promise<Object>} - Result with templates list
+   */
+  async getAllTemplates(options = {}) {
+    try {
+      const { page = 1, limit = 20, isActive, search } = options;
+
+      const where = {};
+      if (isActive !== undefined) {
+        where.isActive = isActive;
+      }
+      if (search) {
+        where.templateName = { [Op.like]: `%${search}%` };
+      }
+
+      const { count, rows: templates } = await RubricTemplate.findAndCountAll({
+        where,
+        limit,
+        offset: (page - 1) * limit,
+        order: [["isDefault", "DESC"], ["templateName", "ASC"]],
+        include: [
+          { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: RubricCriteria, as: "criteria", where: { isActive: true }, required: false },
+        ],
+      });
+
+      return {
+        success: true,
+        data: {
+          templates,
+          pagination: {
+            page,
+            limit,
+            total: count,
+            totalPages: Math.ceil(count / limit),
+          },
+        },
+      };
+    } catch (error) {
+      console.error("Get all rubric templates error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy danh sách rubric templates",
+        error: error.message,
+      };
+    }
+  }
+
   async getTemplateById(templateId) {
     try {
       const template = await RubricTemplate.findByPk(templateId, {

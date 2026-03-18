@@ -49,4 +49,18 @@ router.delete(
   rubricCriteriaController.deleteCriteria
 );
 
+// GET /rubric-criteria - Get all rubric criteria (admin only)
+router.get(
+  "/rubric-criteria",
+  requireRole(["Admin"]),
+  rubricCriteriaController.getAllCriteria
+);
+
+// GET /rubric-criteria/:criteriaId - Get rubric criteria by ID
+router.get(
+  "/rubric-criteria/:criteriaId",
+  requireRole(["Admin", "Instructor"]),
+  rubricCriteriaController.getCriteriaById
+);
+
 export default router;

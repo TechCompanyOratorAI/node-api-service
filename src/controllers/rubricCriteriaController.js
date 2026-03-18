@@ -153,6 +153,69 @@ class RubricCriteriaController {
       });
     }
   }
+
+  /**
+   * GET /rubric-criteria
+   * Get all rubric criteria (admin only)
+   */
+  async getAllCriteria(req, res) {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 50;
+      const templateId = req.query.templateId ? parseInt(req.query.templateId) : undefined;
+      const isActive = req.query.isActive !== undefined ? req.query.isActive === "true" : undefined;
+
+      const result = await rubricCriteriaService.getAllCriteria({
+        page,
+        limit,
+        templateId,
+        isActive,
+      });
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Get all rubric criteria controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * GET /rubric-criteria/:criteriaId
+   * Get rubric criteria by ID
+   */
+  async getCriteriaById(req, res) {
+    try {
+      const { criteriaId } = req.params;
+
+      if (!criteriaId || isNaN(parseInt(criteriaId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID criteria không hợp lệ",
+        });
+      }
+
+      const result = await rubricCriteriaService.getCriteriaById(parseInt(criteriaId));
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(404).json(result);
+      }
+    } catch (error) {
+      console.error("Get rubric criteria by ID controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
 }
 
 module.exports = new RubricCriteriaController();
