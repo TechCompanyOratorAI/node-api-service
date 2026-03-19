@@ -265,6 +265,52 @@ class AIReportController {
   }
 
   /**
+   * PATCH /ai-reports/:reportId/status
+   * Cập nhật trạng thái AI report
+   */
+  async updateReportStatus(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Dữ liệu không hợp lệ",
+          errors: errors.array(),
+        });
+      }
+
+      const { reportId } = req.params;
+      const { reportStatus } = req.body;
+
+      if (!reportId || isNaN(parseInt(reportId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID report không hợp lệ",
+        });
+      }
+
+      const result = await aiReportService.updateReportStatus(
+        parseInt(reportId),
+        reportStatus
+      );
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else if (result.code === "NOT_FOUND") {
+        return res.status(404).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Update report status controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
    * DELETE /ai-reports/:reportId
    * Delete AI report
    */

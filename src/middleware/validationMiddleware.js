@@ -822,7 +822,26 @@ export const validateEditAIReport = [
 
   body("reportStatus")
     .optional()
-    .isIn(["draft", "pending_review", "generating", "completed", "failed", "confirmed", "rejected"])
+    .isIn(["waiting", "draft", "pending_review", "generating", "completed", "failed", "confirmed", "rejected"])
+    .withMessage("reportStatus không hợp lệ"),
+];
+
+// Update AI Report status only (PATCH /ai-reports/:reportId/status)
+const VALID_AI_REPORT_STATUSES = [
+  "waiting",
+  "draft",
+  "pending_review",
+  "generating",
+  "completed",
+  "failed",
+  "confirmed",
+  "rejected",
+];
+export const validateUpdateAIReportStatus = [
+  body("reportStatus")
+    .notEmpty()
+    .withMessage("reportStatus là bắt buộc")
+    .isIn(VALID_AI_REPORT_STATUSES)
     .withMessage("reportStatus không hợp lệ"),
 ];
 
@@ -851,4 +870,5 @@ export default {
   validateClassRubricCustomCriteria,
   validateGenerateAIReport,
   validateEditAIReport,
+  validateUpdateAIReportStatus,
 };

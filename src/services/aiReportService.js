@@ -108,7 +108,7 @@ class AIReportService {
         configId: aiSettings.configId,
         rubricTemplateId: aiSettings.rubricTemplateId,
         classAiSettingId: aiSettings.classAiSettingId,
-        reportStatus: "generating",
+        reportStatus: "waiting",
       };
 
       let report;
@@ -255,21 +255,20 @@ class AIReportService {
         evaluationGuide: c.evaluationGuide,
       }));
 
-      // Create new report record
-      const initialStatus = aiSettings.requireInstructorConfirmation 
-        ? "pending_review" 
-        : "confirmed";
-
+      // Create new report record with status "waiting" (chờ worker xử lý)
       const report = await AIReport.create({
         submissionId: presentationId,
         classId: classId,
         configId: aiSettings.configId,
         rubricTemplateId: aiSettings.rubricTemplateId,
         classAiSettingId: aiSettings.classAiSettingId,
-        reportStatus: "generating",
+        reportStatus: "waiting",
       });
 
       console.log(`[AIReportService] Created report ${report.reportId} for presentation ${presentationId}`);
+
+      // Chuyển sang generating khi đã gửi vào queue
+      await report.update({ reportStatus: "generating" });
 
       // Trigger Python report worker via SQS
       await this._sendToReportQueue(presentationId, report.reportId, classId, jobId, classCriteria, aiSettings);
@@ -578,6 +577,58 @@ class AIReportService {
     }
   }
 
+  /** Trạng thái hợp lệ khi cập nhật reportStatus */
+  static VALID_REPORT_STATUSES = [
+    "waiting",
+    "draft",
+    "pending_review",
+    "generating",
+    "completed",
+    "failed",
+    "confirmed",
+    "rejected",
+  ];
+
+  /**
+   * Cập nhật status của AI report (Admin/Instructor hoặc hệ thống)
+   */
+  async updateReportStatus(reportId, reportStatus) {
+    try {
+      if (!AIReportService.VALID_REPORT_STATUSES.includes(reportStatus)) {
+        return {
+          success: false,
+          message: "Trạng thái không hợp lệ",
+          code: "INVALID_STATUS",
+        };
+      }
+
+      const report = await AIReport.findByPk(reportId);
+
+      if (!report) {
+        return {
+          success: false,
+          message: "AI report không tìm thấy",
+          code: "NOT_FOUND",
+        };
+      }
+
+      await report.update({ reportStatus });
+
+      return {
+        success: true,
+        data: report,
+        message: "Đã cập nhật trạng thái report",
+      };
+    } catch (error) {
+      console.error("Update report status error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi cập nhật trạng thái report",
+        error: error.message,
+      };
+    }
+  }
+
   /**
    * Get AI report by submission ID
    * @param {number} submissionId - Presentation/Submission ID
@@ -634,11 +685,11 @@ class AIReportService {
         };
       }
 
-      // Check if report can be deleted (only draft or rejected reports)
-      if (!["draft", "rejected", "failed"].includes(report.reportStatus)) {
+      // Check if report can be deleted (waiting, draft, rejected, failed)
+      if (!["waiting", "draft", "rejected", "failed"].includes(report.reportStatus)) {
         return {
           success: false,
-          message: "Chỉ có thể xóa report ở trạng thái draft, rejected hoặc failed",
+          message: "Chỉ có thể xóa report ở trạng thái waiting, draft, rejected hoặc failed",
           code: "INVALID_STATUS",
         };
       }

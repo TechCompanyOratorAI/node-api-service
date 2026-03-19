@@ -43,6 +43,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       reportStatus: {
         type: DataTypes.ENUM(
+          "waiting",
           "draft",
           "pending_review",
           "generating",
@@ -52,7 +53,7 @@ module.exports = (sequelize, DataTypes) => {
           "rejected"
         ),
         allowNull: false,
-        defaultValue: "draft",
+        defaultValue: "waiting",
       },
       confirmedByInstructorId: {
         type: DataTypes.INTEGER,

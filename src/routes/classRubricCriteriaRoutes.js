@@ -29,7 +29,7 @@ router.post(
 // GET /classes/:classId/rubric - Get all active class rubric criteria
 router.get(
   "/:classId/rubric",
-  //requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "Instructor"]),
   classRubricCriteriaController.getClassRubricCriteria
 );
 
@@ -54,6 +54,41 @@ router.delete(
   "/class-rubric-criteria/:classRubricCriteriaId",
   requireRole(["Admin", "Instructor"]),
   classRubricCriteriaController.deleteCriterion
+);
+
+// GET /class-rubric-criteria/:classRubricCriteriaId - Get a single class rubric criterion by ID
+router.get(
+  "/class-rubric-criteria/:classRubricCriteriaId",
+  requireRole(["Admin", "Instructor"]),
+  classRubricCriteriaController.getCriterionById
+);
+
+// PATCH /class-rubric-criteria/:classRubricCriteriaId/restore - Restore a soft-deleted criterion
+router.patch(
+  "/class-rubric-criteria/:classRubricCriteriaId/restore",
+  requireRole(["Admin", "Instructor"]),
+  classRubricCriteriaController.restoreCriterion
+);
+
+// POST /class-rubric-criteria/reorder - Reorder multiple criteria (bulk update displayOrder)
+router.post(
+  "/class-rubric-criteria/reorder",
+  requireRole(["Admin", "Instructor"]),
+  classRubricCriteriaController.reorderCriteria
+);
+
+// POST /class-rubric-criteria/bulk-delete - Soft delete multiple criteria at once
+router.post(
+  "/class-rubric-criteria/bulk-delete",
+  requireRole(["Admin", "Instructor"]),
+  classRubricCriteriaController.bulkDeleteCriteria
+);
+
+// GET /classes/:classId/rubric/all - Get all class rubric criteria including inactive
+router.get(
+  "/:classId/rubric/all",
+  requireRole(["Admin", "Instructor"]),
+  classRubricCriteriaController.getAllClassRubricCriteria
 );
 
 export default router;
