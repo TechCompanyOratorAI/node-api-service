@@ -245,7 +245,6 @@ class ClassRubricCriteriaService {
         };
       }
 
-      // Soft delete
       await criterion.update({ isActive: 0 });
 
       return {
@@ -257,6 +256,215 @@ class ClassRubricCriteriaService {
       return {
         success: false,
         message: "Lỗi khi xóa criteria",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get a single class rubric criterion by ID
+   */
+  async getCriterionById(classRubricCriteriaId) {
+    try {
+      const criterion = await ClassRubricCriteria.findByPk(classRubricCriteriaId, {
+        include: [
+          { model: Class, as: "class", attributes: ["classId", "className"] },
+          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+          { model: RubricCriteria, as: "sourceCriteria", attributes: ["criteriaId", "criteriaName"] },
+          { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: User, as: "updater", attributes: ["userId", "firstName", "lastName", "email"] },
+        ],
+      });
+
+      if (!criterion) {
+        return {
+          success: false,
+          message: "Class rubric criteria không tìm thấy",
+        };
+      }
+
+      return {
+        success: true,
+        data: criterion,
+      };
+    } catch (error) {
+      console.error("Get criterion by ID error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy chi tiết criteria",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Restore a soft-deleted criterion
+   */
+  async restoreCriterion(classRubricCriteriaId, userId) {
+    try {
+      const criterion = await ClassRubricCriteria.findByPk(classRubricCriteriaId);
+
+      if (!criterion) {
+        return {
+          success: false,
+          message: "Class rubric criteria không tìm thấy",
+        };
+      }
+
+      if (criterion.isActive === 1) {
+        return {
+          success: false,
+          message: "Criteria đang ở trạng thái hoạt động",
+        };
+      }
+
+      await criterion.update({
+        isActive: 1,
+        updatedBy: userId,
+      });
+
+      return {
+        success: true,
+        data: criterion,
+        message: "Khôi phục criteria thành công",
+      };
+    } catch (error) {
+      console.error("Restore criterion error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi khôi phục criteria",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Reorder multiple criteria (bulk update displayOrder)
+   */
+  async reorderCriteria(orders, userId) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      const updatedIds = [];
+
+      for (const order of orders) {
+        const { classRubricCriteriaId, displayOrder } = order;
+
+        if (!classRubricCriteriaId || typeof displayOrder !== "number") {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Dữ liệu sắp xếp không hợp lệ",
+          };
+        }
+
+        const criterion = await ClassRubricCriteria.findByPk(classRubricCriteriaId);
+
+        if (!criterion) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: `Criteria với ID ${classRubricCriteriaId} không tìm thấy`,
+          };
+        }
+
+        await criterion.update(
+          { displayOrder, updatedBy: userId },
+          { transaction }
+        );
+
+        updatedIds.push(classRubricCriteriaId);
+      }
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: `Đã cập nhật thứ tự cho ${updatedIds.length} criteria`,
+        updatedCount: updatedIds.length,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Reorder criteria error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi sắp xếp criteria",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Soft delete multiple criteria at once
+   */
+  async bulkDeleteCriteria(classRubricCriteriaIds) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      const ids = classRubricCriteriaIds.map((id) => parseInt(id));
+
+      const count = await ClassRubricCriteria.update(
+        { isActive: 0 },
+        {
+          where: {
+            classRubricCriteriaId: { [Op.in]: ids },
+          },
+          transaction,
+        }
+      );
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: `Đã xóa ${count[0]} criteria thành công`,
+        deletedCount: count[0],
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Bulk delete criteria error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi xóa nhiều criteria",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get all class rubric criteria including inactive
+   */
+  async getAllClassRubricCriteria(classId) {
+    try {
+      const classExists = await Class.findByPk(classId);
+      if (!classExists) {
+        return {
+          success: false,
+          message: "Lớp học không tìm thấy",
+        };
+      }
+
+      const criteria = await ClassRubricCriteria.findAll({
+        where: { classId: classId },
+        order: [["displayOrder", "ASC"]],
+        include: [
+          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+          { model: RubricCriteria, as: "sourceCriteria", attributes: ["criteriaId", "criteriaName"] },
+          { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: User, as: "updater", attributes: ["userId", "firstName", "lastName", "email"] },
+        ],
+      });
+
+      return {
+        success: true,
+        data: criteria,
+        total: criteria.length,
+        activeCount: criteria.filter((c) => c.isActive === 1).length,
+        inactiveCount: criteria.filter((c) => c.isActive === 0).length,
+      };
+    } catch (error) {
+      console.error("Get all class rubric criteria error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy danh sách criteria",
         error: error.message,
       };
     }

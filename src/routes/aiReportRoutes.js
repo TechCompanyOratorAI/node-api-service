@@ -5,7 +5,7 @@ import {
   requireEmailVerification,
   requireRole,
 } from "../middleware/authMiddleware.js";
-import { validateGenerateAIReport, validateEditAIReport } from "../middleware/validationMiddleware.js";
+import { validateGenerateAIReport, validateEditAIReport, validateUpdateAIReportStatus } from "../middleware/validationMiddleware.js";
 
 const router = express.Router();
 
@@ -61,6 +61,14 @@ router.put(
   "/:reportId/reject",
   requireRole(["Admin", "Instructor"]),
   aiReportController.rejectReport
+);
+
+// PATCH /ai-reports/:reportId/status - Update AI report status
+router.patch(
+  "/:reportId/status",
+  requireRole(["Admin", "Instructor"]),
+  validateUpdateAIReportStatus,
+  aiReportController.updateReportStatus
 );
 
 // GET /ai-reports/submission/:submissionId - Get AI report by submission ID
