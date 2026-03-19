@@ -11,6 +11,18 @@ import { Op } from "sequelize";
 import db from "../models";
 import queueService from "../services/queueService";
 
+/** Trạng thái hợp lệ khi cập nhật reportStatus */
+const VALID_REPORT_STATUSES = [
+  "waiting",
+  "draft",
+  "pending_review",
+  "generating",
+  "completed",
+  "failed",
+  "confirmed",
+  "rejected",
+];
+
 class AIReportService {
   /**
    * Generate AI report for a submission
@@ -577,24 +589,12 @@ class AIReportService {
     }
   }
 
-  /** Trạng thái hợp lệ khi cập nhật reportStatus */
-  static VALID_REPORT_STATUSES = [
-    "waiting",
-    "draft",
-    "pending_review",
-    "generating",
-    "completed",
-    "failed",
-    "confirmed",
-    "rejected",
-  ];
-
   /**
    * Cập nhật status của AI report (Admin/Instructor hoặc hệ thống)
    */
   async updateReportStatus(reportId, reportStatus) {
     try {
-      if (!AIReportService.VALID_REPORT_STATUSES.includes(reportStatus)) {
+      if (!VALID_REPORT_STATUSES.includes(reportStatus)) {
         return {
           success: false,
           message: "Trạng thái không hợp lệ",

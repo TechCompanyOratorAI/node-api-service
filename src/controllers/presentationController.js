@@ -138,7 +138,13 @@ class PresentationController {
         req.user.role
       );
 
-      return res.status(result.success ? 200 : 404).json(result);
+      if (!result.success) {
+        // Return 403 for access denied, 404 for not found
+        const statusCode = result.message === "Access denied" ? 403 : 404;
+        return res.status(statusCode).json(result);
+      }
+
+      return res.status(200).json(result);
     } catch (error) {
       console.error('Get presentation controller error:', error);
       return res.status(500).json({ success: false, message: 'Internal server error' });

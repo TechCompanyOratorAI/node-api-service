@@ -20,9 +20,22 @@ export const authenticateToken = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Get user from database
+    // Get user from database with role
     const user = await User.findByPk(decoded.userId, {
-      attributes: ['userId', 'username', 'email', 'firstName', 'lastName', 'isActive', 'isEmailVerified']
+      attributes: ['userId', 'username', 'email', 'firstName', 'lastName', 'isActive', 'isEmailVerified'],
+      include: [
+        {
+          model: db.UserRole,
+          as: 'userRoles',
+          include: [
+            {
+              model: db.Role,
+              as: 'role',
+              attributes: ['roleId', 'roleName']
+            }
+          ]
+        }
+      ]
     });
 
     if (!user) {
@@ -39,8 +52,13 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Add user to request object
-    req.user = user;
+    // Extract primary role for authorization
+    const primaryRole = user.userRoles && user.userRoles[0] && user.userRoles[0].role 
+      ? user.userRoles[0].role.roleName 
+      : null;
+        
+    // Add user and role to request object
+    req.user = { ...user.toJSON(), role: primaryRole };
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
@@ -79,13 +97,29 @@ export const optionalAuth = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Get user from database
+    // Get user from database with role
     const user = await User.findByPk(decoded.userId, {
-      attributes: ['userId', 'username', 'email', 'firstName', 'lastName', 'isActive', 'isEmailVerified']
+      attributes: ['userId', 'username', 'email', 'firstName', 'lastName', 'isActive', 'isEmailVerified'],
+      include: [
+        {
+          model: db.UserRole,
+          as: 'userRoles',
+          include: [
+            {
+              model: db.Role,
+              as: 'role',
+              attributes: ['roleId', 'roleName']
+            }
+          ]
+        }
+      ]
     });
 
     if (user && user.isActive) {
-      req.user = user;
+      const primaryRole = user.userRoles && user.userRoles[0] && user.userRoles[0].role 
+        ? user.userRoles[0].role.roleName 
+        : null;
+      req.user = { ...user.toJSON(), role: primaryRole };
     } else {
       req.user = null;
     }

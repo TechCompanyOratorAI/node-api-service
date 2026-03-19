@@ -1046,11 +1046,10 @@ class PresentationService {
         return true;
       }
 
-      // Admin/Teacher can access all
-      if (userRole === "admin" || userRole === "teacher") {
+      // Admin/Teacher/Instructor can access all
+      if (userRole && ["admin", "teacher", "instructor"].includes(userRole.toLowerCase())) {
         return true;
       }
-
       // Check if user is enrolled in same course
       if (presentation.courseId) {
         const enrollment = await TopicEnrollment.findOne({
