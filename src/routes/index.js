@@ -46,43 +46,17 @@ router.use("/webhooks", webhookRoutes);
 router.use("/speakers", speakerRoutes);
 router.use("/jobs", jobRoutes);
 router.use("/storage", storageRoutes);
-
-// Class Routes - mounted at /classes
 router.use("/classes", classRoutes);
-
-// ClassAISettings - mounted at /classes (nested)
 router.use("/classesAISettings", classAISettingRoutes);
-
-// ClassRubricCriteria - mounted at /classes (nested)
 router.use("/classesRubricCriteria", classRubricCriteriaRoutes);
-
-// Enrollment Key Routes - mounted at /enroll-keys
 router.use("/enroll-keys", enrollKeyRoutes);
-
-// Group Routes - mounted at /groups
 router.use("/groups", groupRoutes);
-
-// Department Routes - mounted at /departments
 router.use("/departments", departmentRoutes);
-
-// Speech Quality Routes - mounted at /speech-quality
 router.use("/speech-quality", speechQualityRoutes);
-
-// Rubric-based AI Reporting Routes
-// RubricTemplates - mounted at /rubric-templates
 router.use("/rubric-templates", rubricTemplateRoutes);
-
-// RubricCriteria - mounted at /rubric-templates (nested)
 router.use("/rubric-criteria", rubricCriteriaRoutes);
-
-// ClassAISettings - mounted at /classes (nested under classRoutes)
-
-// ClassRubricCriteria - mounted at /classes (nested under classRoutes)
-
-// AIReports - mounted at /ai-reports
 router.use("/ai-reports", aiReportRoutes);
 
-// Student quick access routes
 router.get(
   "/me/classes",
   authenticateToken,
