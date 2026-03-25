@@ -6,6 +6,7 @@ module.exports = (sequelize, DataTypes) => {
         static associate(models) {
             Feedback.belongsTo(models.Presentation, { foreignKey: 'presentationId', as: 'presentation' });
             Feedback.belongsTo(models.User, { foreignKey: 'reviewerId', as: 'reviewer' });
+            Feedback.belongsTo(models.AIReport, { foreignKey: 'reportId', as: 'aiReport' });
         }
     }
 
@@ -14,10 +15,26 @@ module.exports = (sequelize, DataTypes) => {
             feedbackId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
             presentationId: { type: DataTypes.INTEGER, allowNull: false },
             reviewerId: { type: DataTypes.INTEGER, allowNull: false },
+            reportId: {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                comment: 'FK AIReports — instructor feedback cho AI report',
+            },
             rating: { type: DataTypes.FLOAT },
             comments: { type: DataTypes.TEXT },
+            criterionFeedbacks: {
+                type: DataTypes.JSON,
+                allowNull: true,
+            },
             feedbackType: {
-                type: DataTypes.ENUM('general', 'content', 'delivery', 'structure', 'engagement'),
+                type: DataTypes.ENUM(
+                    'general',
+                    'content',
+                    'delivery',
+                    'structure',
+                    'engagement',
+                    'ai_report_instructor'
+                ),
                 allowNull: false,
                 defaultValue: 'general',
             },

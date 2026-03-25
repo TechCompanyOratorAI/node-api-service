@@ -1,5 +1,6 @@
 import {
   AIReport,
+  Feedback,
   ClassAISetting,
   ClassRubricCriteria,
   Presentation,
@@ -11,7 +12,6 @@ import { Op } from "sequelize";
 import db from "../models";
 import queueService from "../services/queueService";
 
-/** Trạng thái hợp lệ khi cập nhật reportStatus */
 const VALID_REPORT_STATUSES = [
   "waiting",
   "draft",
@@ -24,12 +24,8 @@ const VALID_REPORT_STATUSES = [
 ];
 
 class AIReportService {
-  /**
-   * Generate AI report for a submission
-   */
   async generateReport(submissionId, classId, userId) {
     try {
-      // Check submission exists
       const submission = await Presentation.findByPk(submissionId);
       if (!submission) {
         return {
@@ -38,7 +34,6 @@ class AIReportService {
         };
       }
 
-      // Get active AI settings for the class
       const aiSettings = await ClassAISetting.findOne({
         where: {
           classId: classId,
@@ -55,8 +50,6 @@ class AIReportService {
           message: "Cài đặt AI cho lớp không tìm thấy",
         };
       }
-
-      // Check if AI report is enabled
       if (!aiSettings.enableAiReport) {
         return {
           success: false,
@@ -64,8 +57,6 @@ class AIReportService {
           code: "AI_REPORT_DISABLED",
         };
       }
-
-      // Get class rubric criteria (the actual rubric used for evaluation)
       const classCriteria = await ClassRubricCriteria.findAll({
         where: {
           classId: classId,
@@ -82,17 +73,14 @@ class AIReportService {
         };
       }
 
-      // Check if there's already a report for this submission
       const existingReport = await AIReport.findOne({
         where: { submissionId: submissionId },
       });
 
-      // Determine initial status based on requireInstructorConfirmation
       const initialStatus = aiSettings.requireInstructorConfirmation 
         ? "pending_review" 
         : "confirmed";
 
-      // Prepare class rubric data to pass to AI pipeline
       const rubricData = classCriteria.map((c) => ({
         criteriaId: c.classRubricCriteriaId,
         criteriaName: c.criteriaName,
@@ -102,18 +90,6 @@ class AIReportService {
         evaluationGuide: c.evaluationGuide,
       }));
 
-      // ============================================================
-      // NOTE: This is where you would call the existing AI pipeline
-      // The actual AI processing is handled by BE (Python worker)
-      // Here we just prepare the data and create initial record
-      // ============================================================
-      
-      // For now, create a placeholder record
-      // In production, you would:
-      // 1. Send rubricData + submission to AI pipeline
-      // 2. Receive generated report and scores
-      // 3. Update the record with results
-      
       const reportData = {
         submissionId: submissionId,
         classId: classId,
@@ -131,23 +107,6 @@ class AIReportService {
         report = await AIReport.create(reportData);
       }
 
-      // ============================================================
-      // TODO: Trigger Python AI worker here
-      // Example: await queueService.addJob('generate-ai-report', { 
-      //   reportId: report.reportId,
-      //   submissionId: submissionId,
-      //   rubricData: rubricData,
-      //   settings: {
-      //     feedbackLanguage: aiSettings.feedbackLanguage,
-      //     reportFormat: aiSettings.reportFormat,
-      //     includeCriterionComments: aiSettings.includeCriterionComments,
-      //     includeOverallSummary: aiSettings.includeOverallSummary,
-      //     includeSuggestions: aiSettings.includeSuggestions,
-      //     enableSlideLayoutScoring: aiSettings.enableSlideLayoutScoring,
-      //     slideLayoutWeight: aiSettings.slideLayoutWeight,
-      //   }
-      // });
-      // ============================================================
 
       return {
         success: true,
@@ -178,7 +137,6 @@ class AIReportService {
    */
   async triggerReportAfterAnalysis(presentationId, jobId) {
     try {
-      // Get presentation to find classId
       const presentation = await Presentation.findByPk(presentationId, {
         attributes: ["presentationId", "classId", "title", "status"],
       });
@@ -199,7 +157,6 @@ class AIReportService {
         };
       }
 
-      // Check if AI report is enabled for this class
       const aiSettings = await ClassAISetting.findOne({
         where: {
           classId: classId,
@@ -216,7 +173,6 @@ class AIReportService {
         };
       }
 
-      // Check if class has rubric criteria
       const classCriteria = await ClassRubricCriteria.findAll({
         where: {
           classId: classId,
@@ -233,21 +189,16 @@ class AIReportService {
           message: "Lớp chưa có rubric criteria",
         };
       }
-
-      // Check if there's already a report for this submission
       const existingReport = await AIReport.findOne({
         where: { submissionId: presentationId },
       });
 
       if (existingReport) {
-        // Update existing report and trigger regeneration
         await existingReport.update({
           reportStatus: "generating",
         });
         
         console.log(`[AIReportService] Triggering report regeneration for presentation ${presentationId}`);
-        
-        // Trigger Python report worker via SQS
         await this._sendToReportQueue(presentationId, existingReport.reportId, classId, jobId, classCriteria, aiSettings);
         
         return {
@@ -256,8 +207,6 @@ class AIReportService {
           message: "Đã kích hoạt tạo lại AI report",
         };
       }
-
-      // Prepare rubric data
       const rubricData = classCriteria.map((c) => ({
         criteriaId: c.classRubricCriteriaId,
         criteriaName: c.criteriaName,
@@ -267,7 +216,6 @@ class AIReportService {
         evaluationGuide: c.evaluationGuide,
       }));
 
-      // Create new report record with status "waiting" (chờ worker xử lý)
       const report = await AIReport.create({
         submissionId: presentationId,
         classId: classId,
@@ -278,11 +226,7 @@ class AIReportService {
       });
 
       console.log(`[AIReportService] Created report ${report.reportId} for presentation ${presentationId}`);
-
-      // Chuyển sang generating khi đã gửi vào queue
       await report.update({ reportStatus: "generating" });
-
-      // Trigger Python report worker via SQS
       await this._sendToReportQueue(presentationId, report.reportId, classId, jobId, classCriteria, aiSettings);
 
       return {
@@ -306,7 +250,6 @@ class AIReportService {
    */
   async _sendToReportQueue(presentationId, reportId, classId, jobId, classCriteria, aiSettings) {
     try {
-      // Prepare rubric data
       const rubricData = classCriteria.map((c) => ({
         criteriaId: c.classRubricCriteriaId,
         criteriaName: c.criteriaName,
@@ -316,7 +259,6 @@ class AIReportService {
         evaluationGuide: c.evaluationGuide,
       }));
 
-      // Prepare message for Report Worker
       const queueMessage = {
         presentationId: presentationId,
         reportId: reportId,
@@ -333,8 +275,6 @@ class AIReportService {
           slideLayoutWeight: aiSettings.slideLayoutWeight ? parseFloat(aiSettings.slideLayoutWeight) : 0.1,
         },
       };
-
-      // Send to SQS Report Queue
       const result = await queueService.sendToReportQueue(queueMessage);
 
       console.log(`[AIReportService] Sent job to Report Queue:`, {
@@ -346,14 +286,11 @@ class AIReportService {
       return result;
     } catch (error) {
       console.error("[AIReportService] Failed to send to Report Queue:", error);
-      // Don't throw - report record is already created, worker can be triggered manually if needed
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Get report detail by ID
-   */
+
   async getReportById(reportId) {
     try {
       const report = await AIReport.findByPk(reportId, {
@@ -362,6 +299,14 @@ class AIReportService {
           { model: Class, as: "class", attributes: ["classId", "classCode"] },
           { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
           { model: User, as: "confirmer", attributes: ["userId", "firstName", "lastName", "email"] },
+          {
+            model: Feedback,
+            as: "instructorFeedback",
+            required: false,
+            include: [
+              { model: User, as: "reviewer", attributes: ["userId", "firstName", "lastName", "email"] },
+            ],
+          },
         ],
       });
 
@@ -386,9 +331,7 @@ class AIReportService {
     }
   }
 
-  /**
-   * Get all reports of a class
-   */
+
   async getReportsByClass(classId, options = {}) {
     try {
       const { page = 1, limit = 20, status } = options;
@@ -431,9 +374,6 @@ class AIReportService {
     }
   }
 
-  /**
-   * Confirm AI report (instructor confirms the report)
-   */
   async confirmReport(reportId, instructorId) {
     try {
       const report = await AIReport.findByPk(reportId);
@@ -444,8 +384,6 @@ class AIReportService {
           message: "AI report không tìm thấy",
         };
       }
-
-      // Check if report is in a confirmable state
       if (!["pending_review", "completed", "draft"].includes(report.reportStatus)) {
         return {
           success: false,
@@ -475,9 +413,6 @@ class AIReportService {
     }
   }
 
-  /**
-   * Edit AI report (instructor edits content and/or scores)
-   */
   async editReport(reportId, data, instructorId) {
     try {
       const report = await AIReport.findByPk(reportId);
@@ -489,7 +424,6 @@ class AIReportService {
         };
       }
 
-      // Get AI settings to check if editing is allowed
       const aiSettings = await ClassAISetting.findOne({
         where: {
           classId: report.classId,
@@ -505,7 +439,6 @@ class AIReportService {
         };
       }
 
-      // Allow editing if status is confirmed or pending_review
       if (!["pending_review", "confirmed", "completed", "draft"].includes(report.reportStatus)) {
         return {
           success: false,
@@ -513,8 +446,6 @@ class AIReportService {
           code: "INVALID_STATUS",
         };
       }
-
-      // Update fields
       const updateData = {};
       if (data.overallScore !== undefined) {
         updateData.overallScore = data.overallScore;
@@ -546,9 +477,7 @@ class AIReportService {
     }
   }
 
-  /**
-   * Reject AI report
-   */
+
   async rejectReport(reportId, instructorId) {
     try {
       const report = await AIReport.findByPk(reportId);
@@ -589,9 +518,6 @@ class AIReportService {
     }
   }
 
-  /**
-   * Cập nhật status của AI report (Admin/Instructor hoặc hệ thống)
-   */
   async updateReportStatus(reportId, reportStatus) {
     try {
       if (!VALID_REPORT_STATUSES.includes(reportStatus)) {
@@ -643,6 +569,14 @@ class AIReportService {
           { model: Class, as: "class", attributes: ["classId", "classCode"] },
           { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
           { model: User, as: "confirmer", attributes: ["userId", "firstName", "lastName", "email"] },
+          {
+            model: Feedback,
+            as: "instructorFeedback",
+            required: false,
+            include: [
+              { model: User, as: "reviewer", attributes: ["userId", "firstName", "lastName", "email"] },
+            ],
+          },
         ],
       });
 
