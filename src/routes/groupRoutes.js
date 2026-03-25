@@ -24,4 +24,14 @@ router.post('/:groupId/members/:studentId/remove', groupController.removeMember)
 // [POST] /api/groups/:groupId/members/:studentId/promote - Chuyển quyền leader (chỉ leader)
 router.post('/:groupId/members/:studentId/promote', groupController.promoteMember);
 
+// ============================================================
+// TOPIC SELECTION ROUTES
+// ============================================================
+// [POST]   /api/groups/:groupId/topic - Nhóm trưởng chọn topic cho nhóm
+router.post('/:groupId/topic', groupController.selectGroupTopic);
+// [GET]    /api/groups/:groupId/topic - Lấy topic hiện tại của nhóm
+router.get('/:groupId/topic', groupController.getGroupTopic);
+// [DELETE] /api/groups/:groupId/topic - Huỷ chọn topic (leader only)
+router.delete('/:groupId/topic', groupController.removeGroupTopic);
+
 module.exports = router;

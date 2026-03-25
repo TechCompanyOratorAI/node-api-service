@@ -252,6 +252,81 @@ const getMyGroups = async (req, res) => {
     }
 };
 
+// [POST] /api/groups/:groupId/topic - Nhóm trưởng chọn topic cho nhóm
+const selectGroupTopic = async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const { topicId } = req.body;
+        const currentUser = getCurrentUser(req);
+
+        if (!topicId) {
+            return res.status(400).json({ error: 'topicId là bắt buộc' });
+        }
+
+        const result = await groupService.selectGroupTopic(
+            parseInt(groupId),
+            parseInt(topicId),
+            currentUser.userId
+        );
+
+        if (!result.success) {
+            return res.status(400).json({ error: result.message });
+        }
+
+        res.status(200).json({ message: result.message, data: result.data });
+
+    } catch (error) {
+        console.error('Select group topic error:', error);
+        res.status(500).json({ error: 'Lỗi server: ' + error.message });
+    }
+};
+
+// [GET] /api/groups/:groupId/topic - Lấy topic hiện tại của nhóm
+const getGroupTopic = async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const currentUser = getCurrentUser(req);
+
+        const result = await groupService.getGroupTopic(
+            parseInt(groupId),
+            currentUser.userId
+        );
+
+        if (!result.success) {
+            return res.status(400).json({ error: result.message });
+        }
+
+        res.json({ topic: result.data, message: result.message });
+
+    } catch (error) {
+        console.error('Get group topic error:', error);
+        res.status(500).json({ error: 'Lỗi server: ' + error.message });
+    }
+};
+
+// [DELETE] /api/groups/:groupId/topic - Huỷ chọn topic (leader only)
+const removeGroupTopic = async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const currentUser = getCurrentUser(req);
+
+        const result = await groupService.removeGroupTopic(
+            parseInt(groupId),
+            currentUser.userId
+        );
+
+        if (!result.success) {
+            return res.status(400).json({ error: result.message });
+        }
+
+        res.json({ message: result.message });
+
+    } catch (error) {
+        console.error('Remove group topic error:', error);
+        res.status(500).json({ error: 'Lỗi server: ' + error.message });
+    }
+};
+
 module.exports = {
     createGroup,
     joinGroup,
@@ -263,5 +338,8 @@ module.exports = {
     getGroupsByClass,
     getGroupById,
     getMyGroupInClass,
-    getMyGroups
+    getMyGroups,
+    selectGroupTopic,
+    getGroupTopic,
+    removeGroupTopic
 };
