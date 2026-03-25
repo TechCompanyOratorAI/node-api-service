@@ -109,6 +109,11 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "confirmedByInstructorId",
       as: "confirmer",
     });
+    AIReport.hasOne(models.Feedback, {
+      foreignKey: "reportId",
+      as: "instructorFeedback",
+      scope: { feedbackType: "ai_report_instructor" },
+    });
   };
 
   return AIReport;

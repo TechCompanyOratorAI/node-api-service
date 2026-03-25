@@ -22,6 +22,7 @@ import rubricCriteriaRoutes from "./rubricCriteriaRoutes.js";
 import classAISettingRoutes from "./classAISettingRoutes.js";
 import classRubricCriteriaRoutes from "./classRubricCriteriaRoutes.js";
 import aiReportRoutes from "./aiReportRoutes.js";
+import aiReportFeedbackRoutes from "./aiReportFeedbackRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -56,6 +57,7 @@ router.use("/speech-quality", speechQualityRoutes);
 router.use("/rubric-templates", rubricTemplateRoutes);
 router.use("/rubric-criteria", rubricCriteriaRoutes);
 router.use("/ai-reports", aiReportRoutes);
+router.use("/ai-reports", aiReportFeedbackRoutes);
 
 router.get(
   "/me/classes",
