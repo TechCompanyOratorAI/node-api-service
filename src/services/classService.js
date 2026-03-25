@@ -545,20 +545,30 @@ class ClassService {
           if (keyMaxUses !== undefined) keyUpdates.maxUses = keyMaxUses;
 
           await activeKey.update(keyUpdates, { transaction });
+        } else if (enrollKey !== undefined) {
+          // No active key exists → create a new one
+          await EnrollKey.create({
+            classId,
+            keyValue: enrollKey,
+            expiresAt: keyExpiresAt ? new Date(keyExpiresAt) : null,
+            maxUses: keyMaxUses || null,
+            usedCount: 0,
+            isActive: true,
+            isRevoked: false,
+            createdBy: userId,
+          }, { transaction });
         }
-        // If no active key exists, just skip enrollment key update
-        // Class info update still succeeds
       }
 
       await transaction.commit();
 
-      // Fetch updated class with key info
+      // Fetch updated class with full key info
       const updatedClass = await Class.findByPk(classId, {
         include: [
           {
             model: EnrollKey,
             as: 'enrollKeys',
-            where: { isActive: true, isRevoked: false },
+            attributes: ['keyId', 'keyValue', 'expiresAt', 'maxUses', 'usedCount', 'isActive', 'isRevoked', 'createdAt'],
             required: false
           }
         ]

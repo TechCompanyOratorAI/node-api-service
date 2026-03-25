@@ -1,7 +1,7 @@
-"use strict";
+﻿"use strict";
 
 const db = require("../models");
-const { Group, GroupStudent, Class, User, Enrollment } = db;
+const { Group, GroupStudent, Class, User, Enrollment, TopicEnrollment, Topic, Course, Presentation } = db;
 
 class GroupService {
   async createGroup(classId, groupName, description, userId) {
@@ -575,6 +575,325 @@ class GroupService {
       };
     }
   }
+
+  // ============================================================
+  // TOPIC SELECTION — nhóm trưởng chọn topic cho cả nhóm
+  // ============================================================
+
+  /**
+   * Nhóm trưởng chọn topic cho nhóm.
+   * Tự động enroll tất cả thành viên trong nhóm vào topic đó.
+   * Nếu nhóm đã chọn topic khác → xóa enrollment cũ (nếu chưa có presentation).
+   */
+  async selectGroupTopic(groupId, topicId, userId) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      // 1. Verify caller is leader
+      const leaderMembership = await GroupStudent.findOne({
+        where: { groupId, studentId: userId },
+        transaction,
+      });
+
+      if (!leaderMembership) {
+        await transaction.rollback();
+        return { success: false, message: "Bạn không thuộc nhóm này" };
+      }
+
+      if (leaderMembership.role !== "leader") {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Chỉ trưởng nhóm mới có quyền chọn topic",
+        };
+      }
+
+      // 2. Get group → class → courseId
+      const group = await Group.findByPk(groupId, {
+        include: [{ model: Class, as: "class", attributes: ["classId", "courseId", "status"] }],
+        transaction,
+      });
+
+      if (!group) {
+        await transaction.rollback();
+        return { success: false, message: "Nhóm không tồn tại" };
+      }
+
+      if (group.class.status !== "active") {
+        await transaction.rollback();
+        return { success: false, message: "Lớp học đã đóng" };
+      }
+
+      const courseId = group.class.courseId;
+
+      // 3. Verify topic belongs to this course
+      const topic = await Topic.findByPk(topicId, { transaction });
+
+      if (!topic) {
+        await transaction.rollback();
+        return { success: false, message: "Topic không tồn tại" };
+      }
+
+      if (topic.courseId !== courseId) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Topic không thuộc course của lớp này",
+        };
+      }
+
+      // 4. Check if group already has an active topic enrollment in this course
+      //    (find any TopicEnrollment with groupId = this group, topicId that belongs to same course)
+      const existingEnrollment = await TopicEnrollment.findOne({
+        where: { groupId, status: "enrolled" },
+        include: [
+          {
+            model: Topic,
+            as: "topic",
+            where: { courseId },
+            attributes: ["topicId", "topicName"],
+          },
+        ],
+        transaction,
+      });
+
+      if (existingEnrollment) {
+        if (existingEnrollment.topicId === topicId) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Nhóm đã chọn topic này rồi",
+          };
+        }
+
+        // Check if any presentations exist for this group on the old topic
+        const presentationCount = await Presentation.count({
+          where: { topicId: existingEnrollment.topicId, groupCode: groupId.toString() },
+          transaction,
+        });
+
+        // Also check if any member has a presentation on that topic
+        const memberIds = await GroupStudent.findAll({
+          where: { groupId },
+          attributes: ["studentId"],
+          transaction,
+        });
+        const memberStudentIds = memberIds.map((m) => m.studentId);
+
+        const memberPresentationCount = await Presentation.count({
+          where: {
+            topicId: existingEnrollment.topicId,
+            studentId: memberStudentIds,
+          },
+          transaction,
+        });
+
+        if (presentationCount > 0 || memberPresentationCount > 0) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Không thể đổi topic vì nhóm đã có bài thuyết trình trên topic hiện tại",
+          };
+        }
+
+        // Drop all existing enrollment records for this group
+        await TopicEnrollment.update(
+          { status: "dropped" },
+          { where: { groupId, status: "enrolled" }, transaction }
+        );
+      }
+
+      // 5. Get all group members
+      const members = await GroupStudent.findAll({
+        where: { groupId },
+        attributes: ["studentId"],
+        transaction,
+      });
+
+      if (members.length === 0) {
+        await transaction.rollback();
+        return { success: false, message: "Nhóm không có thành viên" };
+      }
+
+      // 6. Bulk-enroll all members into the topic
+      const enrollments = members.map((m) => ({
+        studentId: m.studentId,
+        topicId,
+        groupId,
+        status: "enrolled",
+        enrolledAt: new Date(),
+      }));
+
+      await TopicEnrollment.bulkCreate(enrollments, { transaction });
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: `Đã chọn topic "${topic.topicName}" cho nhóm. ${members.length} thành viên đã được enroll.`,
+        data: {
+          groupId,
+          topicId,
+          topicName: topic.topicName,
+          enrolledCount: members.length,
+        },
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Select group topic error:", error);
+      return {
+        success: false,
+        message: "Không thể chọn topic cho nhóm",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Lấy topic hiện tại của nhóm (nếu có)
+   */
+  async getGroupTopic(groupId, userId) {
+    try {
+      // Verify user belongs to group
+      const membership = await GroupStudent.findOne({
+        where: { groupId, studentId: userId },
+      });
+
+      if (!membership) {
+        return { success: false, message: "Bạn không thuộc nhóm này" };
+      }
+
+      const group = await Group.findByPk(groupId, {
+        include: [{ model: Class, as: "class", attributes: ["classId", "courseId"] }],
+      });
+
+      if (!group) {
+        return { success: false, message: "Nhóm không tồn tại" };
+      }
+
+      const courseId = group.class.courseId;
+
+      // Find active enrollment for this group
+      const enrollment = await TopicEnrollment.findOne({
+        where: { groupId, status: "enrolled" },
+        include: [
+          {
+            model: Topic,
+            as: "topic",
+            where: { courseId },
+            attributes: ["topicId", "topicName", "description", "dueDate", "sequenceNumber"],
+          },
+        ],
+      });
+
+      if (!enrollment) {
+        return {
+          success: true,
+          data: null,
+          message: "Nhóm chưa chọn topic nào",
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          topicId: enrollment.topic.topicId,
+          topicName: enrollment.topic.topicName,
+          description: enrollment.topic.description,
+          dueDate: enrollment.topic.dueDate,
+          sequenceNumber: enrollment.topic.sequenceNumber,
+          enrolledAt: enrollment.enrolledAt,
+        },
+      };
+    } catch (error) {
+      console.error("Get group topic error:", error);
+      return {
+        success: false,
+        message: "Không thể lấy thông tin topic của nhóm",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Huỷ chọn topic của nhóm (leader only, chặn nếu đã có presentation)
+   */
+  async removeGroupTopic(groupId, userId) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      // Verify leader
+      const leaderMembership = await GroupStudent.findOne({
+        where: { groupId, studentId: userId },
+        transaction,
+      });
+
+      if (!leaderMembership) {
+        await transaction.rollback();
+        return { success: false, message: "Bạn không thuộc nhóm này" };
+      }
+
+      if (leaderMembership.role !== "leader") {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Chỉ trưởng nhóm mới có quyền huỷ topic",
+        };
+      }
+
+      // Find current topic enrollment
+      const existingEnrollment = await TopicEnrollment.findOne({
+        where: { groupId, status: "enrolled" },
+        transaction,
+      });
+
+      if (!existingEnrollment) {
+        await transaction.rollback();
+        return { success: false, message: "Nhóm chưa chọn topic nào" };
+      }
+
+      // Check if any member has a presentation on this topic
+      const members = await GroupStudent.findAll({
+        where: { groupId },
+        attributes: ["studentId"],
+        transaction,
+      });
+      const memberStudentIds = members.map((m) => m.studentId);
+
+      const presentationCount = await Presentation.count({
+        where: {
+          topicId: existingEnrollment.topicId,
+          studentId: memberStudentIds,
+        },
+        transaction,
+      });
+
+      if (presentationCount > 0) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Không thể huỷ topic vì nhóm đã có bài thuyết trình",
+        };
+      }
+
+      // Drop all enrollments for this group
+      await TopicEnrollment.update(
+        { status: "dropped" },
+        { where: { groupId, status: "enrolled" }, transaction }
+      );
+
+      await transaction.commit();
+
+      return { success: true, message: "Đã huỷ chọn topic cho nhóm" };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Remove group topic error:", error);
+      return {
+        success: false,
+        message: "Không thể huỷ topic",
+        error: error.message,
+      };
+    }
+  }
 }
 
 module.exports = new GroupService();
+

@@ -144,16 +144,49 @@ class PresentationService {
         };
       }
 
-      // Step 5: Check topic enrollment (if using topic-based enrollment)
-      const topicEnrollment = await TopicEnrollment.findOne({
-        where: { topicId, studentId, status: "enrolled" },
+      // Step 5: Check topic enrollment via group (if student is in a group)
+      // Nếu sinh viên thuộc nhóm → kiểm tra nhóm đã chọn topic này chưa
+      // Nếu không thuộc nhóm → kiểm tra individual enrollment
+      const { GroupStudent, Group } = db;
+
+      const groupMembership = await GroupStudent.findOne({
+        where: { studentId },
+        include: [{
+          model: Group,
+          as: "group",
+          where: { classId },
+          attributes: ["groupId"],
+        }],
       });
 
-      if (!topicEnrollment) {
-        return {
-          success: false,
-          message: "You are not enrolled in this topic",
-        };
+      if (groupMembership) {
+        // Group-based check: group must have selected this topic
+        const groupTopicEnrollment = await TopicEnrollment.findOne({
+          where: {
+            topicId,
+            groupId: groupMembership.group.groupId,
+            status: "enrolled",
+          },
+        });
+
+        if (!groupTopicEnrollment) {
+          return {
+            success: false,
+            message: "Nh\u00f3m ch\u01b0a ch\u1ecdn topic n\u00e0y. Tr\u01b0\u1edfng nh\u00f3m c\u1ea7n ch\u1ecdn topic tr\u01b0\u1edbc khi t\u1ea1o b\u00e0i thuy\u1ebft tr\u00ecnh",
+          };
+        }
+      } else {
+        // Individual check (fallback for students not in a group)
+        const topicEnrollment = await TopicEnrollment.findOne({
+          where: { topicId, studentId, status: "enrolled" },
+        });
+
+        if (!topicEnrollment) {
+          return {
+            success: false,
+            message: "You are not enrolled in this topic",
+          };
+        }
       }
 
       // Step 6: Create presentation with classId
@@ -417,15 +450,46 @@ class PresentationService {
         };
       }
 
-      const enrollment = await TopicEnrollment.findOne({
-        where: { topicId: presentation.topicId, studentId, status: "enrolled" },
+      // Check topic enrollment via group (if student is in a group for this class)
+      const { GroupStudent, Group } = db;
+
+      const groupMembership = await GroupStudent.findOne({
+        where: { studentId },
+        include: [{
+          model: Group,
+          as: "group",
+          where: { classId: presentation.classId },
+          attributes: ["groupId"],
+        }],
       });
 
-      if (!enrollment) {
-        return {
-          success: false,
-          message: "You are not enrolled in this topic",
-        };
+      if (groupMembership) {
+        const groupTopicEnrollment = await TopicEnrollment.findOne({
+          where: {
+            topicId: presentation.topicId,
+            groupId: groupMembership.group.groupId,
+            status: "enrolled",
+          },
+        });
+
+        if (!groupTopicEnrollment) {
+          return {
+            success: false,
+            message: "Nh\u00f3m ch\u01b0a ch\u1ecdn topic n\u00e0y",
+          };
+        }
+      } else {
+        // Individual fallback
+        const enrollment = await TopicEnrollment.findOne({
+          where: { topicId: presentation.topicId, studentId, status: "enrolled" },
+        });
+
+        if (!enrollment) {
+          return {
+            success: false,
+            message: "You are not enrolled in this topic",
+          };
+        }
       }
 
       return { success: true, presentation };
