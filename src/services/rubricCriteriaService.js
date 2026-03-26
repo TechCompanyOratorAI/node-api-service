@@ -2,14 +2,38 @@ const { RubricCriteria, RubricTemplate, User } = require("../models");
 const { Op } = require("sequelize");
 
 class RubricCriteriaService {
+  /**
+   * Calculate total weight of all active criteria for a template
+   */
+  async getTotalWeight(templateId) {
+    const criteria = await RubricCriteria.findAll({
+      where: { rubricTemplateId: templateId, isActive: true },
+    });
+    return criteria.reduce((sum, c) => sum + parseFloat(c.weight || 0), 0);
+  }
+
   async createCriteria(templateId, data) {
     try {
-      // Check template exists
       const template = await RubricTemplate.findByPk(templateId);
       if (!template) {
         return {
           success: false,
-          message: "Rubric template không tìm thấy",
+          message: "Rubric template không tờm thấy",
+        };
+      }
+
+      const currentWeight = await this.getTotalWeight(templateId);
+      const newWeight = parseFloat(data.weight || 1);
+      const totalWeight = currentWeight + newWeight;
+
+      if (totalWeight > 100) {
+        return {
+          success: false,
+          message: `Tổng weight của các criteria (${currentWeight}) + weight mới (${newWeight}) = ${totalWeight} vượt quá 100. Vui lòng giảm weight.`,
+          code: "WEIGHT_EXCEEDS_100",
+          currentWeight,
+          newWeight,
+          totalWeight,
         };
       }
 
@@ -18,10 +42,22 @@ class RubricCriteriaService {
         rubricTemplateId: templateId,
       });
 
+      const finalWeight = currentWeight + newWeight;
+      if (finalWeight === 100) {
+        await template.update({ isActive: true });
+        return {
+          success: true,
+          data: criteria,
+          message: "Tạo criteria thành công. Template đã được kích hoạt (tổng weight = 100)",
+          templateActivated: true,
+        };
+      }
+
       return {
         success: true,
         data: criteria,
         message: "Tạo criteria thành công",
+        remainingWeight: 100 - finalWeight,
       };
     } catch (error) {
       console.error("Create rubric criteria error:", error);
@@ -77,12 +113,46 @@ class RubricCriteriaService {
         };
       }
 
+      const template = await RubricTemplate.findByPk(criteria.rubricTemplateId);
+
+      if (data.weight !== undefined) {
+        const currentWeight = await this.getTotalWeight(criteria.rubricTemplateId);
+        const oldWeight = parseFloat(criteria.weight || 0);
+        const newWeight = parseFloat(data.weight);
+        const totalWeight = currentWeight - oldWeight + newWeight;
+
+        if (totalWeight > 100) {
+          return {
+            success: false,
+            message: `Tổng weight (${totalWeight}) đang vượt quá 100, yêu cầu giảm weight xuống.`,
+            code: "WEIGHT_EXCEEDS_100",
+            currentWeight: currentWeight - oldWeight,
+            newWeight,
+            totalWeight,
+          };
+        }
+      }
+
       await criteria.update(data);
 
+      const finalWeight = await this.getTotalWeight(criteria.rubricTemplateId);
+
+      if (finalWeight === 100) {
+        await template.update({ isActive: true });
+        return {
+          success: true,
+          data: criteria,
+          message: "Cập nhật criteria thành công. Template đã được kích hoạt (tổng weight = 100)",
+          templateActivated: true,
+        };
+      }
+
+      await template.update({ isActive: false });
       return {
         success: true,
         data: criteria,
         message: "Cập nhật criteria thành công",
+        remainingWeight: 100 - finalWeight,
       };
     } catch (error) {
       console.error("Update rubric criteria error:", error);
@@ -145,7 +215,7 @@ class RubricCriteriaService {
         offset: (page - 1) * limit,
         order: [["displayOrder", "ASC"]],
         include: [
-          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+          { model: RubricTemplate, as: "template", attributes: ["rubricTemplateId", "templateName"] },
         ],
       });
 
@@ -180,7 +250,7 @@ class RubricCriteriaService {
     try {
       const criteria = await RubricCriteria.findByPk(criteriaId, {
         include: [
-          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
+          { model: RubricTemplate, as: "template", attributes: ["rubricTemplateId", "templateName"] },
         ],
       });
 

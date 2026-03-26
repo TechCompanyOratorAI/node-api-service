@@ -196,6 +196,60 @@ class RubricTemplateController {
       });
     }
   }
+
+  /**
+   * PUT /rubric-templates/:templateId/criteria
+   * Update criteria for rubric template
+   */
+  async updateCriteria(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Dữ liệu không hợp lệ",
+          errors: errors.array(),
+        });
+      }
+
+      const { templateId } = req.params;
+
+      if (!templateId || isNaN(parseInt(templateId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID template không hợp lệ",
+        });
+      }
+
+      if (!Array.isArray(req.body.criteria)) {
+        return res.status(400).json({
+          success: false,
+          message: "Dữ liệu criteria phải là một mảng",
+        });
+      }
+
+      const userId = req.user?.userId;
+      const result = await rubricTemplateService.updateCriteria(
+        parseInt(templateId),
+        req.body.criteria,
+        userId
+      );
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else if (result.code === "WEIGHT_EXCEEDS_100") {
+        return res.status(400).json(result);
+      } else {
+        return res.status(404).json(result);
+      }
+    } catch (error) {
+      console.error("Update criteria controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
 }
 
 module.exports = new RubricTemplateController();
