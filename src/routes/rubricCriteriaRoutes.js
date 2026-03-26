@@ -36,7 +36,7 @@ router.get(
 
 // PUT /rubric-criteria/:criteriaId - Update a rubric criterion
 router.put(
-  "/rubric-criteria/:criteriaId",
+  "/:criteriaId",
   requireRole(["Admin"]),
   validateRubricCriteria,
   rubricCriteriaController.updateCriteria
@@ -44,21 +44,21 @@ router.put(
 
 // DELETE /rubric-criteria/:criteriaId - Soft delete a rubric criterion
 router.delete(
-  "/rubric-criteria/:criteriaId",
+  "/:criteriaId",
   requireRole(["Admin"]),
   rubricCriteriaController.deleteCriteria
 );
 
 // GET /rubric-criteria - Get all rubric criteria (admin only)
 router.get(
-  "/rubric-criteria",
+  "/",
   requireRole(["Admin"]),
   rubricCriteriaController.getAllCriteria
 );
 
 // GET /rubric-criteria/:criteriaId - Get rubric criteria by ID
 router.get(
-  "/rubric-criteria/:criteriaId",
+  "/:criteriaId",
   requireRole(["Admin", "Instructor"]),
   rubricCriteriaController.getCriteriaById
 );

@@ -55,6 +55,13 @@ router.put(
   rubricTemplateController.updateTemplate
 );
 
+// PUT /rubric-templates/:templateId/criteria - Update criteria for rubric template
+router.put(
+  "/:templateId/criteria",
+  requireRole(["Admin"]),
+  rubricTemplateController.updateCriteria
+);
+
 // DELETE /rubric-templates/:templateId - Soft delete rubric template
 router.delete(
   "/:templateId",
