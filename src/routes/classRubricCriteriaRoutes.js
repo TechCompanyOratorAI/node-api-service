@@ -19,13 +19,6 @@ router.use(requireEmailVerification);
  * Base path: /class-rubric-criteria
  */
 
-// POST /classes/:classId/rubric/copy-template/:templateId - Copy criteria from template
-router.post(
-  "/:classId/rubric/copy-template/:templateId",
-  requireRole(["Admin", "Instructor"]),
-  classRubricCriteriaController.copyFromTemplate
-);
-
 // GET /classes/:classId/rubric - Get all active class rubric criteria
 router.get(
   "/:classId/rubric",

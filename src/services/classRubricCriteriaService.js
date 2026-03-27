@@ -4,9 +4,93 @@ const db = require("../models");
 const { QueryTypes } = require("sequelize");
 
 class ClassRubricCriteriaService {
-  /**
-   * Copy all active criteria from RubricCriteria to ClassRubricCriteria
-   */
+  async _copyFromTemplateInternal(classId, rubricTemplateId, userId, transaction) {
+    try {
+      const sourceCriteria = await RubricCriteria.findAll({
+        where: {
+          rubricTemplateId: rubricTemplateId,
+          isActive: true,
+        },
+        order: [["displayOrder", "ASC"]],
+        transaction,
+      });
+
+      if (sourceCriteria.length === 0) {
+        return {
+          success: false,
+          message: "Template không có criteria nào để copy",
+        };
+      }
+
+      const existingCriteria = await ClassRubricCriteria.findAll({
+        where: {
+          classId: classId,
+          rubricTemplateId: rubricTemplateId,
+          sourceCriteriaId: { [Op.ne]: null },
+        },
+        attributes: ["sourceCriteriaId"],
+        transaction,
+      });
+
+      const existingSourceIds = existingCriteria.map((c) => c.sourceCriteriaId);
+
+      const criteriaToCopy = sourceCriteria.filter(
+        (c) => !existingSourceIds.includes(c.criteriaId)
+      );
+
+      if (criteriaToCopy.length === 0) {
+        return {
+          success: false,
+          code: "ALREADY_COPIED",
+          message: "Tất cả criteria đã được copy trước đó",
+        };
+      }
+
+      const newCriteria = criteriaToCopy.map((criteria) => ({
+        classId: classId,
+        rubricTemplateId: rubricTemplateId,
+        sourceCriteriaId: criteria.criteriaId,
+        criteriaName: criteria.criteriaName,
+        criteriaDescription: criteria.criteriaDescription,
+        weight: criteria.weight,
+        maxScore: criteria.maxScore,
+        displayOrder: criteria.displayOrder,
+        evaluationGuide: criteria.evaluationGuide,
+        isActive: 1,
+        createdBy: userId,
+        updatedBy: userId,
+      }));
+
+      await ClassRubricCriteria.bulkCreate(newCriteria, { transaction });
+
+      return {
+        success: true,
+        copiedCount: criteriaToCopy.length,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: "Lỗi khi copy criteria",
+        error: error.message,
+      };
+    }
+  }
+
+
+  async _removeTemplateCriteriaInternal(classId, rubricTemplateId, transaction) {
+    await ClassRubricCriteria.update(
+      { isActive: 0 },
+      {
+        where: {
+          classId: classId,
+          rubricTemplateId: rubricTemplateId,
+          sourceCriteriaId: { [Op.ne]: null },
+        },
+        transaction,
+      }
+    );
+  }
+
   async copyFromTemplate(classId, rubricTemplateId, userId) {
     const transaction = await db.sequelize.transaction();
     try {
@@ -30,42 +114,21 @@ class ClassRubricCriteriaService {
         };
       }
 
-      // Get active criteria from template
-      const sourceCriteria = await RubricCriteria.findAll({
-        where: {
-          rubricTemplateId: rubricTemplateId,
-          isActive: true,
-        },
-        order: [["displayOrder", "ASC"]],
-      });
-
-      if (sourceCriteria.length === 0) {
-        await transaction.rollback();
-        return {
-          success: false,
-          message: "Template không có criteria nào để copy",
-        };
-      }
-
-      // Check for existing copied criteria (to prevent duplicates)
-      const existingCriteria = await ClassRubricCriteria.findAll({
-        where: {
-          classId: classId,
-          rubricTemplateId: rubricTemplateId,
-          sourceCriteriaId: { [Op.ne]: null },
-        },
-        attributes: ["sourceCriteriaId"],
-      });
-
-      const existingSourceIds = existingCriteria.map((c) => c.sourceCriteriaId);
-
-      // Filter out already copied criteria
-      const criteriaToCopy = sourceCriteria.filter(
-        (c) => !existingSourceIds.includes(c.criteriaId)
+      const result = await this._copyFromTemplateInternal(
+        classId,
+        rubricTemplateId,
+        userId,
+        transaction
       );
 
-      if (criteriaToCopy.length === 0) {
+      if (!result.success && result.code !== "ALREADY_COPIED") {
         await transaction.rollback();
+        return result;
+      }
+
+      await transaction.commit();
+
+      if (result.code === "ALREADY_COPIED") {
         return {
           success: false,
           message: "Tất cả criteria đã được copy trước đó",
@@ -73,31 +136,10 @@ class ClassRubricCriteriaService {
         };
       }
 
-      // Insert new criteria
-      const newCriteria = criteriaToCopy.map((criteria) => ({
-        classId: classId,
-        rubricTemplateId: rubricTemplateId,
-        sourceCriteriaId: criteria.criteriaId,
-        criteriaName: criteria.criteriaName,
-        criteriaDescription: criteria.criteriaDescription,
-        weight: criteria.weight,
-        maxScore: criteria.maxScore,
-        displayOrder: criteria.displayOrder,
-        evaluationGuide: criteria.evaluationGuide,
-        isActive: 1,
-        createdBy: userId,
-        updatedBy: userId,
-      }));
-
-      await ClassRubricCriteria.bulkCreate(newCriteria, { transaction });
-
-      await transaction.commit();
-
-      // Return updated class rubric criteria
       return {
         success: true,
-        message: `Đã copy ${criteriaToCopy.length} criteria vào lớp học`,
-        copiedCount: criteriaToCopy.length,
+        message: `Đã copy ${result.copiedCount} criteria vào lớp học`,
+        copiedCount: result.copiedCount,
       };
     } catch (error) {
       await transaction.rollback();
@@ -110,9 +152,7 @@ class ClassRubricCriteriaService {
     }
   }
 
-  /**
-   * Get all active class rubric criteria ordered by displayOrder
-   */
+
   async getClassRubricCriteria(classId) {
     try {
       // Check class exists
@@ -165,6 +205,22 @@ class ClassRubricCriteriaService {
           message: "Lớp học không tìm thấy",
         };
       }
+      const existingCriteria = await ClassRubricCriteria.findAll({
+        where: { classId, isActive: 1 },
+        attributes: ["weight"],
+      });
+
+      const totalWeight = existingCriteria.reduce(
+        (sum, c) => sum + (parseFloat(c.weight) || 0),
+        0
+      );
+
+      if (totalWeight >= 100) {
+        return {
+          success: false,
+          message: "Tổng trọng số đã đạt 100%. Không thể thêm criteria mới.",
+        };
+      }
 
       // If rubricTemplateId is provided, validate it
       if (data.rubricTemplateId) {
@@ -200,9 +256,7 @@ class ClassRubricCriteriaService {
     }
   }
 
-  /**
-   * Update a class rubric criterion
-   */
+
   async updateCriterion(classRubricCriteriaId, data) {
     try {
       const criterion = await ClassRubricCriteria.findByPk(classRubricCriteriaId);
@@ -212,6 +266,35 @@ class ClassRubricCriteriaService {
           success: false,
           message: "Class rubric criteria không tìm thấy",
         };
+      }
+      if (data.sourceCriteriaId !== undefined) {
+        delete data.sourceCriteriaId;
+      }
+      if (data.rubricTemplateId !== undefined) {
+        delete data.rubricTemplateId;
+      }
+      if (data.weight !== undefined) {
+        const otherCriteria = await ClassRubricCriteria.findAll({
+          where: {
+            classId: criterion.classId,
+            isActive: 1,
+            classRubricCriteriaId: { [Op.ne]: classRubricCriteriaId },
+          },
+          attributes: ["weight"],
+        });
+
+        const currentTotal = otherCriteria.reduce(
+          (sum, c) => sum + (parseFloat(c.weight) || 0),
+          0
+        );
+        const newTotal = currentTotal + parseFloat(data.weight);
+
+        if (newTotal > 100) {
+          return {
+            success: false,
+            message: `Tổng trọng số không thể vượt quá 100%. Hiện tại đang là ${currentTotal}%, không thể thêm ${data.weight}% nữa.`,
+          };
+        }
       }
 
       await criterion.update(data);
@@ -231,9 +314,6 @@ class ClassRubricCriteriaService {
     }
   }
 
-  /**
-   * Soft delete a class rubric criterion
-   */
   async deleteCriterion(classRubricCriteriaId) {
     try {
       const criterion = await ClassRubricCriteria.findByPk(classRubricCriteriaId);
@@ -242,6 +322,14 @@ class ClassRubricCriteriaService {
         return {
           success: false,
           message: "Class rubric criteria không tìm thấy",
+        };
+      }
+
+      if (criterion.sourceCriteriaId !== null) {
+        return {
+          success: false,
+          message: "Không thể xóa criteria được copy từ template gốc. Chỉ có thể tắt hoạt động.",
+          code: "CANNOT_DELETE_TEMPLATE_CRITERIA",
         };
       }
 
@@ -261,9 +349,7 @@ class ClassRubricCriteriaService {
     }
   }
 
-  /**
-   * Get a single class rubric criterion by ID
-   */
+
   async getCriterionById(classRubricCriteriaId) {
     try {
       const criterion = await ClassRubricCriteria.findByPk(classRubricCriteriaId, {
@@ -315,6 +401,29 @@ class ClassRubricCriteriaService {
         return {
           success: false,
           message: "Criteria đang ở trạng thái hoạt động",
+        };
+      }
+
+      // Check total weight won't exceed 100% when restoring
+      const otherCriteria = await ClassRubricCriteria.findAll({
+        where: {
+          classId: criterion.classId,
+          isActive: 1,
+        },
+        attributes: ["weight"],
+      });
+
+      const currentTotal = otherCriteria.reduce(
+        (sum, c) => sum + (parseFloat(c.weight) || 0),
+        0
+      );
+      const restoreWeight = parseFloat(criterion.weight) || 0;
+      const newTotal = currentTotal + restoreWeight;
+
+      if (newTotal > 100) {
+        return {
+          success: false,
+          message: `Tổng trọng số không thể vượt quá 100%. Hiện tại đang là ${currentTotal}%, không thể khôi phục criteria có trọng số ${restoreWeight}% (tổng sẽ là ${newTotal}%).`,
         };
       }
 
@@ -393,13 +502,32 @@ class ClassRubricCriteriaService {
     }
   }
 
-  /**
-   * Soft delete multiple criteria at once
-   */
   async bulkDeleteCriteria(classRubricCriteriaIds) {
     const transaction = await db.sequelize.transaction();
     try {
       const ids = classRubricCriteriaIds.map((id) => parseInt(id));
+
+      // Check if any of the criteria are from template
+      const criteriaToDelete = await ClassRubricCriteria.findAll({
+        where: {
+          classRubricCriteriaId: { [Op.in]: ids },
+        },
+        attributes: ["classRubricCriteriaId", "sourceCriteriaId", "criteriaName"],
+        transaction,
+      });
+
+      const templateCriteria = criteriaToDelete.filter((c) => c.sourceCriteriaId !== null);
+
+      if (templateCriteria.length > 0) {
+        await transaction.rollback();
+        const names = templateCriteria.map((c) => c.criteriaName).join(", ");
+        return {
+          success: false,
+          message: `Không thể xóa criteria được copy từ template: ${names}. Chỉ có thể xóa criteria tùy chỉnh.`,
+          code: "CANNOT_DELETE_TEMPLATE_CRITERIA",
+          templateCriteriaCount: templateCriteria.length,
+        };
+      }
 
       const count = await ClassRubricCriteria.update(
         { isActive: 0 },
