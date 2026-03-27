@@ -3,51 +3,6 @@ const classRubricCriteriaService = require("../services/classRubricCriteriaServi
 
 class ClassRubricCriteriaController {
   /**
-   * POST /classes/:classId/rubric/copy-template/:templateId
-   * Copy all active criteria from RubricCriteria into ClassRubricCriteria
-   */
-  async copyFromTemplate(req, res) {
-    try {
-      const { classId, templateId } = req.params;
-
-      if (!classId || isNaN(parseInt(classId))) {
-        return res.status(400).json({
-          success: false,
-          message: "ID lớp học không hợp lệ",
-        });
-      }
-
-      if (!templateId || isNaN(parseInt(templateId))) {
-        return res.status(400).json({
-          success: false,
-          message: "ID template không hợp lệ",
-        });
-      }
-
-      const userId = req.user?.userId;
-      const result = await classRubricCriteriaService.copyFromTemplate(
-        parseInt(classId),
-        parseInt(templateId),
-        userId
-      );
-
-      if (result.success) {
-        return res.status(201).json(result);
-      } else if (result.code === "ALREADY_COPIED") {
-        return res.status(409).json(result);
-      } else {
-        return res.status(400).json(result);
-      }
-    } catch (error) {
-      console.error("Copy rubric criteria controller error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Lỗi server nội bộ",
-      });
-    }
-  }
-
-  /**
    * GET /classes/:classId/rubric
    * Get all active class rubric criteria
    */
@@ -189,6 +144,8 @@ class ClassRubricCriteriaController {
 
       if (result.success) {
         return res.status(200).json(result);
+      } else if (result.code === "CANNOT_DELETE_TEMPLATE_CRITERIA") {
+        return res.status(403).json(result);
       } else {
         return res.status(404).json(result);
       }
@@ -343,6 +300,8 @@ class ClassRubricCriteriaController {
 
       if (result.success) {
         return res.status(200).json(result);
+      } else if (result.code === "CANNOT_DELETE_TEMPLATE_CRITERIA") {
+        return res.status(403).json(result);
       } else {
         return res.status(400).json(result);
       }

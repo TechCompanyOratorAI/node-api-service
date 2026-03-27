@@ -296,13 +296,16 @@ class EnrollmentService {
         order: [[{ model: User, as: "student" }, "username", "ASC"]],
       });
 
+      const data = enrollments.map((e) => ({
+        enrollmentId: e.enrollmentId,
+        enrolledAt: e.enrolledAt,
+        student: e.student,
+      }));
+
       return {
         success: true,
-        data: enrollments.map((e) => ({
-          enrollmentId: e.enrollmentId,
-          enrolledAt: e.enrolledAt,
-          student: e.student,
-        })),
+        total: data.length,
+        data,
       };
     } catch (error) {
       console.error("Get class students error:", error);

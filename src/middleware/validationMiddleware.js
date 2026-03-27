@@ -652,11 +652,6 @@ export const validateClassAISetting = [
     .isInt({ min: 1 })
     .withMessage("ID rubric template phải là số nguyên hợp lệ"),
 
-  body("configId")
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage("ID config phải là số nguyên hợp lệ"),
-
   body("enableAiReport")
     .optional()
     .isBoolean()

@@ -1,12 +1,16 @@
 const { ClassAISetting, RubricTemplate, AIConfig, Class, User } = require("../models");
 const { Op } = require("sequelize");
+const classRubricCriteriaService = require("./classRubricCriteriaService");
 
 class ClassAISettingService {
   async createClassAISetting(classId, data, userId) {
+    const transaction = await ClassAISetting.sequelize.transaction();
+
     try {
       // Check class exists
       const classExists = await Class.findByPk(classId);
       if (!classExists) {
+        await transaction.rollback();
         return {
           success: false,
           message: "Lớp học không tìm thấy",
@@ -17,6 +21,7 @@ class ClassAISettingService {
       if (data.rubricTemplateId) {
         const template = await RubricTemplate.findByPk(data.rubricTemplateId);
         if (!template) {
+          await transaction.rollback();
           return {
             success: false,
             message: "Rubric template không tìm thấy",
@@ -30,9 +35,11 @@ class ClassAISettingService {
           classId: classId,
           isActive: true,
         },
+        transaction,
       });
 
       if (existingSetting) {
+        await transaction.rollback();
         return {
           success: false,
           message: "Lớp học đã có cài đặt AI đang hoạt động",
@@ -40,19 +47,59 @@ class ClassAISettingService {
         };
       }
 
-      const setting = await ClassAISetting.create({
-        ...data,
-        classId: classId,
-        createdBy: userId,
-        updatedBy: userId,
-      });
+      // Remove configId if provided (not allowed to be set via API)
+      const { configId, ...safeData } = data;
 
-      return {
+      const setting = await ClassAISetting.create(
+        {
+          ...safeData,
+          classId: classId,
+          createdBy: userId,
+          updatedBy: userId,
+        },
+        { transaction }
+      );
+
+      // Auto-copy criteria from template if rubricTemplateId provided
+      let criteriaCopyResult = null;
+      if (data.rubricTemplateId) {
+        criteriaCopyResult = await classRubricCriteriaService._copyFromTemplateInternal(
+          classId,
+          data.rubricTemplateId,
+          userId,
+          transaction
+        );
+
+        if (!criteriaCopyResult.success && criteriaCopyResult.code !== "ALREADY_COPIED") {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: `Tạo cài đặt thành công nhưng lỗi khi copy criteria: ${criteriaCopyResult.message}`,
+            error: criteriaCopyResult.error,
+          };
+        }
+      }
+
+      await transaction.commit();
+
+      const response = {
         success: true,
         data: setting,
         message: "Tạo cài đặt AI cho lớp thành công",
       };
+
+      if (criteriaCopyResult && criteriaCopyResult.copiedCount > 0) {
+        response.criteriaCopied = true;
+        response.copiedCount = criteriaCopyResult.copiedCount;
+        response.message = `Tạo cài đặt AI và copy ${criteriaCopyResult.copiedCount} criteria từ template thành công`;
+      } else if (criteriaCopyResult && criteriaCopyResult.code === "ALREADY_COPIED") {
+        response.criteriaCopied = false;
+        response.message = "Tạo cài đặt AI thành công. Criteria đã được copy trước đó";
+      }
+
+      return response;
     } catch (error) {
+      await transaction.rollback();
       console.error("Create class AI setting error:", error);
       return {
         success: false,
@@ -100,25 +147,33 @@ class ClassAISettingService {
   }
 
   async updateClassAISetting(classId, data, userId) {
+    const transaction = await ClassAISetting.sequelize.transaction();
+
     try {
       const setting = await ClassAISetting.findOne({
         where: {
           classId: classId,
           isActive: true,
         },
+        transaction,
       });
 
       if (!setting) {
+        await transaction.rollback();
         return {
           success: false,
           message: "Cài đặt AI cho lớp không tìm thấy",
         };
       }
 
-      // Check if rubricTemplateId exists if provided
+      const oldTemplateId = setting.rubricTemplateId;
+      const newTemplateId = data.rubricTemplateId !== undefined ? data.rubricTemplateId : oldTemplateId;
+
+      // Check if new rubricTemplateId exists if provided
       if (data.rubricTemplateId) {
         const template = await RubricTemplate.findByPk(data.rubricTemplateId);
         if (!template) {
+          await transaction.rollback();
           return {
             success: false,
             message: "Rubric template không tìm thấy",
@@ -126,17 +181,61 @@ class ClassAISettingService {
         }
       }
 
-      await setting.update({
-        ...data,
-        updatedBy: userId,
-      });
+      // Remove configId if provided (not allowed to be set via API)
+      const { configId, ...safeData } = data;
 
-      return {
+      await setting.update(
+        {
+          ...safeData,
+          updatedBy: userId,
+        },
+        { transaction }
+      );
+
+      // Handle template switching: if template changed, replace criteria
+      let criteriaResult = null;
+      if (newTemplateId && oldTemplateId !== newTemplateId) {
+        // Remove old copied criteria from previous template (only those with sourceCriteriaId)
+        await classRubricCriteriaService._removeTemplateCriteriaInternal(
+          classId,
+          oldTemplateId,
+          transaction
+        );
+
+        // Copy new template criteria
+        criteriaResult = await classRubricCriteriaService._copyFromTemplateInternal(
+          classId,
+          newTemplateId,
+          userId,
+          transaction
+        );
+
+        if (!criteriaResult.success && criteriaResult.code !== "ALREADY_COPIED") {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: `Cập nhật cài đặt thành công nhưng lỗi khi copy criteria mới: ${criteriaResult.message}`,
+          };
+        }
+      }
+
+      await transaction.commit();
+
+      const response = {
         success: true,
         data: setting,
         message: "Cập nhật cài đặt AI cho lớp thành công",
       };
+
+      if (criteriaResult && criteriaResult.copiedCount > 0) {
+        response.templateSwitched = true;
+        response.copiedCount = criteriaResult.copiedCount;
+        response.message = `Đổi template thành công. Đã copy ${criteriaResult.copiedCount} criteria mới`;
+      }
+
+      return response;
     } catch (error) {
+      await transaction.rollback();
       console.error("Update class AI setting error:", error);
       return {
         success: false,
