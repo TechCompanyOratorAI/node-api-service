@@ -363,20 +363,22 @@ class ClassService {
           {
             model: Course,
             as: "course",
-            include: [
-              {
-                model: Topic,
-                as: "topics",
-                attributes: [
-                  "topicId",
-                  "topicName",
-                  "description",
-                  "sequenceNumber",
-                  "dueDate",
-                  "maxDurationMinutes",
-                ],
-              },
+            attributes: ["courseId", "courseCode", "courseName", "semester", "academicYear"],
+          },
+          {
+            model: Topic,
+            as: "topics",
+            attributes: [
+              "topicId",
+              "topicName",
+              "description",
+              "sequenceNumber",
+              "dueDate",
+              "maxDurationMinutes",
+              "requirements",
             ],
+            required: false,
+            order: [["sequenceNumber", "ASC"]],
           },
           {
             model: User,
@@ -436,48 +438,33 @@ class ClassService {
       // Authorization check for non-admin
       if (userRole !== "Admin") {
         if (userRole === "Instructor") {
-          // Instructor must be assigned to the class
           const isInstructor = await ClassInstructor.findOne({
             where: { classId, instructorId: userId },
           });
-
           if (!isInstructor) {
-            return {
-              success: false,
-              message: "Bạn không có quyền truy cập lớp học này",
-            };
+            return { success: false, message: "Bạn không có quyền truy cập lớp học này" };
           }
         } else if (userRole === "Student") {
-          // Student must be enrolled in the class
           const isEnrolled = await Enrollment.findOne({
             where: { classId, studentId: userId, status: "enrolled" },
           });
-
           if (!isEnrolled) {
-            return {
-              success: false,
-              message: "Bạn không có quyền truy cập lớp học này",
-            };
+            return { success: false, message: "Bạn không có quyền truy cập lớp học này" };
           }
         }
       }
 
-      // Prepare response - hide enrollment keys from students
       const response = classData.toJSON();
       if (userRole === "Student") {
         delete response.enrollKeys;
       }
 
-      // Add derived fields
-      const totalStudents = response.enrollments?.length || 0;
-      const topics = response.course?.topics || [];
-
       return {
         success: true,
         class: {
           ...response,
-          totalStudents,
-          topics,
+          totalStudents: response.enrollments?.length || 0,
+          // topics is now directly on the class
         },
       };
     } catch (error) {
@@ -708,6 +695,163 @@ class ClassService {
         message: "Không thể gỡ bỏ giảng viên",
         error: error.message,
       };
+    }
+  }
+
+  // ============================================================
+  // TOPIC MANAGEMENT (per-class)
+  // ============================================================
+
+  /**
+   * Create a topic for a specific class (Instructor/Admin only)
+   */
+  async createTopic(classId, topicData, userId, userRole) {
+    try {
+      const classData = await Class.findByPk(classId);
+      if (!classData) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Authorization: must be instructor of this class or Admin
+      if (userRole !== "Admin") {
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId: userId },
+        });
+        if (!isInstructor) {
+          return { success: false, message: "Bạn không có quyền tạo topic cho lớp này" };
+        }
+      }
+
+      const { topicName, description, sequenceNumber, dueDate, maxDurationMinutes, requirements } = topicData;
+
+      // Auto sequence if not provided
+      const nextSeq = sequenceNumber ||
+        ((await Topic.max("sequenceNumber", { where: { classId } })) || 0) + 1;
+
+      // Check duplicate sequence
+      if (sequenceNumber) {
+        const existing = await Topic.findOne({ where: { classId, sequenceNumber } });
+        if (existing) {
+          return { success: false, message: "Số thứ tự đã tồn tại trong lớp này" };
+        }
+      }
+
+      const topic = await Topic.create({
+        classId,
+        courseId: classData.courseId, // keep for reference
+        topicName,
+        description,
+        sequenceNumber: nextSeq,
+        dueDate,
+        maxDurationMinutes,
+        requirements,
+      });
+
+      return { success: true, message: "Tạo topic thành công", topic };
+    } catch (error) {
+      console.error("Create topic error:", error);
+      return { success: false, message: "Không thể tạo topic", error: error.message };
+    }
+  }
+
+  /**
+   * Get all topics of a class
+   */
+  async getTopicsByClass(classId, userId, userRole) {
+    try {
+      const classData = await Class.findByPk(classId);
+      if (!classData) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      const topics = await Topic.findAll({
+        where: { classId },
+        order: [["sequenceNumber", "ASC"]],
+      });
+
+      return { success: true, topics };
+    } catch (error) {
+      console.error("Get topics by class error:", error);
+      return { success: false, message: "Không thể lấy danh sách topic", error: error.message };
+    }
+  }
+
+  /**
+   * Update a topic (Instructor of class or Admin)
+   */
+  async updateTopic(topicId, topicData, userId, userRole) {
+    try {
+      const topic = await Topic.findByPk(topicId);
+      if (!topic) {
+        return { success: false, message: "Không tìm thấy topic" };
+      }
+
+      if (userRole !== "Admin") {
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId: topic.classId, instructorId: userId },
+        });
+        if (!isInstructor) {
+          return { success: false, message: "Bạn không có quyền sửa topic này" };
+        }
+      }
+
+      const { topicName, description, sequenceNumber, dueDate, maxDurationMinutes, requirements } = topicData;
+
+      if (sequenceNumber && sequenceNumber !== topic.sequenceNumber) {
+        const existing = await Topic.findOne({
+          where: { classId: topic.classId, sequenceNumber, topicId: { [Op.ne]: topicId } },
+        });
+        if (existing) {
+          return { success: false, message: "Số thứ tự đã tồn tại trong lớp này" };
+        }
+      }
+
+      await topic.update({
+        topicName: topicName || topic.topicName,
+        description: description !== undefined ? description : topic.description,
+        sequenceNumber: sequenceNumber || topic.sequenceNumber,
+        dueDate: dueDate !== undefined ? dueDate : topic.dueDate,
+        maxDurationMinutes: maxDurationMinutes !== undefined ? maxDurationMinutes : topic.maxDurationMinutes,
+        requirements: requirements !== undefined ? requirements : topic.requirements,
+      });
+
+      return { success: true, message: "Cập nhật topic thành công", topic };
+    } catch (error) {
+      console.error("Update topic error:", error);
+      return { success: false, message: "Không thể cập nhật topic", error: error.message };
+    }
+  }
+
+  /**
+   * Delete a topic (Instructor of class or Admin)
+   */
+  async deleteTopic(topicId, userId, userRole) {
+    try {
+      const topic = await Topic.findByPk(topicId);
+      if (!topic) {
+        return { success: false, message: "Không tìm thấy topic" };
+      }
+
+      if (userRole !== "Admin") {
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId: topic.classId, instructorId: userId },
+        });
+        if (!isInstructor) {
+          return { success: false, message: "Bạn không có quyền xóa topic này" };
+        }
+      }
+
+      const { Presentation } = db;
+      const hasPresentation = await Presentation.count({ where: { topicId } });
+      if (hasPresentation > 0) {
+        return { success: false, message: "Không thể xóa topic đã có bài thuyết trình" };
+      }
+
+      await topic.destroy();
+      return { success: true, message: "Xóa topic thành công" };
+    } catch (error) {
+      console.error("Delete topic error:", error);
+      return { success: false, message: "Không thể xóa topic", error: error.message };
     }
   }
 }

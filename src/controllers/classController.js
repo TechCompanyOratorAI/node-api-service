@@ -404,13 +404,8 @@ class ClassController {
   async getClassInstructors(req, res) {
     try {
       const { classId } = req.params;
-
-      // Validate classId
       if (!classId || isNaN(parseInt(classId))) {
-        return res.status(400).json({
-          success: false,
-          message: "ID lớp học không hợp lệ",
-        });
+        return res.status(400).json({ success: false, message: "ID lớp học không hợp lệ" });
       }
 
       const db = require("../models");
@@ -422,13 +417,7 @@ class ClassController {
           {
             model: User,
             as: "instructor",
-            attributes: [
-              "userId",
-              "username",
-              "firstName",
-              "lastName",
-              "email",
-            ],
+            attributes: ["userId", "username", "firstName", "lastName", "email"],
           },
         ],
       });
@@ -442,10 +431,68 @@ class ClassController {
       });
     } catch (error) {
       console.error("Get class instructors error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Lỗi server nội bộ",
-      });
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  // ============================================================
+  // TOPIC HANDLERS (per-class)
+  // ============================================================
+
+  // POST /api/classes/:classId/topics
+  async createTopic(req, res) {
+    try {
+      const { classId } = req.params;
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin" : "Instructor";
+      const result = await classService.createTopic(parseInt(classId), req.body, userId, userRole);
+      return res.status(result.success ? 201 : 400).json(result);
+    } catch (error) {
+      console.error("Create topic error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  // GET /api/classes/:classId/topics
+  async getTopicsByClass(req, res) {
+    try {
+      const { classId } = req.params;
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin")
+        ? "Admin" : req.userRoles?.includes("Instructor") ? "Instructor" : "Student";
+      const result = await classService.getTopicsByClass(parseInt(classId), userId, userRole);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Get topics error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  // PATCH /api/classes/topics/:topicId
+  async updateTopic(req, res) {
+    try {
+      const { topicId } = req.params;
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin" : "Instructor";
+      const result = await classService.updateTopic(parseInt(topicId), req.body, userId, userRole);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Update topic error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  // DELETE /api/classes/topics/:topicId
+  async deleteTopic(req, res) {
+    try {
+      const { topicId } = req.params;
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin" : "Instructor";
+      const result = await classService.deleteTopic(parseInt(topicId), userId, userRole);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Delete topic error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
     }
   }
 }
