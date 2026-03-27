@@ -39,16 +39,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: true,
       },
-      enableSlideLayoutScoring: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-      },
-      slideLayoutWeight: {
-        type: DataTypes.DECIMAL(5, 2),
-        allowNull: false,
-        defaultValue: 0.1,
-      },
       feedbackLanguage: {
         type: DataTypes.STRING(10),
         allowNull: false,

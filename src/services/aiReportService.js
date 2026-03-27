@@ -73,6 +73,15 @@ class AIReportService {
         };
       }
 
+      const totalWeight = classCriteria.reduce((sum, c) => sum + parseFloat(c.weight || 0), 0);
+      if (Math.abs(totalWeight - 100) > 0.01) {
+        return {
+          success: false,
+          message: `Tổng trọng số của các criteria phải bằng 100%. Hiện tại là ${totalWeight.toFixed(2)}%.`,
+          code: "INVALID_CRITERIA_WEIGHT",
+        };
+      }
+
       const existingReport = await AIReport.findOne({
         where: { submissionId: submissionId },
       });
@@ -189,6 +198,17 @@ class AIReportService {
           message: "Lớp chưa có rubric criteria",
         };
       }
+
+      const totalWeight = classCriteria.reduce((sum, c) => sum + parseFloat(c.weight || 0), 0);
+      if (Math.abs(totalWeight - 100) > 0.01) {
+        console.log(`[AIReportService] Class ${classId} criteria weight sum is ${totalWeight.toFixed(2)}%, skipping report generation`);
+        return {
+          success: true,
+          skipped: true,
+          message: `Tổng trọng số criteria phải bằng 100%. Hiện tại là ${totalWeight.toFixed(2)}%.`,
+        };
+      }
+
       const existingReport = await AIReport.findOne({
         where: { submissionId: presentationId },
       });
@@ -271,8 +291,6 @@ class AIReportService {
           includeCriterionComments: aiSettings.includeCriterionComments ?? true,
           includeOverallSummary: aiSettings.includeOverallSummary ?? true,
           includeSuggestions: aiSettings.includeSuggestions ?? true,
-          enableSlideLayoutScoring: aiSettings.enableSlideLayoutScoring ?? false,
-          slideLayoutWeight: aiSettings.slideLayoutWeight ? parseFloat(aiSettings.slideLayoutWeight) : 0.1,
         },
       };
       const result = await queueService.sendToReportQueue(queueMessage);
