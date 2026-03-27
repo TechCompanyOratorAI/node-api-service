@@ -40,8 +40,11 @@ class ClassAISettingService {
         };
       }
 
+      // Remove configId if provided (not allowed to be set via API)
+      const { configId, ...safeData } = data;
+
       const setting = await ClassAISetting.create({
-        ...data,
+        ...safeData,
         classId: classId,
         createdBy: userId,
         updatedBy: userId,
@@ -126,8 +129,11 @@ class ClassAISettingService {
         }
       }
 
+      // Remove configId if provided (not allowed to be set via API)
+      const { configId, ...safeData } = data;
+
       await setting.update({
-        ...data,
+        ...safeData,
         updatedBy: userId,
       });
 
