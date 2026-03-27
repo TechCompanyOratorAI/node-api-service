@@ -128,19 +128,17 @@ class PresentationService {
         };
       }
 
-      // Step 4: Validate topic exists and belongs to class's course
-      const topic = await Topic.findByPk(topicId, {
-        include: [{ model: Course, as: "course" }],
-      });
+      // Step 4: Validate topic exists and belongs to this class directly
+      const topic = await Topic.findByPk(topicId);
 
       if (!topic) {
         return { success: false, message: "Topic not found" };
       }
 
-      if (topic.courseId !== classData.courseId) {
+      if (topic.classId !== parseInt(classId)) {
         return {
           success: false,
-          message: "Topic does not belong to this class's course",
+          message: "Topic does not belong to this class",
         };
       }
 

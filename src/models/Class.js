@@ -86,6 +86,10 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "classId",
       as: "groups",
     });
+    Class.hasMany(models.Topic, {
+      foreignKey: "classId",
+      as: "topics",
+    });
   };
 
   return Class;

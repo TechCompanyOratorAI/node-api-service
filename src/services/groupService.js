@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 const db = require("../models");
 const { Group, GroupStudent, Class, User, Enrollment, TopicEnrollment, Topic, Course, Presentation } = db;
@@ -625,7 +625,7 @@ class GroupService {
 
       const courseId = group.class.courseId;
 
-      // 3. Verify topic belongs to this course
+      // 3. Verify topic belongs to this class directly
       const topic = await Topic.findByPk(topicId, { transaction });
 
       if (!topic) {
@@ -633,23 +633,22 @@ class GroupService {
         return { success: false, message: "Topic không tồn tại" };
       }
 
-      if (topic.courseId !== courseId) {
+      if (topic.classId !== group.classId) {
         await transaction.rollback();
         return {
           success: false,
-          message: "Topic không thuộc course của lớp này",
+          message: "Topic không thuộc lớp học này",
         };
       }
 
-      // 4. Check if group already has an active topic enrollment in this course
-      //    (find any TopicEnrollment with groupId = this group, topicId that belongs to same course)
+      // 4. Check if group already has an active topic enrollment in this class
       const existingEnrollment = await TopicEnrollment.findOne({
         where: { groupId, status: "enrolled" },
         include: [
           {
             model: Topic,
             as: "topic",
-            where: { courseId },
+            where: { classId: group.classId },
             attributes: ["topicId", "topicName"],
           },
         ],
@@ -772,14 +771,14 @@ class GroupService {
 
       const courseId = group.class.courseId;
 
-      // Find active enrollment for this group
+      // Find active enrollment for this group (any topic in this class)
       const enrollment = await TopicEnrollment.findOne({
         where: { groupId, status: "enrolled" },
         include: [
           {
             model: Topic,
             as: "topic",
-            where: { courseId },
+            where: { classId: group.classId },
             attributes: ["topicId", "topicName", "description", "dueDate", "sequenceNumber"],
           },
         ],

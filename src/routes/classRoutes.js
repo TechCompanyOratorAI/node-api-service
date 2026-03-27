@@ -99,4 +99,36 @@ router.delete(
   enrollmentController.leaveClass
 );
 
+// ============================================================
+// TOPIC ROUTES (per-class)
+// ============================================================
+// POST   /api/classes/:classId/topics  - tạo topic cho lớp (Instructor/Admin)
+router.post(
+  "/:classId/topics",
+  requireRole(["Admin", "Instructor"]),
+  requireClassInstructor,
+  classController.createTopic
+);
+
+// GET    /api/classes/:classId/topics  - lấy danh sách topic của lớp
+router.get(
+  "/:classId/topics",
+  requireRole(["Admin", "Instructor", "Student"]),
+  classController.getTopicsByClass
+);
+
+// PATCH  /api/classes/topics/:topicId  - update topic
+router.patch(
+  "/topics/:topicId",
+  requireRole(["Admin", "Instructor"]),
+  classController.updateTopic
+);
+
+// DELETE /api/classes/topics/:topicId  - xóa topic
+router.delete(
+  "/topics/:topicId",
+  requireRole(["Admin", "Instructor"]),
+  classController.deleteTopic
+);
+
 export default router;
