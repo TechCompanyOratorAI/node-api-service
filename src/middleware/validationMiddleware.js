@@ -667,16 +667,6 @@ export const validateClassAISetting = [
     .isBoolean()
     .withMessage("allowInstructorEdit phải là giá trị boolean"),
 
-  body("enableSlideLayoutScoring")
-    .optional()
-    .isBoolean()
-    .withMessage("enableSlideLayoutScoring phải là giá trị boolean"),
-
-  body("slideLayoutWeight")
-    .optional()
-    .isFloat({ min: 0, max: 1 })
-    .withMessage("slideLayoutWeight phải từ 0 đến 1"),
-
   body("feedbackLanguage")
     .optional()
     .isLength({ max: 10 })

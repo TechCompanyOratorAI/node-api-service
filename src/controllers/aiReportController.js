@@ -32,6 +32,8 @@ class AIReportController {
         return res.status(400).json(result);
       } else if (result.code === "EMPTY_CLASS_RUBRIC") {
         return res.status(400).json(result);
+      } else if (result.code === "INVALID_CRITERIA_WEIGHT") {
+        return res.status(400).json(result);
       } else {
         return res.status(400).json(result);
       }
