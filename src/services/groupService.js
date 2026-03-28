@@ -722,7 +722,10 @@ class GroupService {
         enrolledAt: new Date(),
       }));
 
-      await TopicEnrollment.bulkCreate(enrollments, { transaction });
+      await TopicEnrollment.bulkCreate(enrollments, {
+        transaction,
+        updateOnDuplicate: ['status', 'groupId', 'enrolledAt'],
+      });
 
       await transaction.commit();
 
