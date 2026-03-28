@@ -22,7 +22,7 @@ class AIReportFeedbackService {
             : null;
 
       const payload = {
-        presentationId: report.submissionId,
+        presentationId: report.presentationId,
         reviewerId: instructorId,
         reportId,
         feedbackType: AI_REPORT_INSTRUCTOR,

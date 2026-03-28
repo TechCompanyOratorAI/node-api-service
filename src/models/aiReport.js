@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
         field: "reportId",
       },
-      submissionId: {
+      presentationId: {
         type: DataTypes.INTEGER,
         allowNull: false,
         unique: "uq_ai_reports_submission",
@@ -43,9 +43,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       reportStatus: {
         type: DataTypes.ENUM(
-          "waiting",
-          "draft",
-          "pending_review",
+          "pending",
           "generating",
           "completed",
           "failed",
@@ -53,7 +51,7 @@ module.exports = (sequelize, DataTypes) => {
           "rejected"
         ),
         allowNull: false,
-        defaultValue: "waiting",
+        defaultValue: "pending",
       },
       confirmedByInstructorId: {
         type: DataTypes.INTEGER,
@@ -86,7 +84,7 @@ module.exports = (sequelize, DataTypes) => {
 
   AIReport.associate = (models) => {
     AIReport.belongsTo(models.Presentation, {
-      foreignKey: "submissionId",
+      foreignKey: "presentationId",
       as: "submission",
     });
     AIReport.belongsTo(models.Class, {

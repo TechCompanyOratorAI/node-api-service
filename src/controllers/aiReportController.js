@@ -17,11 +17,11 @@ class AIReportController {
         });
       }
 
-      const { submissionId, classId } = req.body;
+      const { presentationId, classId } = req.body;
       const userId = req.user?.userId;
 
       const result = await aiReportService.generateReport(
-        parseInt(submissionId),
+        parseInt(presentationId),
         parseInt(classId),
         userId
       );
@@ -234,21 +234,21 @@ class AIReportController {
   }
 
   /**
-   * GET /ai-reports/submission/:submissionId
-   * Get AI report by submission ID
+   * GET /ai-reports/submission/:presentationId
+   * Get AI report by presentation ID
    */
   async getReportBySubmission(req, res) {
     try {
-      const { submissionId } = req.params;
+      const { presentationId } = req.params;
 
-      if (!submissionId || isNaN(parseInt(submissionId))) {
+      if (!presentationId || isNaN(parseInt(presentationId))) {
         return res.status(400).json({
           success: false,
-          message: "ID submission không hợp lệ",
+          message: "ID presentation không hợp lệ",
         });
       }
 
-      const result = await aiReportService.getReportBySubmission(parseInt(submissionId));
+      const result = await aiReportService.getReportBySubmission(parseInt(presentationId));
 
       if (result.success) {
         return res.status(200).json(result);
@@ -258,7 +258,7 @@ class AIReportController {
         return res.status(400).json(result);
       }
     } catch (error) {
-      console.error("Get AI report by submission controller error:", error);
+      console.error("Get AI report by presentation controller error:", error);
       return res.status(500).json({
         success: false,
         message: "Lỗi server nội bộ",
