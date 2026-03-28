@@ -24,9 +24,9 @@ const VALID_REPORT_STATUSES = [
 ];
 
 class AIReportService {
-  async generateReport(submissionId, classId, userId) {
+  async generateReport(presentationId, classId, userId) {
     try {
-      const submission = await Presentation.findByPk(submissionId);
+      const submission = await Presentation.findByPk(presentationId);
       if (!submission) {
         return {
           success: false,
@@ -83,7 +83,7 @@ class AIReportService {
       }
 
       const existingReport = await AIReport.findOne({
-        where: { submissionId: submissionId },
+        where: { presentationId: presentationId },
       });
 
       const initialStatus = aiSettings.requireInstructorConfirmation 
@@ -100,7 +100,7 @@ class AIReportService {
       }));
 
       const reportData = {
-        submissionId: submissionId,
+        presentationId: presentationId,
         classId: classId,
         configId: aiSettings.configId,
         rubricTemplateId: aiSettings.rubricTemplateId,
@@ -210,7 +210,7 @@ class AIReportService {
       }
 
       const existingReport = await AIReport.findOne({
-        where: { submissionId: presentationId },
+        where: { presentationId: presentationId },
       });
 
       if (existingReport) {
@@ -237,7 +237,7 @@ class AIReportService {
       }));
 
       const report = await AIReport.create({
-        submissionId: presentationId,
+        presentationId: presentationId,
         classId: classId,
         configId: aiSettings.configId,
         rubricTemplateId: aiSettings.rubricTemplateId,
@@ -575,13 +575,13 @@ class AIReportService {
 
   /**
    * Get AI report by submission ID
-   * @param {number} submissionId - Presentation/Submission ID
+   * @param {number} presentationId - Presentation/Submission ID
    * @returns {Promise<Object>} - Result with report data
    */
-  async getReportBySubmission(submissionId) {
+  async getReportBySubmission(presentationId) {
     try {
       const report = await AIReport.findOne({
-        where: { submissionId: submissionId },
+        where: { presentationId: presentationId },
         include: [
           { model: Presentation, as: "submission", attributes: ["presentationId", "title", "status"] },
           { model: Class, as: "class", attributes: ["classId", "classCode"] },

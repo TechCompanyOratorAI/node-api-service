@@ -71,9 +71,9 @@ router.patch(
   aiReportController.updateReportStatus
 );
 
-// GET /ai-reports/submission/:submissionId - Get AI report by submission ID
+// GET /ai-reports/submission/:presentationId - Get AI report by presentation ID
 router.get(
-  "/submission/:submissionId",
+  "/presentation/:presentationId",
   requireRole(["Admin", "Instructor", "Student"]),
   aiReportController.getReportBySubmission
 );
