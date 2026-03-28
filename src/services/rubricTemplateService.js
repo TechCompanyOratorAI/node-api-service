@@ -32,6 +32,7 @@ class RubricTemplateService {
         order: [["isDefault", "DESC"], ["templateName", "ASC"]],
         include: [
           { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: RubricCriteria, as: "criteria", where: { isActive: true }, required: false },
         ],
       });
       return {
