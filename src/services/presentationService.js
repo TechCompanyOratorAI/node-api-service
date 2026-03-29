@@ -534,7 +534,7 @@ class PresentationService {
       }
 
       // Check if already submitted (allow re-submit if failed or no active job)
-      if (presentation.status === "completed") {
+      if (presentation.status === "done") {
         return {
           success: false,
           message: "Presentation is already completed",
@@ -570,16 +570,17 @@ class PresentationService {
         );
       }
 
-      // Update presentation status
+      // Update presentation status to 'submitted'
       await Presentation.update(
         {
-          status: "processing",
+          status: "submitted",
           submittedAt: new Date(),
         },
         { where: { presentationId } }
       );
 
       // Create ASR job (this will also push to SQS queue)
+      // Status will move to 'processing' when a worker picks this job up
       const job = await jobService.createJob(presentationId, "asr", {
         submittedBy: studentId,
         submittedAt: new Date().toISOString(),
