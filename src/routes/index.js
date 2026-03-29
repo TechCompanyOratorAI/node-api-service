@@ -23,6 +23,7 @@ import classAISettingRoutes from "./classAISettingRoutes.js";
 import classRubricCriteriaRoutes from "./classRubricCriteriaRoutes.js";
 import aiReportRoutes from "./aiReportRoutes.js";
 import aiReportFeedbackRoutes from "./aiReportFeedbackRoutes.js";
+import shareRoutes from "./shareRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -58,6 +59,10 @@ router.use("/rubric-templates", rubricTemplateRoutes);
 router.use("/rubric-criteria", rubricCriteriaRoutes);
 router.use("/ai-reports", aiReportRoutes);
 router.use("/ai-reports", aiReportFeedbackRoutes);
+
+// ─── Share routes ───────────────────────────────────────────────
+// Public view: GET /share/:token (no authentication needed)
+router.use("/share", shareRoutes);
 
 router.get(
   "/me/classes",
