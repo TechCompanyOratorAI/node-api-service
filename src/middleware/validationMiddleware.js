@@ -830,6 +830,27 @@ export const validateUpdateAIReportStatus = [
     .withMessage("reportStatus không hợp lệ"),
 ];
 
+// Share invite validation
+export const validateShareInvite = [
+  body("emails")
+    .isArray({ min: 1, max: 50 })
+    .withMessage("emails phải là mảng và có ít nhất 1 địa chỉ (tối đa 50)"),
+  body("emails.*")
+    .isEmail()
+    .withMessage("Mỗi email phải là địa chỉ email hợp lệ")
+    .normalizeEmail(),
+  body("expiresAt")
+    .optional()
+    .isISO8601()
+    .withMessage("expiresAt phải là định dạng ngày hợp lệ (ISO 8601)")
+    .custom((value) => {
+      if (value && new Date(value) <= new Date()) {
+        throw new Error("expiresAt phải là thời điểm trong tương lai");
+      }
+      return true;
+    }),
+];
+
 export default {
   validateRegistration,
   validateInstructorRegistration,
@@ -856,4 +877,5 @@ export default {
   validateGenerateAIReport,
   validateEditAIReport,
   validateUpdateAIReportStatus,
+  validateShareInvite,
 };

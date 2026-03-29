@@ -4,6 +4,7 @@ import { authenticateToken, requireEmailVerification } from '../middleware/authM
 import { generalRateLimit } from '../middleware/rateLimitMiddleware.js';
 import { uploadSlide, uploadMedia, uploadErrorHandler } from '../middleware/uploadMiddleware.js';
 import { validatePresentationCreate, validatePresentationUpdate } from '../middleware/validationMiddleware.js';
+import presentationShareRoutes from './presentationShareRoutes.js';
 
 const router = express.Router();
 
@@ -93,5 +94,9 @@ router.get('/:presentationId/feedback',
   generalRateLimit,
   presentationController.getAIFeedback
 );
+
+// ─── Share management ───────────────────────
+// All share routes: GET|POST|DELETE /:presentationId/share/*
+router.use('/:presentationId/share', presentationShareRoutes);
 
 export default router;

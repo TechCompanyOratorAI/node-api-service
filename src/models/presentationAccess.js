@@ -14,11 +14,21 @@ module.exports = (sequelize, DataTypes) => {
         {
             accessId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
             presentationId: { type: DataTypes.INTEGER, allowNull: false },
-            userId: { type: DataTypes.INTEGER, allowNull: false },
+            userId: { type: DataTypes.INTEGER, allowNull: true }, // NULL for public shares
             accessLevel: {
                 type: DataTypes.ENUM('view', 'comment', 'review', 'manage'),
                 allowNull: false,
                 defaultValue: 'view',
+            },
+            shareType: {
+                type: DataTypes.ENUM('public', 'private'),
+                allowNull: false,
+                defaultValue: 'private',
+            },
+            shareToken: {
+                type: DataTypes.STRING(128),
+                allowNull: true,
+                unique: true,
             },
             grantedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
             grantedBy: { type: DataTypes.INTEGER },
