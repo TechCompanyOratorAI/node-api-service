@@ -830,6 +830,102 @@ export const validateUpdateAIReportStatus = [
     .withMessage("reportStatus không hợp lệ"),
 ];
 
+// ─── Criterion Feedback ───────────────────────────────────────────────────────
+
+// GET  /ai-reports/:reportId/criterion-feedbacks
+export const validateGetCriterionFeedbacks = [
+  param("reportId")
+    .isInt({ min: 1 })
+    .withMessage("reportId phải là số nguyên dương"),
+
+  body("score")
+    .optional()
+    .isDecimal({ decimal_digits: "0,2" })
+    .withMessage("score phải là số thập phân tối đa 2 chữ số sau dấu phẩy")
+    .custom((v) => parseFloat(v) >= 0 && parseFloat(v) <= 100)
+    .withMessage("score phải từ 0 đến 100"),
+
+  body("comment")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("comment không được quá 2000 ký tự")
+    .trim(),
+];
+
+// POST /ai-reports/:reportId/criterion-feedbacks - Tạo feedback cho một criteria
+export const validateCreateCriterionFeedback = [
+  param("reportId")
+    .isInt({ min: 1 })
+    .withMessage("reportId phải là số nguyên dương"),
+
+  body("classRubricCriteriaId")
+    .notEmpty()
+    .withMessage("classRubricCriteriaId là bắt buộc")
+    .isInt({ min: 1 })
+    .withMessage("classRubricCriteriaId phải là số nguyên dương"),
+
+  body("score")
+    .optional()
+    .isDecimal({ decimal_digits: "0,2" })
+    .withMessage("score phải là số thập phân tối đa 2 chữ số sau dấu phẩy")
+    .custom((v) => parseFloat(v) >= 0 && parseFloat(v) <= 100)
+    .withMessage("score phải từ 0 đến 100"),
+
+  body("comment")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("comment không được quá 2000 ký tự")
+    .trim(),
+];
+
+// PUT  /ai-reports/:reportId/criterion-feedbacks/:classRubricCriteriaId
+export const validateUpsertCriterionFeedback = [
+  param("reportId")
+    .isInt({ min: 1 })
+    .withMessage("reportId phải là số nguyên dương"),
+
+  param("classRubricCriteriaId")
+    .isInt({ min: 1 })
+    .withMessage("classRubricCriteriaId phải là số nguyên dương"),
+
+  body("score")
+    .optional()
+    .isDecimal({ decimal_digits: "0,2" })
+    .withMessage("score phải là số thập phân tối đa 2 chữ số sau dấu phẩy")
+    .custom((v) => parseFloat(v) >= 0 && parseFloat(v) <= 100)
+    .withMessage("score phải từ 0 đến 100"),
+
+  body("comment")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("comment không được quá 2000 ký tự")
+    .trim(),
+];
+
+// DELETE /ai-reports/:reportId/criterion-feedbacks/:classRubricCriteriaId
+export const validateDeleteCriterionFeedback = [
+  param("reportId")
+    .isInt({ min: 1 })
+    .withMessage("reportId phải là số nguyên dương"),
+
+  param("classRubricCriteriaId")
+    .isInt({ min: 1 })
+    .withMessage("classRubricCriteriaId phải là số nguyên dương"),
+
+  body("score")
+    .optional()
+    .isDecimal({ decimal_digits: "0,2" })
+    .withMessage("score phải là số thập phân tối đa 2 chữ số sau dấu phẩy")
+    .custom((v) => parseFloat(v) >= 0 && parseFloat(v) <= 100)
+    .withMessage("score phải từ 0 đến 100"),
+
+  body("comment")
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage("comment không được quá 2000 ký tự")
+    .trim(),
+];
+
 export default {
   validateRegistration,
   validateInstructorRegistration,
@@ -856,4 +952,8 @@ export default {
   validateGenerateAIReport,
   validateEditAIReport,
   validateUpdateAIReportStatus,
+  validateGetCriterionFeedbacks,
+  validateCreateCriterionFeedback,
+  validateUpsertCriterionFeedback,
+  validateDeleteCriterionFeedback,
 };

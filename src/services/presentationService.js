@@ -1141,8 +1141,8 @@ class PresentationService {
       return false;
     }
   }
-
-  /**
+  
+/**
    * Get presentations by course (for teachers)
    * @param {number} courseId
    * @param {object} options
@@ -1193,7 +1193,7 @@ class PresentationService {
     }
   }
 
-  /**
+/**
    * Get presentations for instructor (filtered by assigned classes)
    * @param {number} instructorId - Instructor user ID
    * @param {object} filters - Filter options (status, classId, courseId, search)
@@ -1229,7 +1229,7 @@ class PresentationService {
 
       const classIds = instructorClasses.map((ci) => ci.classId);
 
-      // Step 2: Build where clause
+            // Step 2: Build where clause
       const where = {
         classId: { [db.Sequelize.Op.in]: classIds },
       };

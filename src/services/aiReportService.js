@@ -1,11 +1,11 @@
 import {
   AIReport,
   Feedback,
+  CriterionFeedback,
   ClassAISetting,
   ClassRubricCriteria,
   Presentation,
   Class,
-  RubricTemplate,
   User
 } from "../models";
 import { Op } from "sequelize";
@@ -39,9 +39,6 @@ class AIReportService {
           classId: classId,
           isActive: true,
         },
-        include: [
-          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
-        ],
       });
 
       if (!aiSettings) {
@@ -102,8 +99,6 @@ class AIReportService {
       const reportData = {
         presentationId: presentationId,
         classId: classId,
-        configId: aiSettings.configId,
-        rubricTemplateId: aiSettings.rubricTemplateId,
         classAiSettingId: aiSettings.classAiSettingId,
         reportStatus: "waiting",
       };
@@ -136,14 +131,6 @@ class AIReportService {
     }
   }
 
-  /**
-   * Trigger AI report generation after semantic analysis completes
-   * Called from webhook when semantic worker finishes
-   * 
-   * @param {number} presentationId - Presentation ID
-   * @param {number} jobId - Semantic analysis job ID
-   * @returns {Promise<Object>} - Result with report ID and status
-   */
   async triggerReportAfterAnalysis(presentationId, jobId) {
     try {
       const presentation = await Presentation.findByPk(presentationId, {
@@ -217,8 +204,6 @@ class AIReportService {
         await existingReport.update({
           reportStatus: "generating",
           classAiSettingId: aiSettings.classAiSettingId,
-          configId: aiSettings.configId,
-          rubricTemplateId: aiSettings.rubricTemplateId,
         });
         
         console.log(`[AIReportService] Triggering report regeneration for presentation ${presentationId}`);
@@ -242,8 +227,6 @@ class AIReportService {
       const report = await AIReport.create({
         presentationId: presentationId,
         classId: classId,
-        configId: aiSettings.configId,
-        rubricTemplateId: aiSettings.rubricTemplateId,
         classAiSettingId: aiSettings.classAiSettingId,
         reportStatus: "waiting",
       });
@@ -267,10 +250,6 @@ class AIReportService {
     }
   }
 
-  /**
-   * Send job to Report Worker via SQS Queue
-   * @private
-   */
   async _sendToReportQueue(presentationId, reportId, classId, jobId, classCriteria, aiSettings) {
     try {
       const rubricData = classCriteria.map((c) => ({
@@ -318,7 +297,6 @@ class AIReportService {
         include: [
           { model: Presentation, as: "submission", attributes: ["presentationId", "title", "status"] },
           { model: Class, as: "class", attributes: ["classId", "classCode"] },
-          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
           { model: User, as: "confirmer", attributes: ["userId", "firstName", "lastName", "email"] },
           {
             model: Feedback,
@@ -576,11 +554,6 @@ class AIReportService {
     }
   }
 
-  /**
-   * Get AI report by submission ID
-   * @param {number} presentationId - Presentation/Submission ID
-   * @returns {Promise<Object>} - Result with report data
-   */
   async getReportBySubmission(presentationId) {
     try {
       const report = await AIReport.findOne({
@@ -588,7 +561,6 @@ class AIReportService {
         include: [
           { model: Presentation, as: "submission", attributes: ["presentationId", "title", "status"] },
           { model: Class, as: "class", attributes: ["classId", "classCode"] },
-          { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
           { model: User, as: "confirmer", attributes: ["userId", "firstName", "lastName", "email"] },
           {
             model: Feedback,
@@ -596,6 +568,14 @@ class AIReportService {
             required: false,
             include: [
               { model: User, as: "reviewer", attributes: ["userId", "firstName", "lastName", "email"] },
+            ],
+          },
+          {
+            model: CriterionFeedback,
+            as: "criterionFeedbacks",
+            required: false,
+            include: [
+              { model: User, as: "instructor", attributes: ["userId", "firstName", "lastName", "email"] },
             ],
           },
         ],
@@ -640,7 +620,6 @@ class AIReportService {
         };
       }
 
-      // Check if report can be deleted (waiting, draft, rejected, failed)
       if (!["waiting", "draft", "rejected", "failed"].includes(report.reportStatus)) {
         return {
           success: false,
@@ -665,11 +644,6 @@ class AIReportService {
     }
   }
 
-  /**
-   * Get all AI reports (admin/instructor)
-   * @param {Object} options - Pagination and filter options
-   * @returns {Promise<Object>} - Result with reports list
-   */
   async getAllReports(options = {}) {
     try {
       const { page = 1, limit = 20, classId, status } = options;
