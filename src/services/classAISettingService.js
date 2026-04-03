@@ -49,6 +49,8 @@ class ClassAISettingService {
 
       // Remove configId if provided (not allowed to be set via API)
       const { configId, ...safeData } = data;
+      safeData.enableAiReport = true;
+      safeData.requireInstructorConfirmation = true;
 
       const setting = await ClassAISetting.create(
         {
@@ -183,6 +185,10 @@ class ClassAISettingService {
 
       // Remove configId if provided (not allowed to be set via API)
       const { configId, ...safeData } = data;
+
+      // Always enable AI Report and require instructor confirmation
+      safeData.enableAiReport = true;
+      safeData.requireInstructorConfirmation = true;
 
       await setting.update(
         {

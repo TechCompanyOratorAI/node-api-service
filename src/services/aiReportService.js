@@ -216,6 +216,9 @@ class AIReportService {
       if (existingReport) {
         await existingReport.update({
           reportStatus: "generating",
+          classAiSettingId: aiSettings.classAiSettingId,
+          configId: aiSettings.configId,
+          rubricTemplateId: aiSettings.rubricTemplateId,
         });
         
         console.log(`[AIReportService] Triggering report regeneration for presentation ${presentationId}`);
