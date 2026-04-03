@@ -66,7 +66,7 @@ const detectPageCount = async (fileBuffer, mimeType) => {
     // PowerPoint files (.pptx)
     if (
       mimeType ===
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
       mimeType === "application/vnd.ms-powerpoint"
     ) {
       // PPTX is a ZIP file, count slides by counting slide XML files
@@ -212,7 +212,7 @@ class PresentationService {
 
   async uploadSlide({ presentationId, studentId, slideNumber, file }) {
     const transaction = await db.sequelize.transaction();
-
+    
     try {
       const accessResult = await this.getPresentationForStudent(
         presentationId,
@@ -228,7 +228,7 @@ class PresentationService {
       // When uploading a new slide for existing presentation, 
       // clear old slides and analysis data to keep only the latest
       console.log(`🧹 Clearing old slides and analysis data for presentation ${presentationId} to keep only latest`);
-
+      
       // Get existing slides to delete their files from storage
       const existingSlides = await Slide.findAll({
         where: { presentationId },
@@ -254,7 +254,7 @@ class PresentationService {
 
       // Clear segment analyses related to this presentation
       await SegmentAnalysis.destroy({
-        where: {
+        where: { 
           segmentId: {
             [db.Sequelize.Op.in]: db.sequelize.literal(`
               (SELECT ts.segmentId FROM TranscriptSegments ts 
@@ -379,8 +379,9 @@ class PresentationService {
       const safeName = sanitizeFileName(
         file.originalname || `media${extension}`
       );
-      const key = `presentations/${presentation.presentationId
-        }/media/${Date.now()}-${uniqueSuffix}-${safeName}`;
+      const key = `presentations/${
+        presentation.presentationId
+      }/media/${Date.now()}-${uniqueSuffix}-${safeName}`;
 
       const uploadResult = await storageService.uploadBuffer({
         key,
@@ -533,7 +534,7 @@ class PresentationService {
       }
 
       // Check if already submitted (allow re-submit if failed or no active job)
-      if (presentation.status === "done") {
+      if (presentation.status === "completed") {
         return {
           success: false,
           message: "Presentation is already completed",
@@ -569,17 +570,16 @@ class PresentationService {
         );
       }
 
-      // Update presentation status to 'submitted'
+      // Update presentation status
       await Presentation.update(
         {
-          status: "submitted",
+          status: "processing",
           submittedAt: new Date(),
         },
         { where: { presentationId } }
       );
 
       // Create ASR job (this will also push to SQS queue)
-      // Status will move to 'processing' when a worker picks this job up
       const job = await jobService.createJob(presentationId, "asr", {
         submittedBy: studentId,
         submittedAt: new Date().toISOString(),
@@ -948,27 +948,27 @@ class PresentationService {
       const pipeline = {
         asr: asrJob
           ? {
-            status: asrJob.status,
-            startedAt: asrJob.startedAt,
-            completedAt: asrJob.completedAt,
-            error: asrJob.errorMessage,
-          }
+              status: asrJob.status,
+              startedAt: asrJob.startedAt,
+              completedAt: asrJob.completedAt,
+              error: asrJob.errorMessage,
+            }
           : null,
         semantic: semanticJob
           ? {
-            status: semanticJob.status,
-            startedAt: semanticJob.startedAt,
-            completedAt: semanticJob.completedAt,
-            error: semanticJob.errorMessage,
-          }
+              status: semanticJob.status,
+              startedAt: semanticJob.startedAt,
+              completedAt: semanticJob.completedAt,
+              error: semanticJob.errorMessage,
+            }
           : null,
         report: reportJob
           ? {
-            status: reportJob.status,
-            startedAt: reportJob.startedAt,
-            completedAt: reportJob.completedAt,
-            error: reportJob.errorMessage,
-          }
+              status: reportJob.status,
+              startedAt: reportJob.startedAt,
+              completedAt: reportJob.completedAt,
+              error: reportJob.errorMessage,
+            }
           : null,
       };
 
