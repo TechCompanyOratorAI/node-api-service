@@ -281,6 +281,81 @@ class EmailService {
     return await this.sendEmail(email, subject, html);
   }
 
+  // Share invite email template
+  generateShareInviteEmailHtml(recipientName, senderName, presentationTitle, shareUrl, expiresAt) {
+    const expiryNote = expiresAt
+      ? `<p style="color: #666; font-size: 14px; line-height: 1.6;">
+           <strong>Lưu ý:</strong> Liên kết này sẽ hết hạn vào <strong>${new Date(expiresAt).toLocaleString('vi-VN')}</strong>.
+         </p>`
+      : '';
+
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #007bff; margin: 0;">Orator AI</h1>
+            <p style="color: #666; margin: 5px 0 0 0;">Nền tảng thuyết trình thông minh</p>
+          </div>
+
+          <h2 style="color: #333; margin-bottom: 10px;">🎓 Bạn được mời xem bài thuyết trình</h2>
+
+          <p style="color: #555; line-height: 1.6;">Xin chào <strong>${recipientName}</strong>,</p>
+
+          <p style="color: #555; line-height: 1.6;">
+            <strong>${senderName}</strong> đã chia sẻ bài thuyết trình với bạn trên Orator AI:
+          </p>
+
+          <div style="background-color: #f0f4ff; border-left: 4px solid #007bff; padding: 15px 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+            <p style="margin: 0; color: #333; font-size: 18px; font-weight: bold;">📊 ${presentationTitle}</p>
+          </div>
+
+          <div style="text-align: center; margin: 40px 0;">
+            <a href="${shareUrl}"
+               style="background-color: #007bff; color: white; padding: 15px 35px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+              Xem bài thuyết trình
+            </a>
+          </div>
+
+          <p style="color: #666; font-size: 14px; line-height: 1.6;">
+            Hoặc sao chép đường dẫn này vào trình duyệt:
+          </p>
+          <p style="word-break: break-all; color: #007bff; background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 13px;">
+            ${shareUrl}
+          </p>
+
+          ${expiryNote}
+
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+
+          <div style="text-align: center;">
+            <p style="color: #666; font-size: 12px; margin: 0;">
+              Trân trọng,<br>
+              <strong>Đội ngũ Orator AI</strong>
+            </p>
+          </div>
+
+        </div>
+      </div>
+    `;
+  }
+
+  // Send share invite email
+  async sendShareInviteEmail(recipientEmail, recipientName, senderName, presentationTitle, shareUrl, expiresAt = null) {
+    const html = this.generateShareInviteEmailHtml(
+      recipientName,
+      senderName,
+      presentationTitle,
+      shareUrl,
+      expiresAt
+    );
+    return await this.sendEmail(
+      recipientEmail,
+      `${senderName} đã chia sẻ bài thuyết trình với bạn - Orator AI`,
+      html
+    );
+  }
+
   // Test email connection
   async testConnection() {
     if (!this.isConfigured) {

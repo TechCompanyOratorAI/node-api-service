@@ -30,7 +30,7 @@ module.exports = (sequelize, DataTypes) => {
 
       filePath: { type: DataTypes.TEXT, allowNull: false },
       fileName: { type: DataTypes.TEXT },
-      fileFormat: { type: DataTypes.STRING(20) },
+      fileFormat: { type: DataTypes.STRING(255) },
       fileSizeBytes: { type: DataTypes.BIGINT },
       durationSeconds: { type: DataTypes.INTEGER },
       sampleRate: { type: DataTypes.INTEGER },

@@ -247,6 +247,16 @@ class JobService {
 
       await job.markAsRunning(workerName);
       console.log(`🚀 Job ${jobId} started by worker: ${workerName}`);
+
+      // When the ASR job (first in pipeline) starts, mark presentation as 'processing'
+      if (job.jobType === JOB_TYPES.ASR) {
+        await Presentation.update(
+          { status: "processing" },
+          { where: { presentationId: job.presentationId } }
+        );
+        console.log(`📊 Presentation ${job.presentationId} status → processing`);
+      }
+
       return job;
     } catch (error) {
       console.error("❌ Error marking job as started:", error);
@@ -306,6 +316,13 @@ class JobService {
           triggeredBy: completedJob.jobId,
           previousJobType: jobType,
         });
+      } else if (jobType === JOB_TYPES.REPORT) {
+        // Report is the last step – mark presentation as 'done'
+        await Presentation.update(
+          { status: "done" },
+          { where: { presentationId } }
+        );
+        console.log(`🎉 Presentation ${presentationId} status → done (pipeline complete)`);
       }
     } catch (error) {
       console.error("❌ Error triggering next job in pipeline:", error);
@@ -336,10 +353,18 @@ class JobService {
           `🔄 Retrying job ${jobId} (attempt ${job.retryCount + 1}/${MAX_RETRY_COUNT})`,
         );
         await this.retryFailedJob(jobId);
-      } else if (job.retryCount >= MAX_RETRY_COUNT) {
-        console.log(
-          `⛔ Job ${jobId} reached max retry count (${MAX_RETRY_COUNT}), not retrying`,
+      } else {
+        // No more retries – mark presentation as 'failed'
+        const reason = job.retryCount >= MAX_RETRY_COUNT
+          ? `Job ${jobId} reached max retry count (${MAX_RETRY_COUNT}), not retrying`
+          : `Job ${jobId} failed without retry`;
+        console.log(`⛔ ${reason}`);
+
+        await Presentation.update(
+          { status: "failed" },
+          { where: { presentationId: job.presentationId } }
         );
+        console.log(`💥 Presentation ${job.presentationId} status → failed`);
       }
 
       return job;

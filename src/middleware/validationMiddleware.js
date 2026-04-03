@@ -829,10 +829,7 @@ export const validateUpdateAIReportStatus = [
     .isIn(VALID_AI_REPORT_STATUSES)
     .withMessage("reportStatus không hợp lệ"),
 ];
-
 // ─── Criterion Feedback ───────────────────────────────────────────────────────
-
-// GET  /ai-reports/:reportId/criterion-feedbacks
 export const validateGetCriterionFeedbacks = [
   param("reportId")
     .isInt({ min: 1 })
@@ -852,7 +849,6 @@ export const validateGetCriterionFeedbacks = [
     .trim(),
 ];
 
-// POST /ai-reports/:reportId/criterion-feedbacks - Tạo feedback cho một criteria
 export const validateCreateCriterionFeedback = [
   param("reportId")
     .isInt({ min: 1 })
@@ -878,7 +874,6 @@ export const validateCreateCriterionFeedback = [
     .trim(),
 ];
 
-// PUT  /ai-reports/:reportId/criterion-feedbacks/:classRubricCriteriaId
 export const validateUpsertCriterionFeedback = [
   param("reportId")
     .isInt({ min: 1 })
@@ -902,7 +897,6 @@ export const validateUpsertCriterionFeedback = [
     .trim(),
 ];
 
-// DELETE /ai-reports/:reportId/criterion-feedbacks/:classRubricCriteriaId
 export const validateDeleteCriterionFeedback = [
   param("reportId")
     .isInt({ min: 1 })
@@ -926,6 +920,28 @@ export const validateDeleteCriterionFeedback = [
     .trim(),
 ];
 
+// ─── Share Invite Validation ─────────────────────────────────────────────────
+export const validateShareInvite = [
+  body("emails")
+    .isArray({ min: 1, max: 50 })
+    .withMessage("emails phải là mảng và có ít nhất 1 địa chỉ (tối đa 50)"),
+  body("emails.*")
+    .isEmail()
+    .withMessage("Mỗi email phải là địa chỉ email hợp lệ")
+    .normalizeEmail(),
+  body("expiresAt")
+    .optional()
+    .isISO8601()
+    .withMessage("expiresAt phải là định dạng ngày hợp lệ (ISO 8601)")
+    .custom((value) => {
+      if (value && new Date(value) <= new Date()) {
+        throw new Error("expiresAt phải là thời điểm trong tương lai");
+      }
+      return true;
+    }),
+];
+
+// ─── Export Default ──────────────────────────────────────────────────────────
 export default {
   validateRegistration,
   validateInstructorRegistration,
@@ -956,4 +972,5 @@ export default {
   validateCreateCriterionFeedback,
   validateUpsertCriterionFeedback,
   validateDeleteCriterionFeedback,
+  validateShareInvite,
 };
