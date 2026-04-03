@@ -22,10 +22,6 @@ module.exports = (sequelize, DataTypes) => {
             },
             rating: { type: DataTypes.FLOAT },
             comments: { type: DataTypes.TEXT },
-            criterionFeedbacks: {
-                type: DataTypes.JSON,
-                allowNull: true,
-            },
             feedbackType: {
                 type: DataTypes.ENUM(
                     'general',

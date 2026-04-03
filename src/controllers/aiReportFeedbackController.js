@@ -1,142 +1,93 @@
-const aiReportFeedbackService = require('../services/aiReportFeedbackService');
+const { validationResult } = require("express-validator");
+const criterionFeedbackService = require('../services/aiReportFeedbackService');
 
-class AIReportFeedbackController {
-  /**
-   * POST /ai-reports/:reportId/feedback
-   * Tạo hoặc cập nhật instructor feedback cho AI report
-   */
-  async createOrUpdateFeedback(req, res) {
+class CriterionFeedbackController {
+  async create(req, res) {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: "Validation failed", errors: errors.array() });
+      }
+
       const { reportId } = req.params;
       const instructorId = req.user?.userId;
 
-      if (!reportId || isNaN(parseInt(reportId))) {
-        return res.status(400).json({
-          success: false,
-          message: "ID report không hợp lệ",
-        });
-      }
-
-      const result = await aiReportFeedbackService.createOrUpdateFeedback(
+      const result = await criterionFeedbackService.create(
         parseInt(reportId),
         req.body,
         instructorId
       );
 
-      if (result.success) {
-        return res.status(201).json(result);
-      } else if (result.code === "NOT_FOUND") {
-        return res.status(404).json(result);
-      } else {
-        return res.status(400).json(result);
-      }
+      if (result.success) return res.status(201).json(result);
+      return res.status(result.code === "NOT_FOUND" ? 404 : 400).json(result);
     } catch (error) {
-      console.error("Create/update feedback controller error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Lỗi server nội bộ",
-      });
+      console.error("Create criterion feedback controller error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
     }
   }
 
-  /**
-   * GET /ai-reports/:reportId/feedback
-   * Lấy feedback của một AI report
-   */
-  async getFeedbackByReportId(req, res) {
+  async upsert(req, res) {
     try {
-      const { reportId } = req.params;
-
-      if (!reportId || isNaN(parseInt(reportId))) {
-        return res.status(400).json({
-          success: false,
-          message: "ID report không hợp lệ",
-        });
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: "Validation failed", errors: errors.array() });
       }
 
-      const result = await aiReportFeedbackService.getFeedbackByReportId(parseInt(reportId));
+      const { reportId, classRubricCriteriaId } = req.params;
+      const instructorId = req.user?.userId;
 
-      if (result.success) {
-        return res.status(200).json(result);
-      } else if (result.code === "NOT_FOUND") {
-        return res.status(404).json(result);
-      } else {
-        return res.status(400).json(result);
-      }
+      const result = await criterionFeedbackService.upsert(
+        parseInt(reportId),
+        parseInt(classRubricCriteriaId),
+        req.body,
+        instructorId
+      );
+
+      if (result.success) return res.status(200).json(result);
+      return res.status(result.code === "NOT_FOUND" ? 404 : 400).json(result);
     } catch (error) {
-      console.error("Get feedback controller error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Lỗi server nội bộ",
-      });
+      console.error("Upsert criterion feedback controller error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
     }
   }
 
-  /**
-   * DELETE /ai-reports/:reportId/feedback
-   * Xóa feedback của một AI report
-   */
-  async deleteFeedback(req, res) {
+  async delete(req, res) {
     try {
-      const { reportId } = req.params;
-
-      if (!reportId || isNaN(parseInt(reportId))) {
-        return res.status(400).json({
-          success: false,
-          message: "ID report không hợp lệ",
-        });
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: "Validation failed", errors: errors.array() });
       }
 
-      const result = await aiReportFeedbackService.deleteFeedback(parseInt(reportId));
+      const { reportId, classRubricCriteriaId } = req.params;
 
-      if (result.success) {
-        return res.status(200).json(result);
-      } else if (result.code === "NOT_FOUND") {
-        return res.status(404).json(result);
-      } else {
-        return res.status(400).json(result);
-      }
+      const result = await criterionFeedbackService.delete(parseInt(reportId), parseInt(classRubricCriteriaId));
+
+      if (result.success) return res.status(200).json(result);
+      return res.status(result.code === "NOT_FOUND" ? 404 : 400).json(result);
     } catch (error) {
-      console.error("Delete feedback controller error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Lỗi server nội bộ",
-      });
+      console.error("Delete criterion feedback controller error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
     }
   }
 
-  /**
-   * PATCH /ai-reports/:reportId/feedback/visibility
-   * Toggle visibility của feedback cho student
-   */
-  async toggleVisibility(req, res) {
+  async getByReportId(req, res) {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: "Validation failed", errors: errors.array() });
+      }
+
       const { reportId } = req.params;
 
-      if (!reportId || isNaN(parseInt(reportId))) {
-        return res.status(400).json({
-          success: false,
-          message: "ID report không hợp lệ",
-        });
-      }
+      const result = await criterionFeedbackService.getByReportId(parseInt(reportId));
 
-      const result = await aiReportFeedbackService.toggleVisibility(parseInt(reportId));
-
-      if (result.success) {
-        return res.status(200).json(result);
-      } else if (result.code === "NOT_FOUND") {
-        return res.status(404).json(result);
-      } else {
-        return res.status(400).json(result);
-      }
+      if (result.success) return res.status(200).json(result);
+      return res.status(400).json(result);
     } catch (error) {
-      console.error("Toggle visibility controller error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Lỗi server nội bộ",
-      });
+      console.error("Get criterion feedbacks controller error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
     }
   }
 }
 
-module.exports = new AIReportFeedbackController();
+module.exports = new CriterionFeedbackController();
