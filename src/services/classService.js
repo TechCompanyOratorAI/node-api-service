@@ -16,10 +16,9 @@ const { Op } = require("sequelize");
 
 class ClassService {
   /**
-   * Create new class with enrollment key (Admin or Lead Instructor)
-   * Authorization: Admin OR instructor in course with 'lead' role
+   * Create new class with enrollment key (Admin only)
    */
-  async createClass(classData, userId) {
+  async createClass(classData, userId, userRoles = []) {
     const { courseId, classCode, startDate, endDate, maxStudents, maxGroupMembers, enrollKey, keyExpiresAt, keyMaxUses } = classData;
     const transaction = await db.sequelize.transaction();
 
@@ -67,12 +66,17 @@ class ClassService {
         createdBy: userId,
       }, { transaction });
 
-      // Auto-assign creator as instructor to the class
-      await ClassInstructor.create({
-        classId: newClass.classId,
-        instructorId: userId,
-        assignedBy: userId
-      }, { transaction });
+      const isAdmin = userRoles.includes("Admin");
+      const isInstructor = userRoles.includes("Instructor");
+
+      // Only instructor creators should be auto-assigned to the class.
+      if (isInstructor && !isAdmin) {
+        await ClassInstructor.create({
+          classId: newClass.classId,
+          instructorId: userId,
+          assignedBy: userId
+        }, { transaction });
+      }
 
       await transaction.commit();
 
