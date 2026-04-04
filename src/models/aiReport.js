@@ -20,14 +20,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
-      configId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-      rubricTemplateId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
       classAiSettingId: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -44,6 +36,9 @@ module.exports = (sequelize, DataTypes) => {
       reportStatus: {
         type: DataTypes.ENUM(
           "pending",
+          "waiting",
+          "draft",
+          "pending_review",
           "generating",
           "completed",
           "failed",
@@ -55,6 +50,10 @@ module.exports = (sequelize, DataTypes) => {
       },
       confirmedByInstructorId: {
         type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      feedbackOfInstructor: {
+        type: DataTypes.TEXT,
         allowNull: true,
       },
       confirmedAt: {
@@ -72,8 +71,6 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: true,
       indexes: [
         { fields: ["classId"] },
-        { fields: ["configId"] },
-        { fields: ["rubricTemplateId"] },
         { fields: ["classAiSettingId"] },
         { fields: ["reportStatus"] },
         { fields: ["confirmedByInstructorId"] },
@@ -91,14 +88,6 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "classId",
       as: "class",
     });
-    AIReport.belongsTo(models.AIConfig, {
-      foreignKey: "configId",
-      as: "aiConfig",
-    });
-    AIReport.belongsTo(models.RubricTemplate, {
-      foreignKey: "rubricTemplateId",
-      as: "rubricTemplate",
-    });
     AIReport.belongsTo(models.ClassAISetting, {
       foreignKey: "classAiSettingId",
       as: "classAiSetting",
@@ -107,10 +96,13 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "confirmedByInstructorId",
       as: "confirmer",
     });
-    AIReport.hasOne(models.Feedback, {
+    AIReport.hasMany(models.CriterionFeedback, {
+      foreignKey: "reportId",
+      as: "criterionFeedbacks",
+    });
+    AIReport.hasMany(models.Feedback, {
       foreignKey: "reportId",
       as: "instructorFeedback",
-      scope: { feedbackType: "ai_report_instructor" },
     });
   };
 

@@ -1,165 +1,139 @@
-const { Feedback, AIReport, User } = require("../models");
+const { CriterionFeedback, AIReport, User, ClassRubricCriteria } = require("../models");
 
-const AI_REPORT_INSTRUCTOR = "ai_report_instructor";
-
-class AIReportFeedbackService {
-  async createOrUpdateFeedback(reportId, data, instructorId) {
+class CriterionFeedbackService {
+  async create(reportId, data, instructorId) {
+    const transaction = await CriterionFeedback.sequelize.transaction();
     try {
-      const report = await AIReport.findByPk(reportId);
+      const report = await AIReport.findByPk(reportId, { transaction });
       if (!report) {
+        await transaction.rollback();
+        return { success: false, message: "AI report không tìm thấy", code: "NOT_FOUND" };
+      }
+
+      const criteria = await ClassRubricCriteria.findByPk(data.classRubricCriteriaId, { transaction });
+      if (!criteria) {
+        await transaction.rollback();
+        return { success: false, message: "Criteria không tìm thấy", code: "NOT_FOUND" };
+      }
+
+      if (criteria.classId !== report.classId) {
+        await transaction.rollback();
+        return { success: false, message: "Criteria không thuộc class của report này", code: "INVALID_CRITERIA" };
+      }
+
+      const existing = await CriterionFeedback.findOne({
+        where: { reportId: parseInt(reportId), classRubricCriteriaId: parseInt(data.classRubricCriteriaId) },
+        transaction,
+      });
+      if (existing) {
+        await transaction.rollback();
         return {
           success: false,
-          message: "AI report không tìm thấy",
-          code: "NOT_FOUND",
+          message: "Feedback cho criteria này đã tồn tại, dùng PUT để cập nhật",
+          code: "ALREADY_EXISTS",
         };
       }
 
-      const comments =
-        data.feedbackContent !== undefined
-          ? data.feedbackContent
-          : data.comments !== undefined
-            ? data.comments
-            : null;
+      const feedback = await CriterionFeedback.create(
+        {
+          reportId: parseInt(reportId),
+          classRubricCriteriaId: parseInt(data.classRubricCriteriaId),
+          instructorId,
+          ...(data.score !== undefined ? { score: data.score } : {}),
+          ...(data.comment !== undefined ? { comment: data.comment } : {}),
+        },
+        { transaction }
+      );
 
-      const payload = {
-        presentationId: report.presentationId,
-        reviewerId: instructorId,
-        reportId,
-        feedbackType: AI_REPORT_INSTRUCTOR,
-        comments,
-        criterionFeedbacks: data.criterionFeedbacks ?? null,
-        rating: data.rating !== undefined && data.rating !== null ? data.rating : null,
-        isVisibleToStudent: data.isVisibleToStudent ?? true,
-      };
+      await transaction.commit();
 
-      let row = await Feedback.findOne({
-        where: { reportId, feedbackType: AI_REPORT_INSTRUCTOR },
-      });
-
-      if (row) {
-        await row.update(payload);
-        return {
-          success: true,
-          data: row,
-          message: "Đã cập nhật feedback",
-        };
-      }
-
-      row = await Feedback.create(payload);
-      return {
-        success: true,
-        data: row,
-        message: "Đã tạo feedback",
-      };
-    } catch (error) {
-      console.error("Create/update feedback error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi tạo/cập nhật feedback",
-        error: error.message,
-      };
-    }
-  }
-
-  async getFeedbackByReportId(reportId) {
-    try {
-      const feedback = await Feedback.findOne({
-        where: { reportId, feedbackType: AI_REPORT_INSTRUCTOR },
+      const created = await CriterionFeedback.findByPk(feedback.criterionFeedbackId, {
         include: [
-          {
-            model: User,
-            as: "reviewer",
-            attributes: ["userId", "firstName", "lastName", "email"],
-          },
+          { model: User, as: "instructor", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: ClassRubricCriteria, as: "classRubricCriteria", attributes: ["classRubricCriteriaId", "criteriaName", "maxScore"] },
         ],
       });
 
-      if (!feedback) {
-        return {
-          success: false,
-          message: "Feedback không tìm thấy",
-          code: "NOT_FOUND",
-        };
-      }
-
-      return {
-        success: true,
-        data: feedback,
-      };
+      return { success: true, data: created, message: "Tạo criterion feedback thành công" };
     } catch (error) {
-      console.error("Get feedback error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi lấy feedback",
-        error: error.message,
-      };
+      await transaction.rollback();
+      console.error("Create criterion feedback error:", error);
+      return { success: false, message: "Lỗi khi tạo feedback", error: error.message };
     }
   }
 
-  async deleteFeedback(reportId) {
+  async upsert(reportId, classRubricCriteriaId, data, instructorId) {
+    const transaction = await CriterionFeedback.sequelize.transaction();
     try {
-      const feedback = await Feedback.findOne({
-        where: { reportId, feedbackType: AI_REPORT_INSTRUCTOR },
-      });
-
-      if (!feedback) {
-        return {
-          success: false,
-          message: "Feedback không tìm thấy",
-          code: "NOT_FOUND",
-        };
+      const report = await AIReport.findByPk(reportId, { transaction });
+      if (!report) {
+        await transaction.rollback();
+        return { success: false, message: "AI report không tìm thấy", code: "NOT_FOUND" };
       }
 
-      await feedback.destroy();
+      await CriterionFeedback.upsert(
+        {
+          reportId: parseInt(reportId),
+          classRubricCriteriaId: parseInt(classRubricCriteriaId),
+          instructorId,
+          ...(data.score !== undefined ? { score: data.score } : {}),
+          ...(data.comment !== undefined ? { comment: data.comment } : {}),
+        },
+        { transaction }
+      );
 
-      return {
-        success: true,
-        message: "Đã xóa feedback",
-      };
+      await transaction.commit();
+
+      const updated = await CriterionFeedback.findOne({
+        where: { reportId: parseInt(reportId), classRubricCriteriaId: parseInt(classRubricCriteriaId) },
+        include: [
+          { model: User, as: "instructor", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: ClassRubricCriteria, as: "classRubricCriteria", attributes: ["classRubricCriteriaId", "criteriaName", "maxScore"] },
+        ],
+      });
+
+      return { success: true, data: updated, message: "Đã cập nhật feedback của criteria" };
     } catch (error) {
-      console.error("Delete feedback error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi xóa feedback",
-        error: error.message,
-      };
+      await transaction.rollback();
+      console.error("Upsert criterion feedback error:", error);
+      return { success: false, message: "Lỗi khi cập nhật feedback", error: error.message };
     }
   }
 
-  async toggleVisibility(reportId) {
+  async delete(reportId, classRubricCriteriaId) {
     try {
-      const feedback = await Feedback.findOne({
-        where: { reportId, feedbackType: AI_REPORT_INSTRUCTOR },
+      const deleted = await CriterionFeedback.destroy({
+        where: { reportId: parseInt(reportId), classRubricCriteriaId: parseInt(classRubricCriteriaId) },
       });
 
-      if (!feedback) {
-        return {
-          success: false,
-          message: "Feedback không tìm thấy",
-          code: "NOT_FOUND",
-        };
+      if (!deleted) {
+        return { success: false, message: "Criterion feedback không tìm thấy", code: "NOT_FOUND" };
       }
 
-      const next = !feedback.isVisibleToStudent;
-      await feedback.update({ isVisibleToStudent: next });
-      await feedback.reload();
-
-      return {
-        success: true,
-        data: feedback,
-        message: feedback.isVisibleToStudent
-          ? "Đã hiển thị cho sinh viên"
-          : "Đã ẩn khỏi sinh viên",
-      };
+      return { success: true, message: "Đã xóa feedback của criteria" };
     } catch (error) {
-      console.error("Toggle visibility error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi thay đổi visibility",
-        error: error.message,
-      };
+      console.error("Delete criterion feedback error:", error);
+      return { success: false, message: "Lỗi khi xóa feedback", error: error.message };
+    }
+  }
+
+  async getByReportId(reportId) {
+    try {
+      const feedbacks = await CriterionFeedback.findAll({
+        where: { reportId: parseInt(reportId) },
+        include: [
+          { model: User, as: "instructor", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: ClassRubricCriteria, as: "classRubricCriteria", attributes: ["classRubricCriteriaId", "criteriaName", "criteriaDescription", "maxScore"] },
+        ],
+        order: [["criterionFeedbackId", "ASC"]],
+      });
+
+      return { success: true, data: feedbacks };
+    } catch (error) {
+      console.error("Get criterion feedbacks error:", error);
+      return { success: false, message: "Lỗi khi lấy feedback", error: error.message };
     }
   }
 }
 
-module.exports = new AIReportFeedbackService();
+module.exports = new CriterionFeedbackService();
