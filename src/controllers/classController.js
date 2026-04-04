@@ -27,7 +27,11 @@ class ClassController {
       }
 
       const classData = { ...req.body, courseId: parseInt(courseId) };
-      const result = await classService.createClass(classData, req.user.userId);
+      const result = await classService.createClass(
+        classData,
+        req.user.userId,
+        req.userRoles || []
+      );
 
       if (result.success) {
         return res.status(201).json(result);

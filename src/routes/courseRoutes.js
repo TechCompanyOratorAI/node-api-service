@@ -2,7 +2,6 @@ import express from 'express';
 import courseController from '../controllers/courseController.js';
 import classController from '../controllers/classController.js';
 import { authenticateToken, requireEmailVerification, requireRole } from '../middleware/authMiddleware.js';
-import { requireCourseInstructor } from '../middleware/classAuthMiddleware.js';
 import {
     validateCourse,
     validateCourseUpdate,
@@ -52,8 +51,7 @@ router.delete('/:courseId',
 
 // Class management routes for course
 router.post('/:courseId/classes',
-    requireRole(['Admin', 'Instructor']),
-    requireCourseInstructor,
+    requireRole(['Admin']),
     validateCreateClass,
     classController.createClass
 );
