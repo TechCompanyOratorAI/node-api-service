@@ -373,7 +373,7 @@ class AIReportService {
     }
   }
 
-  async confirmReport(reportId, instructorId) {
+  async confirmReport(reportId, instructorId, feedbackOfInstructor, gradeForInstructor) {
     try {
       const report = await AIReport.findByPk(reportId);
 
@@ -395,6 +395,8 @@ class AIReportService {
         reportStatus: "confirmed",
         confirmedByInstructorId: instructorId,
         confirmedAt: new Date(),
+        feedbackOfInstructor: feedbackOfInstructor,
+        gradeForInstructor: gradeForInstructor,
       });
 
       return {
