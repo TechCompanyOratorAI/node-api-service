@@ -24,10 +24,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
-      rubricTemplateId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
       overallScore: {
         type: DataTypes.DECIMAL(5, 2),
       },
@@ -79,7 +75,6 @@ module.exports = (sequelize, DataTypes) => {
         { fields: ["reportStatus"] },
         { fields: ["confirmedByInstructorId"] },
         { fields: ["generatedAt"] },
-        { fields: ["rubricTemplateId"] },
       ],
     }
   );
@@ -96,10 +91,6 @@ module.exports = (sequelize, DataTypes) => {
     AIReport.belongsTo(models.ClassAISetting, {
       foreignKey: "classAiSettingId",
       as: "classAiSetting",
-    });
-    AIReport.belongsTo(models.RubricTemplate, {
-      foreignKey: "rubricTemplateId",
-      as: "rubricTemplate",
     });
     AIReport.belongsTo(models.User, {
       foreignKey: "confirmedByInstructorId",
