@@ -123,6 +123,7 @@ class AIReportController {
   async confirmReport(req, res) {
     try {
       const { reportId } = req.params;
+      const { feedbackOfInstructor, gradeForInstructor } = req.body;
 
       if (!reportId || isNaN(parseInt(reportId))) {
         return res.status(400).json({
@@ -132,7 +133,7 @@ class AIReportController {
       }
 
       const instructorId = req.user?.userId;
-      const result = await aiReportService.confirmReport(parseInt(reportId), instructorId);
+      const result = await aiReportService.confirmReport(parseInt(reportId), instructorId, feedbackOfInstructor, gradeForInstructor);
 
       if (result.success) {
         return res.status(200).json(result);

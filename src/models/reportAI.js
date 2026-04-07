@@ -56,6 +56,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
+      gradeForInstructor: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: true,
+      },
       confirmedAt: {
         type: DataTypes.DATE,
       },
