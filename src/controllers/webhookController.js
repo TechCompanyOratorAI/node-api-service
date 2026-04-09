@@ -322,19 +322,33 @@ const asrComplete = async (req, res) => {
         audioFileName: presentation?.audioRecord?.fileName,
       });
       
-      const audioFilename = presentation?.audioRecord?.fileName || null;
+      let s3AudioKey = null;
+      if (presentation?.audioRecord?.filePath) {
+        try {
+          if (presentation.audioRecord.filePath.startsWith('http')) {
+            const url = new URL(presentation.audioRecord.filePath);
+            s3AudioKey = url.pathname.substring(1); // Remove leading slash
+          } else {
+            s3AudioKey = presentation.audioRecord.filePath;
+          }
+        } catch (e) {
+          s3AudioKey = presentation.audioRecord.fileName || null;
+        }
+      } else {
+        s3AudioKey = presentation?.audioRecord?.fileName || null;
+      }
       
       console.log(`🔍 DEBUG: audioFilename extracted:`, {
-        audioFilename,
-        type: typeof audioFilename,
-        isNull: audioFilename === null,
+        audioFilename: s3AudioKey,
+        type: typeof s3AudioKey,
+        isNull: s3AudioKey === null,
       });
       
       const semanticJobMetadata = {
         transcriptSegments: transcript?.segments?.length || 0,
         uniqueSpeakers: diarization?.speakers?.length || 0,
         asrJobId: jobId,
-        audioFilename: audioFilename,  // 🎤 Pass audio filename for speech quality analysis
+        audioFilename: s3AudioKey,  // 🎤 Pass audio filename/key for speech quality analysis
       };
       
       console.log(`🔍 DEBUG: Creating semantic job with metadata:`, JSON.stringify(semanticJobMetadata, null, 2));
