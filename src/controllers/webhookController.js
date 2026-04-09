@@ -655,7 +655,6 @@ const analysisComplete = async (req, res) => {
               },
               { transaction },
             );
-            console.log(`   💾 ContentRelevance upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
 
             await SemanticSimilarity.upsert(
               {
@@ -664,7 +663,6 @@ const analysisComplete = async (req, res) => {
               },
               { transaction },
             );
-            console.log(`   💾 SemanticSimilarity upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
 
             await AlignmentCheck.upsert(
               {
@@ -680,7 +678,6 @@ const analysisComplete = async (req, res) => {
               },
               { transaction },
             );
-            console.log(`   💾 AlignmentCheck upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
           } catch (upsertError) {
             console.error(`   ❌ Failed to upsert detail tables: ${upsertError.message}`);
           }
