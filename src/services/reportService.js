@@ -87,21 +87,34 @@ class ReportService {
         // First, prepare all segment data with validation (without saving yet)
         for (const segment of segmentAnalyses) {
           try {
-            // Validate slideId - only use if valid (exists in Slides table)
-            let slideIdToUse = segment.bestMatchingSlide || segment.slideId || null;
+            // bestMatchingSlide from AI is SLIDE NUMBER, not slideId
+            // We need to find the actual slideId using slideNumber
+            let slideIdToUse = null;
 
-            // If slideId is provided, validate it exists in Slides table
-            if (slideIdToUse) {
+            if (segment.bestMatchingSlide) {
               const slide = await Slide.findOne({
                 where: {
                   presentationId: presentationId,
-                  slideId: slideIdToUse
+                  slideNumber: segment.bestMatchingSlide
                 },
                 transaction
               });
-              if (!slide) {
-                console.log(`   ⚠️ Slide ${slideIdToUse} not found for segment ${segment.segmentId}, setting to null`);
-                slideIdToUse = null;
+              if (slide) {
+                slideIdToUse = slide.slideId;
+              } else {
+                console.log(`   ⚠️ Slide with number ${segment.bestMatchingSlide} not found for segment ${segment.segmentId}, setting to null`);
+              }
+            } else if (segment.slideId) {
+              // Fallback to slideId if provided
+              const slide = await Slide.findOne({
+                where: {
+                  presentationId: presentationId,
+                  slideId: segment.slideId
+                },
+                transaction
+              });
+              if (slide) {
+                slideIdToUse = slide.slideId;
               }
             }
 
