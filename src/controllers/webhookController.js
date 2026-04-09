@@ -309,6 +309,13 @@ const asrComplete = async (req, res) => {
 
     // Enqueue semantic job for py-semantic-worker
     try {
+      // Get audio filename for speech quality analysis
+      const presentation = await Presentation.findByPk(presentationId, {
+        include: ["audioRecord"],
+      });
+      
+      const audioFilename = presentation?.audioRecord?.fileName || null;
+      
       const semanticJob = await jobService.createJob(
         presentationId,
         "semantic",
@@ -316,11 +323,15 @@ const asrComplete = async (req, res) => {
           transcriptSegments: transcript?.segments?.length || 0,
           uniqueSpeakers: diarization?.speakers?.length || 0,
           asrJobId: jobId,
+          audioFilename: audioFilename,  // 🎤 Pass audio filename for speech quality analysis
         },
       );
       console.log(
         `✅ Semantic job ${semanticJob.jobId} enqueued for presentation ${presentationId}`,
       );
+      if (audioFilename) {
+        console.log(`   - Audio filename for speech quality: ${audioFilename}`);
+      }
     } catch (enqueueError) {
       console.error("⚠️ Failed to enqueue semantic job:", enqueueError);
       // Don't fail the request - ASR completed successfully
