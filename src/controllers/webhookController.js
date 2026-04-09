@@ -488,21 +488,9 @@ const analysisComplete = async (req, res) => {
       `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
     );
     
-    // DEBUG: Log speech quality detection
-    //console.log(`🔍 DEBUG: Speech Quality Detection`);
-    console.log(`  - overallScores exists: ${!!analysis?.overallScores}`);
-    if (analysis?.overallScores) {
-      console.log(`  - overallScores keys:`, Object.keys(analysis.overallScores));
-      console.log(`  - speechFluency: ${analysis.overallScores.speechFluency}`);
-      console.log(`  - speechClarity: ${analysis.overallScores.speechClarity}`);
-      console.log(`  - speechConfidence: ${analysis.overallScores.speechConfidence}`);
-      console.log(`  - speechOverall: ${analysis.overallScores.speechOverall}`);
-    }
-    console.log(`  - hasSpeechQuality: ${hasSpeechQuality}`);
-    console.log(`  - segmentAnalyses count: ${analysis?.segmentAnalyses?.length}`);
-    if (analysis?.segmentAnalyses?.[0]) {
-      console.log(`  - First segment has speechQuality: ${!!analysis.segmentAnalyses[0].speechQuality}`);
-    }
+    console.log(
+      `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
+    );
 
     // Check for idempotency key to prevent duplicate processing
     if (idempotencyKey && processedRequests.has(idempotencyKey)) {
@@ -727,13 +715,14 @@ const analysisComplete = async (req, res) => {
       }
     }
 
+    // Commit transaction before marking job completed to release locks
+    await transaction.commit();
+
     // Mark job as completed
     await jobService.markJobCompleted(jobId, {
       analysisCreated: true,
       segmentAnalysisCount: analysis?.segmentAnalyses?.length || 0,
     });
-
-    await transaction.commit();
 
     console.log(`✅ Analysis webhook processed successfully for job ${jobId}`);
 
@@ -987,9 +976,6 @@ const reportComplete = async (req, res) => {
 
     // Debug: Log segmentAnalyses info
     console.log(`📊 segmentAnalyses: ${segmentAnalyses ? segmentAnalyses.length : 0} items`);
-    if (segmentAnalyses && segmentAnalyses.length > 0) {
-      console.log(`   - First segmentId: ${segmentAnalyses[0].segmentId}`);
-    }
 
     let responseData = {
       jobId,
@@ -1081,17 +1067,11 @@ const reportComplete = async (req, res) => {
       responseData.overallScore = report?.summary?.overallScore;
     }
 
-    // Update presentation status to completed (skip in test mode if not exists)
-    try {
-      await reportService.completePresentation(presentationId, transaction);
-    } catch (error) {
-      if (process.env.NODE_ENV !== "test") {
-        throw error;
-      }
-      console.log(
-        `⚠️ Skipping presentation update in test mode: ${error.message}`,
-      );
-    }
+    // Update presentation status is already handled correctly by jobService when jobType is 'report'.
+    // We do NOT use reportService.completePresentation here to avoid deadlocks with markJobCompleted.
+    
+    // Commit transaction to release any table locks before marking job completed
+    await transaction.commit();
 
     // Mark job as completed with metadata
     try {
@@ -1105,8 +1085,6 @@ const reportComplete = async (req, res) => {
       console.error(`⚠️ Failed to mark job completed:`, jobError.message);
       // Don't fail request - report already saved
     }
-
-    await transaction.commit();
 
     console.log(`✅ Report webhook processed successfully for job ${jobId}`);
 
