@@ -22,7 +22,6 @@ const {
   Course,
   AIReport,
   Feedback,
-  RubricTemplate,
   Class,
 } = db;
 
@@ -410,12 +409,6 @@ class ShareService {
         aiReport = await AIReport.findOne({
           where: { presentationId },
           include: [
-            {
-              model: RubricTemplate,
-              as: 'rubricTemplate',
-              attributes: ['rubricTemplateId', 'templateName'],
-              required: false,
-            },
             {
               model: User,
               as: 'confirmer',
