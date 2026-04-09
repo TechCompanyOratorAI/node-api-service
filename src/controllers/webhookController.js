@@ -573,6 +573,45 @@ const analysisComplete = async (req, res) => {
           } else {
             createdCount++;
           }
+
+          
+          await ContentRelevance.upsert(
+            {
+              segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+              relevanceScore: segAnalysis.relevanceScore || 0,
+              matchedConcepts: segAnalysis.topicKeywordsFound
+                ? segAnalysis.topicKeywordsFound.join(", ")
+                : null,
+              explanation:
+                segAnalysis.issues && segAnalysis.issues.length > 0
+                  ? segAnalysis.issues.join("; ")
+                  : null,
+            },
+            { transaction },
+          );
+
+          await SemanticSimilarity.upsert(
+            {
+              segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+              similarityScore: segAnalysis.semanticScore || 0,
+            },
+            { transaction },
+          );
+
+          await AlignmentCheck.upsert(
+            {
+              segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+              alignmentStatus:
+                segAnalysis.alignmentScore >= 80 ? "aligned" : "misaligned",
+              timingSyncScore: segAnalysis.alignmentScore || 0,
+              expectedSlideNumber: segAnalysis.expectedSlideNumber,
+              misalignmentReason:
+                segAnalysis.timingDeviation > 0
+                  ? `Timing deviation: ${segAnalysis.timingDeviation}s`
+                  : null,
+            },
+            { transaction },
+          );
         }
 
         console.log(
