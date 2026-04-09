@@ -1,4 +1,4 @@
-const { ClassAISetting, RubricTemplate, AIConfig, Class, User } = require("../models");
+const { ClassAISetting, RubricTemplate, Class, User } = require("../models");
 const { Op } = require("sequelize");
 const classRubricCriteriaService = require("./classRubricCriteriaService");
 
@@ -47,8 +47,8 @@ class ClassAISettingService {
         };
       }
 
-      // Remove configId if provided (not allowed to be set via API)
-      const { configId, ...safeData } = data;
+      const safeData = { ...data };
+      delete safeData.configId;
       safeData.enableAiReport = true;
       safeData.requireInstructorConfirmation = true;
 
@@ -120,7 +120,6 @@ class ClassAISettingService {
         },
         include: [
           { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
-          { model: AIConfig, as: "aiConfig", attributes: ["configId", "configName"] },
           { model: Class, as: "class", attributes: ["classId", "classCode"] },
           { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
           { model: User, as: "updater", attributes: ["userId", "firstName", "lastName", "email"] },
@@ -183,8 +182,8 @@ class ClassAISettingService {
         }
       }
 
-      // Remove configId if provided (not allowed to be set via API)
-      const { configId, ...safeData } = data;
+      const safeData = { ...data };
+      delete safeData.configId;
 
       // Always enable AI Report and require instructor confirmation
       safeData.enableAiReport = true;
@@ -313,7 +312,6 @@ class ClassAISettingService {
         order: [["createdAt", "DESC"]],
         include: [
           { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
-          { model: AIConfig, as: "aiConfig", attributes: ["configId", "configName"] },
           { model: Class, as: "class", attributes: ["classId", "classCode"] },
           { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
         ],
@@ -351,7 +349,6 @@ class ClassAISettingService {
       const setting = await ClassAISetting.findByPk(settingId, {
         include: [
           { model: RubricTemplate, as: "rubricTemplate", attributes: ["rubricTemplateId", "templateName"] },
-          { model: AIConfig, as: "aiConfig", attributes: ["configId", "configName"] },
           { model: Class, as: "class", attributes: ["classId", "classCode"] },
           { model: User, as: "creator", attributes: ["userId", "firstName", "lastName", "email"] },
           { model: User, as: "updater", attributes: ["userId", "firstName", "lastName", "email"] },
