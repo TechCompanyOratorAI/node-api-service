@@ -507,6 +507,15 @@ const analysisComplete = async (req, res) => {
       console.log(
         `📊 Saving analysis results for presentation ${presentationId}`,
       );
+      console.log(
+        `📊 Analysis payload: segmentAnalyses count = ${analysis.segmentAnalyses ? analysis.segmentAnalyses.length : 0}`,
+      );
+      console.log(
+        `📊 First segment sample:`,
+        analysis.segmentAnalyses && analysis.segmentAnalyses[0]
+          ? JSON.stringify(analysis.segmentAnalyses[0])
+          : "null",
+      );
 
       // Save segment-level analyses using findOrCreate to handle duplicates
       if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
@@ -574,44 +583,51 @@ const analysisComplete = async (req, res) => {
             createdCount++;
           }
 
-          
-          await ContentRelevance.upsert(
-            {
-              segAnalysisId: segmentAnalysisRecord.segAnalysisId,
-              relevanceScore: segAnalysis.relevanceScore || 0,
-              matchedConcepts: segAnalysis.topicKeywordsFound
-                ? segAnalysis.topicKeywordsFound.join(", ")
-                : null,
-              explanation:
-                segAnalysis.issues && segAnalysis.issues.length > 0
-                  ? segAnalysis.issues.join("; ")
+  
+          try {
+            await ContentRelevance.upsert(
+              {
+                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+                relevanceScore: segAnalysis.relevanceScore || 0,
+                matchedConcepts: segAnalysis.topicKeywordsFound
+                  ? segAnalysis.topicKeywordsFound.join(", ")
                   : null,
-            },
-            { transaction },
-          );
+                explanation:
+                  segAnalysis.issues && segAnalysis.issues.length > 0
+                    ? segAnalysis.issues.join("; ")
+                    : null,
+              },
+              { transaction },
+            );
+            console.log(`   💾 ContentRelevance upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
 
-          await SemanticSimilarity.upsert(
-            {
-              segAnalysisId: segmentAnalysisRecord.segAnalysisId,
-              similarityScore: segAnalysis.semanticScore || 0,
-            },
-            { transaction },
-          );
+            await SemanticSimilarity.upsert(
+              {
+                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+                similarityScore: segAnalysis.semanticScore || 0,
+              },
+              { transaction },
+            );
+            console.log(`   💾 SemanticSimilarity upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
 
-          await AlignmentCheck.upsert(
-            {
-              segAnalysisId: segmentAnalysisRecord.segAnalysisId,
-              alignmentStatus:
-                segAnalysis.alignmentScore >= 80 ? "aligned" : "misaligned",
-              timingSyncScore: segAnalysis.alignmentScore || 0,
-              expectedSlideNumber: segAnalysis.expectedSlideNumber,
-              misalignmentReason:
-                segAnalysis.timingDeviation > 0
-                  ? `Timing deviation: ${segAnalysis.timingDeviation}s`
-                  : null,
-            },
-            { transaction },
-          );
+            await AlignmentCheck.upsert(
+              {
+                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+                alignmentStatus:
+                  segAnalysis.alignmentScore >= 80 ? "aligned" : "misaligned",
+                timingSyncScore: segAnalysis.alignmentScore || 0,
+                expectedSlideNumber: segAnalysis.expectedSlideNumber,
+                misalignmentReason:
+                  segAnalysis.timingDeviation > 0
+                    ? `Timing deviation: ${segAnalysis.timingDeviation}s`
+                    : null,
+              },
+              { transaction },
+            );
+            console.log(`   💾 AlignmentCheck upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
+          } catch (upsertError) {
+            console.error(`   ❌ Failed to upsert detail tables: ${upsertError.message}`);
+          }
         }
 
         console.log(
