@@ -1289,6 +1289,27 @@ async function saveSpeechQualityAnalysis(
       }
     });
 
+    // === DEBUG LOG ===
+    console.log("=== DEBUG SpeechQualityAnalysis data ===");
+    console.log("overallScores:", JSON.stringify(overallScores));
+    console.log("speechAnalysisData after cleanup:", JSON.stringify(speechAnalysisData));
+    // Check if all scores are undefined/null
+    const hasAnyScore =
+      speechAnalysisData.fluencyScore != null ||
+      speechAnalysisData.clarityScore != null ||
+      speechAnalysisData.confidenceScore != null ||
+      speechAnalysisData.overallScore != null;
+    console.log("hasAnyScore:", hasAnyScore);
+    console.log("===========================================");
+
+    // If no speech quality scores available, skip this analysis entirely
+    if (!hasAnyScore) {
+      console.log(
+        `⚠️ No speech quality scores available, skipping SpeechQualityAnalysis for presentation ${presentationId}`,
+      );
+      return null;
+    }
+
     const step1Time = Date.now();
     const [speechAnalysis, created] = await SpeechQualityAnalysis.upsert(
       speechAnalysisData,
@@ -1298,7 +1319,24 @@ async function saveSpeechQualityAnalysis(
       },
     );
 
-    const speechAnalysisId = speechAnalysis.id;
+    // MySQL often does not populate instance.id from upsert; reload row so FKs are valid
+    let speechAnalysisId = speechAnalysis?.id;
+    console.log("speechAnalysis.id from upsert:", speechAnalysis?.id);
+
+    if (speechAnalysisId == null) {
+      const row = await SpeechQualityAnalysis.findOne({
+        where: { presentationId, jobId },
+        order: [["id", "DESC"]],
+        transaction,
+      });
+      speechAnalysisId = row?.id;
+      console.log("speechAnalysisId from findOne:", speechAnalysisId);
+    }
+    if (speechAnalysisId == null) {
+      throw new Error(
+        "SpeechQualityAnalysis upsert did not yield id; cannot save hesitation patterns",
+      );
+    }
     console.log(
       `${created ? "Created" : "Updated"} speech quality analysis with ID: ${speechAnalysisId} (${Date.now() - step1Time}ms)`,
     );
@@ -1309,29 +1347,58 @@ async function saveSpeechQualityAnalysis(
     let totalHesitationCount = 0;
     let totalHesitationTime = 0;
 
+    console.log("segmentAnalyses count:", segmentAnalyses?.length ?? 0);
+
     if (segmentAnalyses && segmentAnalyses.length > 0) {
       console.log(
         `📊 Processing ${segmentAnalyses.length} segments for batch insert`,
       );
 
       for (const segment of segmentAnalyses) {
+        // === DEBUG: log each segment's speech quality ===
+        if (segment.speechQuality) {
+          console.log(
+            `  Segment ${segment.segmentId}: hesitationPatterns=${segment.speechQuality.hesitationPatterns?.length ?? 0}, hesitationCount=${segment.speechQuality.hesitationCount}, totalHesitationTime=${segment.speechQuality.totalHesitationTime}`,
+          );
+        } else {
+          console.log(`  Segment ${segment.segmentId}: NO speechQuality data`);
+        }
+
         // Collect hesitation patterns for batch insert
         if (segment.speechQuality && segment.speechQuality.hesitationPatterns) {
           for (const pattern of segment.speechQuality.hesitationPatterns) {
+            const startTime = pattern.startTime ?? pattern.start_time;
+            const endTime = pattern.endTime ?? pattern.end_time;
+            const duration = pattern.duration;
+            const patternType = pattern.type ?? pattern.patternType ?? pattern.pattern_type;
+            const confidence = pattern.confidence;
+            if (
+              startTime == null ||
+              endTime == null ||
+              duration == null ||
+              patternType == null ||
+              confidence == null
+            ) {
+              console.warn(
+                "⚠️ Skipping hesitation pattern with missing required fields:",
+                JSON.stringify(pattern),
+              );
+              continue;
+            }
             hesitationPatternsData.push({
               speechAnalysisId: speechAnalysisId,
               segmentId: segment.segmentId,
-              startTime: pattern.startTime,
-              endTime: pattern.endTime,
-              duration: pattern.duration,
-              patternType: pattern.type,
-              confidence: pattern.confidence,
-              description: pattern.description,
+              startTime,
+              endTime,
+              duration,
+              patternType,
+              confidence,
+              description: pattern.description ?? null,
               segmentText: segment.segmentText || null,
             });
 
             totalHesitationCount++;
-            totalHesitationTime += pattern.duration;
+            totalHesitationTime += Number(duration);
           }
         }
 
@@ -1376,6 +1443,16 @@ async function saveSpeechQualityAnalysis(
         }
       }
 
+      // === DEBUG before inserts ===
+      console.log(`hesitationPatternsData.length: ${hesitationPatternsData.length}`);
+      console.log(`segmentQualityData.length: ${segmentQualityData.length}`);
+      if (hesitationPatternsData.length > 0) {
+        console.log("First hesitation pattern sample:", JSON.stringify(hesitationPatternsData[0]));
+      }
+      if (segmentQualityData.length > 0) {
+        console.log("First segment quality sample:", JSON.stringify(segmentQualityData[0]));
+      }
+
       // Batch insert hesitation patterns
       const step2Time = Date.now();
       if (hesitationPatternsData.length > 0) {
@@ -1389,6 +1466,8 @@ async function saveSpeechQualityAnalysis(
         console.log(
           `✅ Hesitation patterns inserted (${Date.now() - step2Time}ms)`,
         );
+      } else {
+        console.log("⚠️ No hesitation patterns to insert (hesitationPatternsData is empty)");
       }
 
       // Batch process segment quality data with timing info
