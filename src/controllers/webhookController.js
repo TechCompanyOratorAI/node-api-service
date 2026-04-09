@@ -1568,8 +1568,12 @@ async function saveSpeechQualityAnalysis(
           if (timing && timing.endTimestamp && timing.startTimestamp) {
             const segmentDuration = timing.endTimestamp - timing.startTimestamp;
             if (segmentDuration > 0) {
-              data.hesitationRatio =
-                data.segmentHesitationTime / segmentDuration;
+              // Clamp to [0, 1] — hesitation time can exceed segment duration
+              // (e.g., overlapping silences), so cap at 1.0 to pass model validation
+              data.hesitationRatio = Math.min(
+                1.0,
+                data.segmentHesitationTime / segmentDuration,
+              );
               data.segmentStartTime = timing.startTimestamp;
               data.segmentEndTime = timing.endTimestamp;
               data.segmentDuration = segmentDuration;
