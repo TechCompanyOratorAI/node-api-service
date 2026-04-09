@@ -16,10 +16,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: "uq_class_ai_settings_class",
       },
-      configId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
       rubricTemplateId: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -38,6 +34,16 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         allowNull: false,
         defaultValue: true,
+      },
+      enableSlideLayoutScoring: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      slideLayoutWeight: {
+        type: DataTypes.DECIMAL(7, 2),
+        allowNull: false,
+        defaultValue: 0.1,
       },
       feedbackLanguage: {
         type: DataTypes.STRING(10),
@@ -81,11 +87,7 @@ module.exports = (sequelize, DataTypes) => {
     {
       tableName: "ClassAISettings",
       timestamps: true,
-      indexes: [
-        { fields: ["configId"] },
-        { fields: ["rubricTemplateId"] },
-        { fields: ["isActive"] },
-      ],
+      indexes: [{ fields: ["rubricTemplateId"] }, { fields: ["isActive"] }],
     }
   );
 
@@ -93,10 +95,6 @@ module.exports = (sequelize, DataTypes) => {
     ClassAISetting.belongsTo(models.Class, {
       foreignKey: "classId",
       as: "class",
-    });
-    ClassAISetting.belongsTo(models.AIConfig, {
-      foreignKey: "configId",
-      as: "aiConfig",
     });
     ClassAISetting.belongsTo(models.RubricTemplate, {
       foreignKey: "rubricTemplateId",
