@@ -318,15 +318,41 @@ class JobService {
         });
       } else if (jobType === JOB_TYPES.REPORT) {
         // Report is the last step – mark presentation as 'done'
-        await Presentation.update(
-          { status: "done" },
-          { where: { presentationId } }
-        );
+        // Use retry logic to handle lock wait timeouts from concurrent transactions
+        await this._updatePresentationStatusWithRetry(presentationId, "done");
         console.log(`🎉 Presentation ${presentationId} status → done (pipeline complete)`);
       }
     } catch (error) {
       console.error("❌ Error triggering next job in pipeline:", error);
       // Don't throw, just log - pipeline continuation failure shouldn't fail current job
+    }
+  }
+
+  /**
+   * Update Presentation status with retry logic for lock wait timeouts
+   * @private
+   */
+  async _updatePresentationStatusWithRetry(presentationId, status, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await Presentation.update(
+          { status },
+          { where: { presentationId } }
+        );
+        return; // success
+      } catch (error) {
+        const isLockTimeout = error?.original?.code === 'ER_LOCK_WAIT_TIMEOUT' 
+          || error?.parent?.code === 'ER_LOCK_WAIT_TIMEOUT';
+        if (isLockTimeout && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+          console.warn(
+            `⚠️ Lock timeout updating presentation ${presentationId} status to '${status}', retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`,
+          );
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      }
     }
   }
 
@@ -360,10 +386,7 @@ class JobService {
           : `Job ${jobId} failed without retry`;
         console.log(`⛔ ${reason}`);
 
-        await Presentation.update(
-          { status: "failed" },
-          { where: { presentationId: job.presentationId } }
-        );
+        await this._updatePresentationStatusWithRetry(job.presentationId, "failed");
         console.log(`💥 Presentation ${job.presentationId} status → failed`);
       }
 
