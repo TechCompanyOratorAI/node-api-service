@@ -26,6 +26,9 @@ class RubricCriteriaController {
         });
       }
 
+      // Force maxScore to always be 100
+      req.body.maxScore = 100;
+
       const result = await rubricCriteriaService.createCriteria(
         parseInt(templateId),
         req.body
@@ -100,6 +103,11 @@ class RubricCriteriaController {
           success: false,
           message: "ID criteria không hợp lệ",
         });
+      }
+
+      // Force maxScore to always be 100
+      if (req.body.maxScore !== undefined) {
+        req.body.maxScore = 100;
       }
 
       const result = await rubricCriteriaService.updateCriteria(
