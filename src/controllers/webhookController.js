@@ -310,30 +310,57 @@ const asrComplete = async (req, res) => {
     // Enqueue semantic job for py-semantic-worker
     try {
       // Get audio filename for speech quality analysis
+      console.log(`🔍 DEBUG: Fetching presentation ${presentationId} with audioRecord...`);
       const presentation = await Presentation.findByPk(presentationId, {
         include: ["audioRecord"],
       });
       
+      console.log(`🔍 DEBUG: Presentation found:`, {
+        presentationId: presentation?.presentationId,
+        hasAudioRecord: !!presentation?.audioRecord,
+        audioRecordId: presentation?.audioRecord?.audioId,
+        audioFileName: presentation?.audioRecord?.fileName,
+      });
+      
       const audioFilename = presentation?.audioRecord?.fileName || null;
+      
+      console.log(`🔍 DEBUG: audioFilename extracted:`, {
+        audioFilename,
+        type: typeof audioFilename,
+        isNull: audioFilename === null,
+      });
+      
+      const semanticJobMetadata = {
+        transcriptSegments: transcript?.segments?.length || 0,
+        uniqueSpeakers: diarization?.speakers?.length || 0,
+        asrJobId: jobId,
+        audioFilename: audioFilename,  // 🎤 Pass audio filename for speech quality analysis
+      };
+      
+      console.log(`🔍 DEBUG: Creating semantic job with metadata:`, JSON.stringify(semanticJobMetadata, null, 2));
       
       const semanticJob = await jobService.createJob(
         presentationId,
         "semantic",
-        {
-          transcriptSegments: transcript?.segments?.length || 0,
-          uniqueSpeakers: diarization?.speakers?.length || 0,
-          asrJobId: jobId,
-          audioFilename: audioFilename,  // 🎤 Pass audio filename for speech quality analysis
-        },
+        semanticJobMetadata,
       );
+      
+      console.log(`🔍 DEBUG: Semantic job created:`, {
+        jobId: semanticJob.jobId,
+        metadata: semanticJob.metadata,
+      });
+      
       console.log(
         `✅ Semantic job ${semanticJob.jobId} enqueued for presentation ${presentationId}`,
       );
       if (audioFilename) {
         console.log(`   - Audio filename for speech quality: ${audioFilename}`);
+      } else {
+        console.log(`   ⚠️ WARNING: No audio filename found for speech quality analysis`);
       }
     } catch (enqueueError) {
       console.error("⚠️ Failed to enqueue semantic job:", enqueueError);
+      console.error("Error stack:", enqueueError.stack);
       // Don't fail the request - ASR completed successfully
     }
 
@@ -446,6 +473,22 @@ const analysisComplete = async (req, res) => {
     console.log(
       `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
     );
+    
+    // DEBUG: Log speech quality detection
+    console.log(`🔍 DEBUG: Speech Quality Detection`);
+    console.log(`  - overallScores exists: ${!!analysis?.overallScores}`);
+    if (analysis?.overallScores) {
+      console.log(`  - overallScores keys:`, Object.keys(analysis.overallScores));
+      console.log(`  - speechFluency: ${analysis.overallScores.speechFluency}`);
+      console.log(`  - speechClarity: ${analysis.overallScores.speechClarity}`);
+      console.log(`  - speechConfidence: ${analysis.overallScores.speechConfidence}`);
+      console.log(`  - speechOverall: ${analysis.overallScores.speechOverall}`);
+    }
+    console.log(`  - hasSpeechQuality: ${hasSpeechQuality}`);
+    console.log(`  - segmentAnalyses count: ${analysis?.segmentAnalyses?.length}`);
+    if (analysis?.segmentAnalyses?.[0]) {
+      console.log(`  - First segment has speechQuality: ${!!analysis.segmentAnalyses[0].speechQuality}`);
+    }
 
     // Check for idempotency key to prevent duplicate processing
     if (idempotencyKey && processedRequests.has(idempotencyKey)) {
