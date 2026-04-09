@@ -314,14 +314,14 @@ const asrComplete = async (req, res) => {
       const presentation = await Presentation.findByPk(presentationId, {
         include: ["audioRecord"],
       });
-      
-      console.log(`🔍 DEBUG: Presentation found:`, {
-        presentationId: presentation?.presentationId,
-        hasAudioRecord: !!presentation?.audioRecord,
-        audioRecordId: presentation?.audioRecord?.audioId,
-        audioFileName: presentation?.audioRecord?.fileName,
-      });
-      
+
+      // console.log(`🔍 DEBUG: Presentation found:`, {
+      //   presentationId: presentation?.presentationId,
+      //   hasAudioRecord: !!presentation?.audioRecord,
+      //   audioRecordId: presentation?.audioRecord?.audioId,
+      //   audioFileName: presentation?.audioRecord?.fileName,
+      // });
+
       let s3AudioKey = null;
       if (presentation?.audioRecord?.filePath) {
         try {
@@ -337,33 +337,33 @@ const asrComplete = async (req, res) => {
       } else {
         s3AudioKey = presentation?.audioRecord?.fileName || null;
       }
-      
+
       console.log(`🔍 DEBUG: audioFilename extracted:`, {
         audioFilename: s3AudioKey,
         type: typeof s3AudioKey,
         isNull: s3AudioKey === null,
       });
-      
+
       const semanticJobMetadata = {
         transcriptSegments: transcript?.segments?.length || 0,
         uniqueSpeakers: diarization?.speakers?.length || 0,
         asrJobId: jobId,
         audioFilename: s3AudioKey,  // 🎤 Pass audio filename/key for speech quality analysis
       };
-      
-      console.log(`🔍 DEBUG: Creating semantic job with metadata:`, JSON.stringify(semanticJobMetadata, null, 2));
-      
+
+      //console.log(`🔍 DEBUG: Creating semantic job with metadata:`, JSON.stringify(semanticJobMetadata, null, 2));
+
       const semanticJob = await jobService.createJob(
         presentationId,
         "semantic",
         semanticJobMetadata,
       );
-      
-      console.log(`🔍 DEBUG: Semantic job created:`, {
-        jobId: semanticJob.jobId,
-        metadata: semanticJob.metadata,
-      });
-      
+
+      // console.log(`🔍 DEBUG: Semantic job created:`, {
+      //   jobId: semanticJob.jobId,
+      //   metadata: semanticJob.metadata,
+      // });
+
       console.log(
         `✅ Semantic job ${semanticJob.jobId} enqueued for presentation ${presentationId}`,
       );
@@ -487,7 +487,7 @@ const analysisComplete = async (req, res) => {
     console.log(
       `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
     );
-    
+
     // DEBUG: Log speech quality detection
     console.log(`🔍 DEBUG: Speech Quality Detection`);
     console.log(`  - overallScores exists: ${!!analysis?.overallScores}`);
@@ -651,7 +651,7 @@ const analysisComplete = async (req, res) => {
             createdCount++;
           }
 
-  
+
           try {
             await ContentRelevance.upsert(
               {
@@ -667,7 +667,7 @@ const analysisComplete = async (req, res) => {
               },
               { transaction },
             );
-            console.log(`   💾 ContentRelevance upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
+            //console.log(`   💾 ContentRelevance upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
 
             await SemanticSimilarity.upsert(
               {
@@ -676,7 +676,7 @@ const analysisComplete = async (req, res) => {
               },
               { transaction },
             );
-            console.log(`   💾 SemanticSimilarity upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
+            //console.log(`   💾 SemanticSimilarity upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
 
             await AlignmentCheck.upsert(
               {
@@ -692,7 +692,7 @@ const analysisComplete = async (req, res) => {
               },
               { transaction },
             );
-            console.log(`   💾 AlignmentCheck upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
+            //console.log(`   💾 AlignmentCheck upserted for segAnalysisId=${segmentAnalysisRecord.segAnalysisId}`);
           } catch (upsertError) {
             console.error(`   ❌ Failed to upsert detail tables: ${upsertError.message}`);
           }
@@ -769,7 +769,7 @@ const analysisComplete = async (req, res) => {
     // Trigger AI Report Generation (Rubric-based)
     // After semantic analysis completes, check if we should generate AI report
     // ============================================================
-    
+
     // Initialize response object early to avoid undefined errors
     let responseData = {
       jobId,
@@ -777,7 +777,7 @@ const analysisComplete = async (req, res) => {
       segmentAnalyses: analysis?.segmentAnalyses?.length || 0,
       speechQualityProcessed: hasSpeechQuality,
     };
-    
+
     try {
       console.log(
         `🤖 Checking if AI report should be generated for presentation ${presentationId}`,
@@ -1483,20 +1483,20 @@ async function saveSpeechQualityAnalysis(
           // Add speech quality issues and suggestions
           const speechIssues = segment.issues
             ? segment.issues.filter(
-                (issue) =>
-                  issue.toLowerCase().includes("hesitation") ||
-                  issue.toLowerCase().includes("speech") ||
-                  issue.toLowerCase().includes("fluency"),
-              )
+              (issue) =>
+                issue.toLowerCase().includes("hesitation") ||
+                issue.toLowerCase().includes("speech") ||
+                issue.toLowerCase().includes("fluency"),
+            )
             : [];
 
           const speechSuggestions = segment.suggestions
             ? segment.suggestions.filter(
-                (suggestion) =>
-                  suggestion.toLowerCase().includes("hesitation") ||
-                  suggestion.toLowerCase().includes("speech") ||
-                  suggestion.toLowerCase().includes("fluency"),
-              )
+              (suggestion) =>
+                suggestion.toLowerCase().includes("hesitation") ||
+                suggestion.toLowerCase().includes("speech") ||
+                suggestion.toLowerCase().includes("fluency"),
+            )
             : [];
 
           if (speechIssues.length > 0) {
