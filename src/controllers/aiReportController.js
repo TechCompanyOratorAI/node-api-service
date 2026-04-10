@@ -123,6 +123,7 @@ class AIReportController {
   async confirmReport(req, res) {
     try {
       const { reportId } = req.params;
+      const { feedbackOfInstructor, gradeForInstructor } = req.body;
 
       if (!reportId || isNaN(parseInt(reportId))) {
         return res.status(400).json({
@@ -131,8 +132,31 @@ class AIReportController {
         });
       }
 
+      // Validate required fields
+      if (!feedbackOfInstructor || typeof feedbackOfInstructor !== "string" || feedbackOfInstructor.trim() === "") {
+        return res.status(400).json({
+          success: false,
+          message: "feedbackOfInstructor là bắt buộc và không được để trống",
+        });
+      }
+
+      if (gradeForInstructor === undefined || gradeForInstructor === null || isNaN(Number(gradeForInstructor))) {
+        return res.status(400).json({
+          success: false,
+          message: "gradeForInstructor là bắt buộc và phải là số",
+        });
+      }
+
+      const grade = Number(gradeForInstructor);
+      if (grade < 0 || grade > 10) {
+        return res.status(400).json({
+          success: false,
+          message: "gradeForInstructor phải nằm trong khoảng 0 - 10",
+        });
+      }
+
       const instructorId = req.user?.userId;
-      const result = await aiReportService.confirmReport(parseInt(reportId), instructorId);
+      const result = await aiReportService.confirmReport(parseInt(reportId), instructorId, feedbackOfInstructor.trim(), grade);
 
       if (result.success) {
         return res.status(200).json(result);

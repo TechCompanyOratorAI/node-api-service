@@ -1,5 +1,6 @@
 import express from "express";
 import classController from "../controllers/classController.js";
+import classScoreController from "../controllers/classScoreController.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import enrollKeyController from "../controllers/enrollKeyController.js";
 import {
@@ -67,6 +68,14 @@ router.get(
   "/:classId/students",
   requireRole(["Admin", "Instructor"]),
   enrollmentController.getClassStudents
+);
+
+// Class scores - get all students and their scores (Instructor/Admin)
+router.get(
+  "/:classId/scores",
+  requireRole(["Admin", "Instructor"]),
+  requireClassInstructorOrAdmin,
+  classScoreController.getClassScores
 );
 
 // Enrollment key management

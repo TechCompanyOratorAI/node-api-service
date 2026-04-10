@@ -309,20 +309,72 @@ const asrComplete = async (req, res) => {
 
     // Enqueue semantic job for py-semantic-worker
     try {
+      // Get audio filename for speech quality analysis
+      // console.log(`🔍 DEBUG: Fetching presentation ${presentationId} with audioRecord...`);
+      const presentation = await Presentation.findByPk(presentationId, {
+        include: ["audioRecord"],
+      });
+      
+      console.log(`🔍 DEBUG: Presentation found:`, {
+        presentationId: presentation?.presentationId,
+        hasAudioRecord: !!presentation?.audioRecord,
+        audioRecordId: presentation?.audioRecord?.audioId,
+        audioFileName: presentation?.audioRecord?.fileName,
+      });
+      
+      let s3AudioKey = null;
+      if (presentation?.audioRecord?.filePath) {
+        try {
+          if (presentation.audioRecord.filePath.startsWith('http')) {
+            const url = new URL(presentation.audioRecord.filePath);
+            s3AudioKey = url.pathname.substring(1); // Remove leading slash
+          } else {
+            s3AudioKey = presentation.audioRecord.filePath;
+          }
+        } catch (e) {
+          s3AudioKey = presentation.audioRecord.fileName || null;
+        }
+      } else {
+        s3AudioKey = presentation?.audioRecord?.fileName || null;
+      }
+      
+      // console.log(`🔍 DEBUG: audioFilename extracted:`, {
+      //   audioFilename: s3AudioKey,
+      //   type: typeof s3AudioKey,
+      //   isNull: s3AudioKey === null,
+      // });
+      
+      const semanticJobMetadata = {
+        transcriptSegments: transcript?.segments?.length || 0,
+        uniqueSpeakers: diarization?.speakers?.length || 0,
+        asrJobId: jobId,
+        audioFilename: s3AudioKey,  // 🎤 Pass audio filename/key for speech quality analysis
+      };
+      
+      console.log(`🔍 DEBUG: Creating semantic job with metadata:`, JSON.stringify(semanticJobMetadata, null, 2));
+      
       const semanticJob = await jobService.createJob(
         presentationId,
         "semantic",
-        {
-          transcriptSegments: transcript?.segments?.length || 0,
-          uniqueSpeakers: diarization?.speakers?.length || 0,
-          asrJobId: jobId,
-        },
+        semanticJobMetadata,
       );
+      
+      console.log(`🔍 DEBUG: Semantic job created:`, {
+        jobId: semanticJob.jobId,
+        metadata: semanticJob.metadata,
+      });
+      
       console.log(
         `✅ Semantic job ${semanticJob.jobId} enqueued for presentation ${presentationId}`,
       );
+      if (s3AudioKey) {
+        console.log(`   - Audio filename for speech quality: ${s3AudioKey}`);
+      } else {
+        console.log(`   ⚠️ WARNING: No audio filename found for speech quality analysis`);
+      }
     } catch (enqueueError) {
       console.error("⚠️ Failed to enqueue semantic job:", enqueueError);
+      console.error("Error stack:", enqueueError.stack);
       // Don't fail the request - ASR completed successfully
     }
 
@@ -435,6 +487,10 @@ const analysisComplete = async (req, res) => {
     console.log(
       `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
     );
+    
+    console.log(
+      `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
+    );
 
     // Check for idempotency key to prevent duplicate processing
     if (idempotencyKey && processedRequests.has(idempotencyKey)) {
@@ -507,6 +563,15 @@ const analysisComplete = async (req, res) => {
       console.log(
         `📊 Saving analysis results for presentation ${presentationId}`,
       );
+      console.log(
+        `📊 Analysis payload: segmentAnalyses count = ${analysis.segmentAnalyses ? analysis.segmentAnalyses.length : 0}`,
+      );
+      console.log(
+        `📊 First segment sample:`,
+        analysis.segmentAnalyses && analysis.segmentAnalyses[0]
+          ? JSON.stringify(analysis.segmentAnalyses[0])
+          : "null",
+      );
 
       // Save segment-level analyses using findOrCreate to handle duplicates
       if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
@@ -573,6 +638,49 @@ const analysisComplete = async (req, res) => {
           } else {
             createdCount++;
           }
+
+  
+          try {
+            await ContentRelevance.upsert(
+              {
+                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+                relevanceScore: segAnalysis.relevanceScore || 0,
+                matchedConcepts: segAnalysis.topicKeywordsFound
+                  ? segAnalysis.topicKeywordsFound.join(", ")
+                  : null,
+                explanation:
+                  segAnalysis.issues && segAnalysis.issues.length > 0
+                    ? segAnalysis.issues.join("; ")
+                    : null,
+              },
+              { transaction },
+            );
+
+            await SemanticSimilarity.upsert(
+              {
+                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+                similarityScore: segAnalysis.semanticScore || 0,
+              },
+              { transaction },
+            );
+
+            await AlignmentCheck.upsert(
+              {
+                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
+                alignmentStatus:
+                  segAnalysis.alignmentScore >= 80 ? "aligned" : "misaligned",
+                timingSyncScore: segAnalysis.alignmentScore || 0,
+                expectedSlideNumber: segAnalysis.expectedSlideNumber,
+                misalignmentReason:
+                  segAnalysis.timingDeviation > 0
+                    ? `Timing deviation: ${segAnalysis.timingDeviation}s`
+                    : null,
+              },
+              { transaction },
+            );
+          } catch (upsertError) {
+            console.error(`   ❌ Failed to upsert detail tables: ${upsertError.message}`);
+          }
         }
 
         console.log(
@@ -604,13 +712,14 @@ const analysisComplete = async (req, res) => {
       }
     }
 
+    // Commit transaction before marking job completed to release locks
+    await transaction.commit();
+
     // Mark job as completed
     await jobService.markJobCompleted(jobId, {
       analysisCreated: true,
       segmentAnalysisCount: analysis?.segmentAnalyses?.length || 0,
     });
-
-    await transaction.commit();
 
     console.log(`✅ Analysis webhook processed successfully for job ${jobId}`);
 
@@ -864,9 +973,6 @@ const reportComplete = async (req, res) => {
 
     // Debug: Log segmentAnalyses info
     console.log(`📊 segmentAnalyses: ${segmentAnalyses ? segmentAnalyses.length : 0} items`);
-    if (segmentAnalyses && segmentAnalyses.length > 0) {
-      console.log(`   - First segmentId: ${segmentAnalyses[0].segmentId}`);
-    }
 
     let responseData = {
       jobId,
@@ -958,17 +1064,11 @@ const reportComplete = async (req, res) => {
       responseData.overallScore = report?.summary?.overallScore;
     }
 
-    // Update presentation status to completed (skip in test mode if not exists)
-    try {
-      await reportService.completePresentation(presentationId, transaction);
-    } catch (error) {
-      if (process.env.NODE_ENV !== "test") {
-        throw error;
-      }
-      console.log(
-        `⚠️ Skipping presentation update in test mode: ${error.message}`,
-      );
-    }
+    // Update presentation status is already handled correctly by jobService when jobType is 'report'.
+    // We do NOT use reportService.completePresentation here to avoid deadlocks with markJobCompleted.
+    
+    // Commit transaction to release any table locks before marking job completed
+    await transaction.commit();
 
     // Mark job as completed with metadata
     try {
@@ -982,8 +1082,6 @@ const reportComplete = async (req, res) => {
       console.error(`⚠️ Failed to mark job completed:`, jobError.message);
       // Don't fail request - report already saved
     }
-
-    await transaction.commit();
 
     console.log(`✅ Report webhook processed successfully for job ${jobId}`);
 
@@ -1234,6 +1332,27 @@ async function saveSpeechQualityAnalysis(
       }
     });
 
+    // === DEBUG LOG ===
+    console.log("=== DEBUG SpeechQualityAnalysis data ===");
+    console.log("overallScores:", JSON.stringify(overallScores));
+    console.log("speechAnalysisData after cleanup:", JSON.stringify(speechAnalysisData));
+    // Check if all scores are undefined/null
+    const hasAnyScore =
+      speechAnalysisData.fluencyScore != null ||
+      speechAnalysisData.clarityScore != null ||
+      speechAnalysisData.confidenceScore != null ||
+      speechAnalysisData.overallScore != null;
+    console.log("hasAnyScore:", hasAnyScore);
+    console.log("===========================================");
+
+    // If no speech quality scores available, skip this analysis entirely
+    if (!hasAnyScore) {
+      console.log(
+        `⚠️ No speech quality scores available, skipping SpeechQualityAnalysis for presentation ${presentationId}`,
+      );
+      return null;
+    }
+
     const step1Time = Date.now();
     const [speechAnalysis, created] = await SpeechQualityAnalysis.upsert(
       speechAnalysisData,
@@ -1243,7 +1362,24 @@ async function saveSpeechQualityAnalysis(
       },
     );
 
-    const speechAnalysisId = speechAnalysis.id;
+    // MySQL often does not populate instance.id from upsert; reload row so FKs are valid
+    let speechAnalysisId = speechAnalysis?.id;
+    console.log("speechAnalysis.id from upsert:", speechAnalysis?.id);
+
+    if (speechAnalysisId == null) {
+      const row = await SpeechQualityAnalysis.findOne({
+        where: { presentationId, jobId },
+        order: [["id", "DESC"]],
+        transaction,
+      });
+      speechAnalysisId = row?.id;
+      console.log("speechAnalysisId from findOne:", speechAnalysisId);
+    }
+    if (speechAnalysisId == null) {
+      throw new Error(
+        "SpeechQualityAnalysis upsert did not yield id; cannot save hesitation patterns",
+      );
+    }
     console.log(
       `${created ? "Created" : "Updated"} speech quality analysis with ID: ${speechAnalysisId} (${Date.now() - step1Time}ms)`,
     );
@@ -1254,29 +1390,58 @@ async function saveSpeechQualityAnalysis(
     let totalHesitationCount = 0;
     let totalHesitationTime = 0;
 
+    console.log("segmentAnalyses count:", segmentAnalyses?.length ?? 0);
+
     if (segmentAnalyses && segmentAnalyses.length > 0) {
       console.log(
         `📊 Processing ${segmentAnalyses.length} segments for batch insert`,
       );
 
       for (const segment of segmentAnalyses) {
+        // === DEBUG: log each segment's speech quality ===
+        if (segment.speechQuality) {
+          console.log(
+            `  Segment ${segment.segmentId}: hesitationPatterns=${segment.speechQuality.hesitationPatterns?.length ?? 0}, hesitationCount=${segment.speechQuality.hesitationCount}, totalHesitationTime=${segment.speechQuality.totalHesitationTime}`,
+          );
+        } else {
+          console.log(`  Segment ${segment.segmentId}: NO speechQuality data`);
+        }
+
         // Collect hesitation patterns for batch insert
         if (segment.speechQuality && segment.speechQuality.hesitationPatterns) {
           for (const pattern of segment.speechQuality.hesitationPatterns) {
+            const startTime = pattern.startTime ?? pattern.start_time;
+            const endTime = pattern.endTime ?? pattern.end_time;
+            const duration = pattern.duration;
+            const patternType = pattern.type ?? pattern.patternType ?? pattern.pattern_type;
+            const confidence = pattern.confidence;
+            if (
+              startTime == null ||
+              endTime == null ||
+              duration == null ||
+              patternType == null ||
+              confidence == null
+            ) {
+              console.warn(
+                "⚠️ Skipping hesitation pattern with missing required fields:",
+                JSON.stringify(pattern),
+              );
+              continue;
+            }
             hesitationPatternsData.push({
               speechAnalysisId: speechAnalysisId,
               segmentId: segment.segmentId,
-              startTime: pattern.startTime,
-              endTime: pattern.endTime,
-              duration: pattern.duration,
-              patternType: pattern.type,
-              confidence: pattern.confidence,
-              description: pattern.description,
+              startTime,
+              endTime,
+              duration,
+              patternType,
+              confidence,
+              description: pattern.description ?? null,
               segmentText: segment.segmentText || null,
             });
 
             totalHesitationCount++;
-            totalHesitationTime += pattern.duration;
+            totalHesitationTime += Number(duration);
           }
         }
 
@@ -1321,6 +1486,16 @@ async function saveSpeechQualityAnalysis(
         }
       }
 
+      // === DEBUG before inserts ===
+      console.log(`hesitationPatternsData.length: ${hesitationPatternsData.length}`);
+      console.log(`segmentQualityData.length: ${segmentQualityData.length}`);
+      if (hesitationPatternsData.length > 0) {
+        console.log("First hesitation pattern sample:", JSON.stringify(hesitationPatternsData[0]));
+      }
+      if (segmentQualityData.length > 0) {
+        console.log("First segment quality sample:", JSON.stringify(segmentQualityData[0]));
+      }
+
       // Batch insert hesitation patterns
       const step2Time = Date.now();
       if (hesitationPatternsData.length > 0) {
@@ -1334,6 +1509,8 @@ async function saveSpeechQualityAnalysis(
         console.log(
           `✅ Hesitation patterns inserted (${Date.now() - step2Time}ms)`,
         );
+      } else {
+        console.log("⚠️ No hesitation patterns to insert (hesitationPatternsData is empty)");
       }
 
       // Batch process segment quality data with timing info

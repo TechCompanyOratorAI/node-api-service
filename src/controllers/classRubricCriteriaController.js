@@ -59,6 +59,9 @@ class ClassRubricCriteriaController {
         });
       }
 
+      // Force maxScore to always be 100
+      req.body.maxScore = 100;
+
       const userId = req.user?.userId;
       const result = await classRubricCriteriaService.createCustomCriterion(
         parseInt(classId),
@@ -102,6 +105,11 @@ class ClassRubricCriteriaController {
           success: false,
           message: "ID criteria không hợp lệ",
         });
+      }
+
+      // Force maxScore to always be 100
+      if (req.body.maxScore !== undefined) {
+        req.body.maxScore = 100;
       }
 
       const result = await classRubricCriteriaService.updateCriterion(

@@ -84,25 +84,31 @@ class ReportService {
       let segmentDataToCreate = [];
 
       if (analysisResult && segmentAnalyses && segmentAnalyses.length > 0) {
+        // Pre-fetch all slides for this presentation to avoid N+1 queries in the loop
+        const slides = await Slide.findAll({
+          where: { presentationId: presentationId },
+          transaction
+        });
+        const slideNumberMap = {};
+        const slideIdMap = {};
+        slides.forEach(s => {
+          if (s.slideNumber !== null) slideNumberMap[s.slideNumber] = s.slideId;
+          if (s.slideId !== null) slideIdMap[s.slideId] = s.slideId;
+        });
+
         // First, prepare all segment data with validation (without saving yet)
         for (const segment of segmentAnalyses) {
           try {
-            // Validate slideId - only use if valid (exists in Slides table)
-            let slideIdToUse = segment.bestMatchingSlide || segment.slideId || null;
+            // bestMatchingSlide from AI is SLIDE NUMBER, not slideId
+            // We need to find the actual slideId using slideNumber
+            let slideIdToUse = null;
 
-            // If slideId is provided, validate it exists in Slides table
-            if (slideIdToUse) {
-              const slide = await Slide.findOne({
-                where: {
-                  presentationId: presentationId,
-                  slideId: slideIdToUse
-                },
-                transaction
-              });
-              if (!slide) {
-                console.log(`   ⚠️ Slide ${slideIdToUse} not found for segment ${segment.segmentId}, setting to null`);
-                slideIdToUse = null;
-              }
+            if (segment.bestMatchingSlide && slideNumberMap[segment.bestMatchingSlide]) {
+              slideIdToUse = slideNumberMap[segment.bestMatchingSlide];
+            } else if (segment.bestMatchingSlide) {
+              console.log(`   ⚠️ Slide with number ${segment.bestMatchingSlide} not found for segment ${segment.segmentId}, setting to null`);
+            } else if (segment.slideId && slideIdMap[segment.slideId]) {
+              slideIdToUse = slideIdMap[segment.slideId];
             }
 
             segmentDataToCreate.push({
@@ -122,29 +128,30 @@ class ReportService {
         }
         console.log(`✅ Prepared ${processedSegments} segments for processing`);
 
-        // 3. Sử dụng upsert để insert or update - KHÔNG xóa dữ liệu cũ
-        // Điều này giữ nguyên data cũ nếu insert fail
+        // 3. Sử dụng bulkCreate với updateOnDuplicate để xử lý nhanh và tránh block table lâu
+        // Điều này giúp fix lỗi lock wait timeout do transaction kéo dài quá 50s
         let createdSegments = 0;
         let upsertErrors = 0;
         
-        for (const segData of segmentDataToCreate) {
-          try {
-            // Use upsert to avoid data loss
-            await SegmentAnalysis.upsert(
-              {
-                segmentId: segData.segmentId,
-                slideId: segData.slideId,
-                analyzedAt: segData.analyzedAt,
-              },
-              { transaction }
-            );
-            createdSegments++;
-          } catch (segmentError) {
-            upsertErrors++;
-            console.error(
-              `⚠️ Error upserting segment ${segData.segmentId}: ${segmentError.message}`,
-            );
+        try {
+          // Prepare exact objects for SegmentAnalysis table
+          const recordsToBulkCreate = segmentDataToCreate.map(segData => ({
+             segmentId: segData.segmentId,
+             slideId: segData.slideId,
+             analyzedAt: segData.analyzedAt,
+             analysisResultId: analysisResult.resultId
+          }));
+          
+          if (recordsToBulkCreate.length > 0) {
+            await SegmentAnalysis.bulkCreate(recordsToBulkCreate, {
+               transaction,
+               updateOnDuplicate: ['slideId', 'analyzedAt']
+            });
+            createdSegments = recordsToBulkCreate.length;
           }
+        } catch (error) {
+           console.error(`⚠️ Error bulk upserting segments: ${error.message}`);
+           upsertErrors = segmentDataToCreate.length;
         }
         console.log(`✅ Successfully upserted ${createdSegments} segments (${upsertErrors} errors)`);
       } else {
