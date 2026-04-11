@@ -1,6 +1,6 @@
 import db from '../models/index.js';
 
-const { Course, Topic, User, Presentation, Enrollment, CourseInstructor } = db;
+const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class } = db;
 
 class CourseService {
     // Create new course (with multi-instructor support)
@@ -112,69 +112,97 @@ class CourseService {
 
             const offset = (page - 1) * limit;
 
-            // Build where clause for Course table
-            const where = {};
-            if (semester) where.semester = semester;
-            if (academicYear) where.academicYear = academicYear;
-            if (departmentId) where.departmentId = departmentId;
-            if (majorCode) where.majorCode = majorCode;
-            // Default to active courses only if not specified (for student access)
-            if (isActive !== undefined) {
-                where.isActive = isActive;
-            } else {
-                where.isActive = true;
-            }
+    // Build where clause for Course table
+    const where = {};
+    if (semester) where.semester = semester;
+    if (academicYear) where.academicYear = academicYear;
+    if (departmentId) where.departmentId = departmentId;
+    if (majorCode) where.majorCode = majorCode;
+    // Default to active courses only if not specified (for student access)
+    if (isActive !== undefined) {
+        where.isActive = isActive;
+    } else {
+        where.isActive = true;
+    }
 
-            // Search in course code or name
-            if (search) {
-                where[db.Sequelize.Op.or] = [
-                    { courseCode: { [db.Sequelize.Op.like]: `%${search}%` } },
-                    { courseName: { [db.Sequelize.Op.like]: `%${search}%` } }
-                ];
-            }
+    // Search in course code or name
+    if (search) {
+        where[db.Sequelize.Op.or] = [
+            { courseCode: { [db.Sequelize.Op.like]: `%${search}%` } },
+            { courseName: { [db.Sequelize.Op.like]: `%${search}%` } }
+        ];
+    }
 
-            // Build instructors include with optional filter
-            const instructorsInclude = {
-                model: User,
-                as: 'instructors',
-                attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
-                through: { attributes: ['assignedAt', 'assignedBy'] },
+    // Build instructors include with optional filter
+    const instructorsInclude = {
+        model: User,
+        as: 'instructors',
+        attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
+        through: { attributes: ['assignedAt', 'assignedBy'] },
+        required: false
+    };
+
+    // If filtering by instructorId, add where clause to instructor join
+    if (instructorId) {
+        instructorsInclude.where = { userId: instructorId };
+        instructorsInclude.required = true;
+    }
+
+    const { count, rows: courses } = await Course.findAndCountAll({
+        where,
+        include: [
+            instructorsInclude,
+            {
+                model: Topic,
+                as: 'topics',
+                attributes: ['topicId', 'topicName', 'sequenceNumber'],
                 required: false
-            };
-
-            // If filtering by instructorId, add where clause to instructor join
-            if (instructorId) {
-                instructorsInclude.where = { userId: instructorId };
-                instructorsInclude.required = true;
             }
+        ],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        order: [[sortBy, sortOrder]],
+        distinct: true
+    });
 
-            const { count, rows: courses } = await Course.findAndCountAll({
-                where,
-                include: [
-                    instructorsInclude,
-                    {
-                        model: Topic,
-                        as: 'topics',
-                        attributes: ['topicId', 'topicName', 'sequenceNumber'],
-                        required: false
-                    }
-                ],
-                limit: parseInt(limit),
-                offset: parseInt(offset),
-                order: [[sortBy, sortOrder]],
-                distinct: true
-            });
+    // Count active classes per course (status=active AND endDate >= today)
+    const now = new Date();
+    const courseIds = courses.map(c => c.courseId);
+    const activeClassCounts = {};
+    if (courseIds.length > 0) {
+        const activeClasses = await Class.findAll({
+            attributes: [
+                'courseId',
+                [db.sequelize.fn('COUNT', db.sequelize.col('classId')), 'activeCount']
+            ],
+            where: {
+                courseId: courseIds,
+                status: 'active',
+                endDate: { [db.Sequelize.Op.gte]: now }
+            },
+            group: ['courseId']
+        });
+        activeClasses.forEach(c => {
+            activeClassCounts[c.courseId] = parseInt(c.get('activeCount'), 10);
+        });
+    }
 
-            return {
-                success: true,
-                data: courses,
-                pagination: {
-                    total: count,
-                    page: parseInt(page),
-                    limit: parseInt(limit),
-                    totalPages: Math.ceil(count / limit)
-                }
-            };
+    const coursesWithStats = courses.map(course => {
+        const json = course.toJSON();
+        json.totalActiveClasses = activeClassCounts[course.courseId] || 0;
+        return json;
+    });
+
+    return {
+        success: true,
+        data: coursesWithStats,
+        pagination: {
+            total: count,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(count / limit)
+        }
+    };
         } catch (error) {
             console.error('Get all courses error:', error);
             return {

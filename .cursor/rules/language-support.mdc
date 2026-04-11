@@ -1,0 +1,152 @@
+---
+description: Language support - English and Vietnamese only (NO Chinese)
+alwaysApply: true
+---
+
+# Ngôn Ngữ Hỗ Trợ / Supported Languages
+
+## ⚠️ QUAN TRỌNG / IMPORTANT
+
+### KHÔNG sử dụng tiếng Trung (Chinese)
+- **NGHIÊM CẤM / STRICTLY PROHIBITED**: Trả lời bằng tiếng Trung Quốc (Simplified hoặc Traditional Chinese)
+- Chỉ được sử dụng **tiếng Anh (English)** và **tiếng Việt (Vietnamese)**
+- Nếu cần dịch, chỉ dịch giữa **EN ↔ VI**
+
+### 强制规定 / Strict Rules
+- ❌ 禁止使用中文回复 / NO Chinese responses
+- ✅ 仅使用英文和越南文 / English and Vietnamese ONLY
+- ⚠️ 如需翻译，请使用 EN ↔ VI / For translation, use EN ↔ VI
+
+## Tổ Quan / Overview
+
+Dự án này hỗ trợ **tiếng Anh (English)** và **tiếng Việt (Vietnamese)** làm ngôn ngữ giao tiếp và tài liệu.
+
+This project supports **English** and **Vietnamese** as communication and documentation languages.
+
+## Nguyên Tắc / Principles
+
+### 1. Giao Tiếp / Communication
+
+- **Trong code và tài liệu / In code and documentation**: Sử dụng **tiếng Anh** cho:
+  - Tên biến, hàm, class (Variable, function, class names)
+  - Comment trong code (Code comments)
+  - Tài liệu API (API documentation)
+  - README và tài liệu kỹ thuật (Technical documentation)
+
+- **Trong giao tiếp với người dùng / User communication**: Hỗ trợ cả hai ngôn ngữ:
+  - API messages và error responses
+  - Validation messages
+  - User-facing notifications
+
+### 2. Viết Tắt Quốc Tế / International Abbreviations
+
+Sử dụng các viết tắt quốc tế phổ biến:
+
+| Tiếng Việt | Tiếng Anh | Giải thích |
+|------------|-----------|------------|
+| API | API | Application Programming Interface |
+| CRUD | CRUD | Create, Read, Update, Delete |
+| DB | DB | Database |
+| ID | ID | Identifier |
+| UUID | UUID | Universal Unique Identifier |
+| JSON | JSON | JavaScript Object Notation |
+| HTTP | HTTP | HyperText Transfer Protocol |
+| URL | URL | Uniform Resource Locator |
+| req | req | Request |
+| res | res | Response |
+| err | err | Error |
+| config | config | Configuration |
+| auth | auth | Authentication |
+
+### 3. Định Dạng Ngày Tháng / Date Format
+
+- **Mặc định / Default**: ISO 8601 (`YYYY-MM-DD`) cho dữ liệu
+- **Hiển thị / Display**: Hỗ trợ cả `DD/MM/YYYY` (Việt Nam) và `MM/DD/YYYY` (US)
+- **Múi giờ / Timezone**: Sử dụng **Asia/Ho_Chi_Minh (UTC+7)** - giờ Việt Nam
+
+### 4. Validation Messages
+
+** Ví dụ / Example**:
+
+```javascript
+// ✅ Đúng / Correct
+const validationMessages = {
+  required: {
+    en: 'This field is required',
+    vi: 'Trường này là bắt buộc'
+  },
+  email: {
+    en: 'Please enter a valid email address',
+    vi: 'Vui lòng nhập địa chỉ email hợp lệ'
+  },
+  minLength: {
+    en: 'Must be at least {min} characters',
+    vi: 'Phải có ít nhất {min} ký tự'
+  }
+};
+```
+
+### 5. Error Responses
+
+API responses nên hỗ trợ đa ngôn ngữ:
+
+```javascript
+// ✅ Đúng / Correct
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": {
+      "en": "Validation failed",
+      "vi": "Xác thực thất bại"
+    },
+    "details": [...]
+  }
+}
+```
+
+### 6. Logging
+
+- Sử dụng **tiếng Anh** cho log messages
+- Dễ dàng debug và search trên internet
+
+```javascript
+// ✅ Đúng / Correct
+logger.info('User logged in successfully', { userId, timestamp });
+logger.error('Failed to connect to database', { error: err.message });
+
+// ❌ Sai / Incorrect
+logger.info('Người dùng đăng nhập thành công');
+```
+
+### 7. Database Schema
+
+- Tên bảng và cột: **tiếng Anh** (`user_id`, `created_at`, `is_active`)
+- Comments: Có thể dùng **tiếng Việt** để giải thích (nếu cần)
+
+### 8. Git Commit Messages
+
+- **Khuyến khích / Recommended**: Sử dụng **tiếng Anh**
+- Tuy nhiên, có thể dùng **tiếng Việt** nếu cần thiết
+
+```bash
+# ✅ Đúng / Correct
+git commit -m "feat: add user authentication module"
+git commit -m "fix: resolve login timeout issue"
+
+// ✅ Cũng được chấp nhận / Also acceptable
+git commit -m "feat: thêm module xác thực người dùng"
+```
+
+## Tóm Tắt / Summary
+
+| Ngữ cảnh / Context | Ngôn ngữ / Language |
+|-------------------|---------------------|
+| Code, functions, variables | English |
+| Code comments | English (hoặc/or Vietnamese nếu cần) |
+| API documentation | English |
+| Error messages (API) | English + Vietnamese |
+| Validation messages | English + Vietnamese |
+| Logs | English |
+| README, docs | English (có thể có translation) |
+| Git commit | English (khuyến khích/recommended) |
