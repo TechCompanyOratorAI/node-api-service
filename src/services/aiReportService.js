@@ -11,6 +11,7 @@ import {
 import { Op } from "sequelize";
 import db from "../models";
 import queueService from "../services/queueService";
+import classGradeSyncService from "./classGradeSyncService";
 
 const VALID_REPORT_STATUSES = [
   "waiting",
@@ -398,6 +399,16 @@ class AIReportService {
         feedbackOfInstructor: feedbackOfInstructor,
         gradeForInstructor: gradeForInstructor,
       });
+
+      // Dong bo finalGrade vao Enrollment sau khi confirm
+      // studentId nam trong Presentation, khong nam trong AIReport
+      const presentation = await Presentation.findByPk(report.presentationId, {
+        attributes: ["studentId"],
+      });
+      await classGradeSyncService.syncEnrollmentFinalGrade(
+        report.classId,
+        presentation ? presentation.studentId : null
+      );
 
       return {
         success: true,

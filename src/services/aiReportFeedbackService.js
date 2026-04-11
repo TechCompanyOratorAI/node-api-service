@@ -1,4 +1,5 @@
-const { CriterionFeedback, AIReport, User, ClassRubricCriteria } = require("../models");
+const { CriterionFeedback, AIReport, User, ClassRubricCriteria, Presentation } = require("../models");
+const classGradeSyncService = require("./classGradeSyncService");
 
 class CriterionFeedbackService {
   async create(reportId, data, instructorId) {
@@ -47,6 +48,14 @@ class CriterionFeedbackService {
 
       await transaction.commit();
 
+      // Dong bo finalGrade sau khi tao feedback
+      const presentation = await Presentation.findByPk(report.presentationId, {
+        attributes: ["studentId"],
+      });
+      if (presentation) {
+        await classGradeSyncService.syncEnrollmentFinalGrade(report.classId, presentation.studentId);
+      }
+
       const created = await CriterionFeedback.findByPk(feedback.criterionFeedbackId, {
         include: [
           { model: User, as: "instructor", attributes: ["userId", "firstName", "lastName", "email"] },
@@ -71,21 +80,46 @@ class CriterionFeedbackService {
         return { success: false, message: "AI report không tìm thấy", code: "NOT_FOUND" };
       }
 
-      await CriterionFeedback.upsert(
-        {
-          reportId: parseInt(reportId),
-          classRubricCriteriaId: parseInt(classRubricCriteriaId),
-          instructorId,
-          ...(data.score !== undefined ? { score: data.score } : {}),
-          ...(data.comment !== undefined ? { comment: data.comment } : {}),
-        },
-        { transaction }
-      );
+      const rid = parseInt(reportId, 10);
+      const cid = parseInt(classRubricCriteriaId, 10);
+
+      // findOne + update/create is reliable on MySQL; Model.upsert() inserts duplicates if UNIQUE index is missing
+      const existing = await CriterionFeedback.findOne({
+        where: { reportId: rid, classRubricCriteriaId: cid },
+        transaction,
+      });
+
+      const payload = {
+        instructorId,
+        ...(data.score !== undefined ? { score: data.score } : {}),
+        ...(data.comment !== undefined ? { comment: data.comment } : {}),
+      };
+
+      if (existing) {
+        await existing.update(payload, { transaction });
+      } else {
+        await CriterionFeedback.create(
+          {
+            reportId: rid,
+            classRubricCriteriaId: cid,
+            ...payload,
+          },
+          { transaction }
+        );
+      }
 
       await transaction.commit();
 
+      // Dong bo finalGrade sau khi upsert feedback (vi score cua instructor co the thay doi)
+      const presentation = await Presentation.findByPk(report.presentationId, {
+        attributes: ["studentId"],
+      });
+      if (presentation) {
+        await classGradeSyncService.syncEnrollmentFinalGrade(report.classId, presentation.studentId);
+      }
+
       const updated = await CriterionFeedback.findOne({
-        where: { reportId: parseInt(reportId), classRubricCriteriaId: parseInt(classRubricCriteriaId) },
+        where: { reportId: rid, classRubricCriteriaId: cid },
         include: [
           { model: User, as: "instructor", attributes: ["userId", "firstName", "lastName", "email"] },
           { model: ClassRubricCriteria, as: "classRubricCriteria", attributes: ["classRubricCriteriaId", "criteriaName", "maxScore"] },
@@ -102,12 +136,28 @@ class CriterionFeedbackService {
 
   async delete(reportId, classRubricCriteriaId) {
     try {
+      // Lay thong tin report truoc khi xoa de biet studentId va classId
+      const report = await AIReport.findByPk(parseInt(reportId, 10), {
+        attributes: ["reportId", "classId", "presentationId"],
+      });
+      if (!report) {
+        return { success: false, message: "AI report không tìm thấy", code: "NOT_FOUND" };
+      }
+
       const deleted = await CriterionFeedback.destroy({
-        where: { reportId: parseInt(reportId), classRubricCriteriaId: parseInt(classRubricCriteriaId) },
+        where: { reportId: parseInt(reportId, 10), classRubricCriteriaId: parseInt(classRubricCriteriaId, 10) },
       });
 
       if (!deleted) {
         return { success: false, message: "Criterion feedback không tìm thấy", code: "NOT_FOUND" };
+      }
+
+      // Dong bo finalGrade sau khi xoa feedback
+      const presentation = await Presentation.findByPk(report.presentationId, {
+        attributes: ["studentId"],
+      });
+      if (presentation) {
+        await classGradeSyncService.syncEnrollmentFinalGrade(report.classId, presentation.studentId);
       }
 
       return { success: true, message: "Đã xóa feedback của criteria" };
