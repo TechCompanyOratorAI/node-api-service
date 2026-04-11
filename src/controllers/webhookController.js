@@ -974,10 +974,12 @@ const reportComplete = async (req, res) => {
 
     // Handle failure status
     if (status === "failed") {
+      // shouldRetry = false: report failures should NOT re-queue the semantic job.
+      // The report worker has its own retry mechanism via SQS visibility timeout.
       await jobService.markJobFailed(
         jobId,
         error || "Report generation failed",
-        true,
+        false,   // ← do NOT retry – prevents semantic job from being re-queued
       );
       await transaction.commit();
 
