@@ -99,6 +99,7 @@ const verifyWebhookAuth = (req, res, next) => {
  */
 const asrComplete = async (req, res) => {
   const transaction = await db.sequelize.transaction();
+  let transactionCommitted = false;
 
   try {
     const { jobId, presentationId, status, error, transcript, diarization } =
@@ -110,13 +111,7 @@ const asrComplete = async (req, res) => {
 
     // Validate required fields
     if (!jobId || !presentationId || !status) {
-      if (transaction && !transaction.finished) {
-        try {
-          await transaction.rollback();
-        } catch (rollbackError) {
-          console.error("❌ Transaction rollback failed:", rollbackError);
-        }
-      }
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: "Missing required fields: jobId, presentationId, status",
@@ -128,13 +123,6 @@ const asrComplete = async (req, res) => {
     try {
       job = await jobService.getJobById(jobId);
     } catch (jobError) {
-      if (transaction && !transaction.finished) {
-        try {
-          await transaction.rollback();
-        } catch (rollbackError) {
-          console.error("❌ Transaction rollback failed:", rollbackError);
-        }
-      }
       console.error(`⚠️ Job not found: ${jobId}`);
 
       // Still process the webhook data even if job record is missing
@@ -165,6 +153,7 @@ const asrComplete = async (req, res) => {
       );
 
       await transaction.commit();
+      transactionCommitted = true;
 
       return res.json({
         success: true,
@@ -246,10 +235,18 @@ const asrComplete = async (req, res) => {
         `✅ Created transcript with ${createdSegments.length} segments`,
       );
 
-      // Commit transcript and segments immediately to avoid timeout rollback
+      // Commit transcript and segments
       await transaction.commit();
+      transactionCommitted = true;
       console.log(`✅ Transcript transaction committed`);
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // EVERYTHING BELOW runs AFTER transaction is committed.
+    // All operations here have their own error handling and will NOT
+    // propagate to the main catch block (which would try to rollback
+    // the already-committed transaction).
+    // ═══════════════════════════════════════════════════════════════
 
     // Process diarization if available (outside main transaction)
     if (
@@ -310,7 +307,6 @@ const asrComplete = async (req, res) => {
     // Enqueue semantic job for py-semantic-worker
     try {
       // Get audio filename for speech quality analysis
-      // console.log(`🔍 DEBUG: Fetching presentation ${presentationId} with audioRecord...`);
       const presentation = await Presentation.findByPk(presentationId, {
         include: ["audioRecord"],
       });
@@ -337,12 +333,6 @@ const asrComplete = async (req, res) => {
       } else {
         s3AudioKey = presentation?.audioRecord?.fileName || null;
       }
-      
-      // console.log(`🔍 DEBUG: audioFilename extracted:`, {
-      //   audioFilename: s3AudioKey,
-      //   type: typeof s3AudioKey,
-      //   isNull: s3AudioKey === null,
-      // });
       
       const semanticJobMetadata = {
         transcriptSegments: transcript?.segments?.length || 0,
@@ -407,14 +397,12 @@ const asrComplete = async (req, res) => {
       },
     });
   } catch (error) {
-    // Only rollback if transaction is still pending (not committed yet)
-    if (!transaction.finished) {
-      if (transaction && !transaction.finished) {
-        try {
-          await transaction.rollback();
-        } catch (rollbackError) {
-          console.error("❌ Transaction rollback failed:", rollbackError);
-        }
+    // Only rollback if transaction has NOT been committed yet
+    if (!transactionCommitted) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error("❌ Transaction rollback failed:", rollbackError);
       }
     }
     console.error("❌ ASR webhook error:", error);
