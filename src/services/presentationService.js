@@ -149,12 +149,14 @@ class PresentationService {
 
       const groupMembership = await GroupStudent.findOne({
         where: { studentId },
-        include: [{
-          model: Group,
-          as: "group",
-          where: { classId },
-          attributes: ["groupId"],
-        }],
+        include: [
+          {
+            model: Group,
+            as: "group",
+            where: { classId },
+            attributes: ["groupId"],
+          },
+        ],
       });
 
       if (groupMembership) {
@@ -170,7 +172,8 @@ class PresentationService {
         if (!groupTopicEnrollment) {
           return {
             success: false,
-            message: "Nh\u00f3m ch\u01b0a ch\u1ecdn topic n\u00e0y. Tr\u01b0\u1edfng nh\u00f3m c\u1ea7n ch\u1ecdn topic tr\u01b0\u1edbc khi t\u1ea1o b\u00e0i thuy\u1ebft tr\u00ecnh",
+            message:
+              "Nh\u00f3m ch\u01b0a ch\u1ecdn topic n\u00e0y. Tr\u01b0\u1edfng nh\u00f3m c\u1ea7n ch\u1ecdn topic tr\u01b0\u1edbc khi t\u1ea1o b\u00e0i thuy\u1ebft tr\u00ecnh",
           };
         }
       } else {
@@ -212,11 +215,11 @@ class PresentationService {
 
   async uploadSlide({ presentationId, studentId, slideNumber, file }) {
     const transaction = await db.sequelize.transaction();
-    
+
     try {
       const accessResult = await this.getPresentationForStudent(
         presentationId,
-        studentId
+        studentId,
       );
       if (!accessResult.success) {
         await transaction.rollback();
@@ -225,14 +228,11 @@ class PresentationService {
 
       const presentation = accessResult.presentation;
 
-      // When uploading a new slide for existing presentation, 
-      // clear old slides and analysis data to keep only the latest
-      console.log(`🧹 Clearing old slides and analysis data for presentation ${presentationId} to keep only latest`);
-      
+
       // Get existing slides to delete their files from storage
       const existingSlides = await Slide.findAll({
         where: { presentationId },
-        transaction
+        transaction,
       });
 
       // Delete old slide files from storage
@@ -244,47 +244,48 @@ class PresentationService {
             const url = new URL(oldSlide.filePath);
             const key = url.pathname.substring(1); // Remove leading slash
             await storageService.deleteFile(key);
-            console.log(`🗑️ Deleted old slide file: ${key}`);
           }
         } catch (deleteError) {
-          console.warn(`⚠️ Failed to delete old slide file ${oldSlide.filePath}:`, deleteError);
+          console.warn(
+            `⚠️ Failed to delete old slide file ${oldSlide.filePath}:`,
+            deleteError,
+          );
           // Continue even if file deletion fails
         }
       }
 
       // Clear segment analyses related to this presentation
       await SegmentAnalysis.destroy({
-        where: { 
+        where: {
           segmentId: {
             [db.Sequelize.Op.in]: db.sequelize.literal(`
               (SELECT ts.segmentId FROM TranscriptSegments ts 
                JOIN Transcripts t ON ts.transcriptId = t.transcriptId 
                WHERE t.presentationId = ${presentationId})
-            `)
-          }
+            `),
+          },
         },
-        transaction
+        transaction,
       });
 
       // Clear analysis results for this presentation
       await AnalysisResult.destroy({
         where: { presentationId },
-        transaction
+        transaction,
       });
 
       // Clear feedback for this presentation
       await Feedback.destroy({
         where: { presentationId },
-        transaction
+        transaction,
       });
 
       // Delete old slides from database
       await Slide.destroy({
         where: { presentationId },
-        transaction
+        transaction,
       });
 
-      console.log(`✅ Cleared old slides and analysis data for presentation ${presentationId}`);
 
       // Detect number of pages in the file
       const pageCount = await detectPageCount(file.buffer, file.mimetype);
@@ -293,14 +294,11 @@ class PresentationService {
       // slideNumber represents the number of pages in this slide file
       const finalSlideNumber = slideNumber || pageCount;
 
-      console.log(
-        `📄 Detected ${pageCount} pages in file, using slideNumber: ${finalSlideNumber}`
-      );
 
       const extension = path.extname(file.originalname || "");
       const uniqueSuffix = crypto.randomBytes(6).toString("hex");
       const safeName = sanitizeFileName(
-        file.originalname || `slide-${finalSlideNumber}${extension}`
+        file.originalname || `slide-${finalSlideNumber}${extension}`,
       );
       const key = `presentations/${presentation.presentationId}/slides/${finalSlideNumber}-${uniqueSuffix}-${safeName}`;
 
@@ -310,15 +308,18 @@ class PresentationService {
         contentType: file.mimetype,
       });
 
-      const slide = await Slide.create({
-        presentationId: presentation.presentationId,
-        slideNumber: finalSlideNumber,
-        filePath: uploadResult.url,
-        fileName: file.originalname,
-        fileFormat: file.mimetype,
-        fileSizeBytes: file.size,
-        uploadedAt: new Date(),
-      }, { transaction });
+      const slide = await Slide.create(
+        {
+          presentationId: presentation.presentationId,
+          slideNumber: finalSlideNumber,
+          filePath: uploadResult.url,
+          fileName: file.originalname,
+          fileFormat: file.mimetype,
+          fileSizeBytes: file.size,
+          uploadedAt: new Date(),
+        },
+        { transaction },
+      );
 
       await transaction.commit();
 
@@ -334,10 +335,7 @@ class PresentationService {
             pageCount: pageCount, // Also include detected page count
             fileName: file.originalname,
             fileFormat: file.mimetype,
-          }
-        );
-        console.log(
-          `✅ Created slides job ${job.jobId} for slide ${slide.slideId} (${pageCount} pages) - old data cleared`
+          },
         );
       } catch (jobError) {
         // Log error but don't fail the upload
@@ -367,7 +365,7 @@ class PresentationService {
     try {
       const accessResult = await this.getPresentationForStudent(
         presentationId,
-        studentId
+        studentId,
       );
       if (!accessResult.success) {
         return accessResult;
@@ -377,7 +375,7 @@ class PresentationService {
       const extension = path.extname(file.originalname || "");
       const uniqueSuffix = crypto.randomBytes(6).toString("hex");
       const safeName = sanitizeFileName(
-        file.originalname || `media${extension}`
+        file.originalname || `media${extension}`,
       );
       const key = `presentations/${
         presentation.presentationId
@@ -420,7 +418,7 @@ class PresentationService {
       if (durationSeconds && !presentation.durationSeconds) {
         await Presentation.update(
           { durationSeconds },
-          { where: { presentationId: presentation.presentationId } }
+          { where: { presentationId: presentation.presentationId } },
         );
       }
 
@@ -453,12 +451,14 @@ class PresentationService {
 
       const groupMembership = await GroupStudent.findOne({
         where: { studentId },
-        include: [{
-          model: Group,
-          as: "group",
-          where: { classId: presentation.classId },
-          attributes: ["groupId"],
-        }],
+        include: [
+          {
+            model: Group,
+            as: "group",
+            where: { classId: presentation.classId },
+            attributes: ["groupId"],
+          },
+        ],
       });
 
       if (groupMembership) {
@@ -479,7 +479,11 @@ class PresentationService {
       } else {
         // Individual fallback
         const enrollment = await TopicEnrollment.findOne({
-          where: { topicId: presentation.topicId, studentId, status: "enrolled" },
+          where: {
+            topicId: presentation.topicId,
+            studentId,
+            status: "enrolled",
+          },
         });
 
         if (!enrollment) {
@@ -513,7 +517,7 @@ class PresentationService {
       // Verify access
       const accessResult = await this.getPresentationForStudent(
         presentationId,
-        studentId
+        studentId,
       );
       if (!accessResult.success) {
         return accessResult;
@@ -522,9 +526,8 @@ class PresentationService {
       const presentation = accessResult.presentation;
 
       // Validate presentation is complete
-      const validationResult = await this.validatePresentationForSubmission(
-        presentationId
-      );
+      const validationResult =
+        await this.validatePresentationForSubmission(presentationId);
       if (!validationResult.isValid) {
         return {
           success: false,
@@ -544,19 +547,12 @@ class PresentationService {
       // If processing, cleanup orphaned jobs first, then check for active jobs
       if (presentation.status === "processing") {
         // Cleanup any orphaned jobs (queued/running but SQS message deleted)
-        const cleanedCount = await jobService.cleanupOrphanedJobs(
-          presentationId
-        );
-        if (cleanedCount > 0) {
-          console.log(
-            `🧹 Cleaned up ${cleanedCount} orphaned job(s) for presentation ${presentationId}`
-          );
-        }
+        const cleanedCount =
+          await jobService.cleanupOrphanedJobs(presentationId);
 
         // Re-check for active jobs after cleanup
-        const activeJob = await jobService.getActiveJobForPresentation(
-          presentationId
-        );
+        const activeJob =
+          await jobService.getActiveJobForPresentation(presentationId);
         if (activeJob) {
           return {
             success: false,
@@ -565,9 +561,76 @@ class PresentationService {
           };
         }
         // If no active job after cleanup, allow re-submit
-        console.log(
-          `⚠️ Presentation ${presentationId} has status 'processing' but no active job after cleanup. Allowing re-submit.`
-        );
+      }
+
+      // If resubmitting from "failed" status, clean up old analysis data
+      if (presentation.status === "failed") {
+
+        // Delete all jobs for this presentation
+        await Job.destroy({
+          where: { presentationId },
+        });
+
+        // Get transcript IDs to delete segments
+        const transcripts = await Transcript.findAll({
+          where: { presentationId },
+          attributes: ["transcriptId"],
+        });
+        const transcriptIds = transcripts.map((t) => t.transcriptId);
+
+        if (transcriptIds.length > 0) {
+          // Delete segment analyses
+          await SegmentAnalysis.destroy({
+            where: {
+              segmentId: {
+                [db.Sequelize.Op.in]: db.sequelize.literal(
+                  `(SELECT segmentId FROM TranscriptSegments WHERE transcriptId IN (${transcriptIds.join(",")}))`,
+                ),
+              },
+            },
+          });
+          // Delete transcript segments
+          await TranscriptSegment.destroy({
+            where: { transcriptId: { [db.Sequelize.Op.in]: transcriptIds } },
+          });
+          // Delete transcripts
+        await Transcript.destroy({
+          where: { presentationId },
+        });
+        }
+
+        // Delete old feedbacks
+        await Feedback.destroy({
+          where: { presentationId },
+        });
+
+        // Delete old analysis results
+        await AnalysisResult.destroy({
+          where: { presentationId },
+        });
+
+        // Recreate slides jobs if slides exist
+        const slides = await Slide.findAll({
+          where: { presentationId },
+        });
+        for (const slide of slides) {
+          try {
+            const slideJob = await jobService.createJob(
+              presentationId,
+              "slides",
+              {
+                slideId: slide.slideId,
+                slideUrl: slide.filePath,
+                slideNumber: slide.slideNumber,
+                fileName: slide.fileName,
+                fileFormat: slide.fileFormat,
+                resubmitted: true,
+              },
+            );
+          } catch (slideJobError) {
+            console.error("⚠️ Failed to recreate slides job:", slideJobError);
+          }
+        }
       }
 
       // Update presentation status
@@ -576,7 +639,7 @@ class PresentationService {
           status: "processing",
           submittedAt: new Date(),
         },
-        { where: { presentationId } }
+        { where: { presentationId } },
       );
 
       // Create ASR job (this will also push to SQS queue)
@@ -585,13 +648,12 @@ class PresentationService {
         submittedAt: new Date().toISOString(),
       });
 
-      console.log(
-        `✅ Submitted presentation ${presentationId} for processing, job ${job.jobId}`
-      );
-
+      const isResubmit = presentation.status === "failed";
       return {
         success: true,
-        message: "Presentation submitted successfully",
+        message: isResubmit
+          ? "Presentation resubmitted successfully. It is being processed again."
+          : "Presentation submitted successfully",
         presentation: await this.getPresentationById(presentationId, studentId),
         job,
       };
@@ -600,6 +662,80 @@ class PresentationService {
       return {
         success: false,
         message: "Failed to submit presentation",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Resubmit presentation after failure (failed → processing)
+   * Only allows resubmit when presentation status is "failed"
+   * @param {number} presentationId
+   * @param {number} studentId
+   * @returns {Promise<object>}
+   */
+  async resubmitPresentation(presentationId, studentId) {
+    try {
+      // Verify access
+      const accessResult = await this.getPresentationForStudent(
+        presentationId,
+        studentId,
+      );
+      if (!accessResult.success) {
+        return accessResult;
+      }
+
+      const presentation = accessResult.presentation;
+
+      // Only allow resubmit when status is "failed"
+      if (presentation.status !== "failed") {
+        return {
+          success: false,
+          message: `Cannot resubmit presentation with status "${presentation.status}". Only failed presentations can be resubmitted.`,
+        };
+      }
+
+      // Validate presentation still has required files
+      const validationResult =
+        await this.validatePresentationForSubmission(presentationId);
+      if (!validationResult.isValid) {
+        return {
+          success: false,
+          message:
+            "Presentation is not ready for resubmission. " +
+            validationResult.errors.join(" "),
+          validation: validationResult,
+        };
+      }
+
+      // Update presentation status back to processing
+      await Presentation.update(
+        {
+          status: "processing",
+          submittedAt: new Date(),
+        },
+        { where: { presentationId } },
+      );
+
+      // Create ASR job to restart the pipeline
+      const job = await jobService.createJob(presentationId, "asr", {
+        resubmittedBy: studentId,
+        resubmittedAt: new Date().toISOString(),
+        reason: "Resubmit after failure",
+      });
+
+      return {
+        success: true,
+        message:
+          "Presentation resubmitted successfully. It is being processed again.",
+        presentation: await this.getPresentationById(presentationId, studentId),
+        job,
+      };
+    } catch (error) {
+      console.error("Resubmit presentation error:", error);
+      return {
+        success: false,
+        message: "Failed to resubmit presentation",
         error: error.message,
       };
     }
@@ -640,7 +776,7 @@ class PresentationService {
       // Check for slides
       if (!presentation.slides || presentation.slides.length === 0) {
         validation.warnings.push(
-          "No slides uploaded - analysis will be limited"
+          "No slides uploaded - analysis will be limited",
         );
       }
 
@@ -706,7 +842,7 @@ class PresentationService {
       const hasAccess = await this.checkPresentationAccess(
         presentationId,
         userId,
-        userRole
+        userRole,
       );
       if (!hasAccess) {
         return { success: false, message: "Access denied" };
@@ -796,7 +932,7 @@ class PresentationService {
     try {
       const accessResult = await this.getPresentationForStudent(
         presentationId,
-        studentId
+        studentId,
       );
       if (!accessResult.success) {
         return accessResult;
@@ -840,7 +976,7 @@ class PresentationService {
     try {
       const accessResult = await this.getPresentationForStudent(
         presentationId,
-        studentId
+        studentId,
       );
       if (!accessResult.success) {
         await transaction.rollback();
@@ -886,8 +1022,6 @@ class PresentationService {
         });
       }
 
-      console.log(`✅ Deleted presentation ${presentationId}`);
-
       return { success: true, message: "Presentation deleted successfully" };
     } catch (error) {
       await transaction.rollback();
@@ -911,7 +1045,7 @@ class PresentationService {
       // Check access
       const hasAccess = await this.checkPresentationAccess(
         presentationId,
-        userId
+        userId,
       );
       if (!hasAccess) {
         return { success: false, message: "Access denied" };
@@ -934,15 +1068,15 @@ class PresentationService {
       // Get current/latest job for each type
       const asrJob = await jobService.getJobByPresentation(
         presentationId,
-        "asr"
+        "asr",
       );
       const semanticJob = await jobService.getJobByPresentation(
         presentationId,
-        "semantic"
+        "semantic",
       );
       const reportJob = await jobService.getJobByPresentation(
         presentationId,
-        "report"
+        "report",
       );
 
       const pipeline = {
@@ -1003,7 +1137,7 @@ class PresentationService {
       // Check access
       const hasAccess = await this.checkPresentationAccess(
         presentationId,
-        userId
+        userId,
       );
       if (!hasAccess) {
         return { success: false, message: "Access denied" };
@@ -1109,7 +1243,10 @@ class PresentationService {
       }
 
       // Admin/Teacher/Instructor can access all
-      if (userRole && ["admin", "teacher", "instructor"].includes(userRole.toLowerCase())) {
+      if (
+        userRole &&
+        ["admin", "teacher", "instructor"].includes(userRole.toLowerCase())
+      ) {
         return true;
       }
       // Check if user is enrolled in same course
@@ -1139,8 +1276,8 @@ class PresentationService {
       return false;
     }
   }
-  
-/**
+
+  /**
    * Get presentations by course (for teachers)
    * @param {number} courseId
    * @param {object} options
@@ -1191,7 +1328,7 @@ class PresentationService {
     }
   }
 
-/**
+  /**
    * Get presentations for instructor (filtered by assigned classes)
    * @param {number} instructorId - Instructor user ID
    * @param {object} filters - Filter options (status, classId, courseId, search)
@@ -1201,7 +1338,7 @@ class PresentationService {
   async getPresentationsByInstructor(
     instructorId,
     filters = {},
-    pagination = {}
+    pagination = {},
   ) {
     try {
       const { ClassInstructor } = db;
@@ -1227,7 +1364,7 @@ class PresentationService {
 
       const classIds = instructorClasses.map((ci) => ci.classId);
 
-            // Step 2: Build where clause
+      // Step 2: Build where clause
       const where = {
         classId: { [db.Sequelize.Op.in]: classIds },
       };
@@ -1293,7 +1430,7 @@ class PresentationService {
             },
           ],
           distinct: true,
-        }
+        },
       );
 
       return {
@@ -1327,7 +1464,7 @@ class PresentationService {
       // Check access
       const hasAccess = await this.checkPresentationAccess(
         presentationId,
-        userId
+        userId,
       );
       if (!hasAccess) {
         return { success: false, message: "Access denied" };
@@ -1355,7 +1492,7 @@ class PresentationService {
       // Check access
       const hasAccess = await this.checkPresentationAccess(
         presentationId,
-        userId
+        userId,
       );
       if (!hasAccess) {
         return { success: false, message: "Access denied" };
@@ -1365,16 +1502,16 @@ class PresentationService {
       const feedbacks = await Feedback.findAll({
         where: {
           presentationId: presentationId,
-          feedbackType: 'general'
+          feedbackType: "general",
         },
-        order: [['createdAtFeedback', 'DESC']]
+        order: [["createdAtFeedback", "DESC"]],
       });
 
       if (!feedbacks || feedbacks.length === 0) {
         return {
           success: true,
           message: "No AI feedback found for this presentation",
-          feedback: null
+          feedback: null,
         };
       }
 
@@ -1390,8 +1527,8 @@ class PresentationService {
           comments: aiFeedback.comments,
           feedbackType: aiFeedback.feedbackType,
           isVisibleToStudent: aiFeedback.isVisibleToStudent,
-          createdAtFeedback: aiFeedback.createdAtFeedback
-        }
+          createdAtFeedback: aiFeedback.createdAtFeedback,
+        },
       };
     } catch (error) {
       console.error("Get AI feedback error:", error);
