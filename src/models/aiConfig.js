@@ -5,9 +5,10 @@ module.exports = (sequelize, DataTypes) => {
     class AIConfig extends Model {
         static associate(models) {
             AIConfig.belongsTo(models.User, { foreignKey: 'managedBy', as: 'manager' });
-            AIConfig.hasMany(models.Transcript, { foreignKey: 'configId', as: 'transcripts' });
-            AIConfig.hasMany(models.SegmentAnalysis, { foreignKey: 'configId', as: 'segmentAnalyses' });
-            AIConfig.hasMany(models.AnalysisResult, { foreignKey: 'configId', as: 'analysisResults' });
+            // configId column has been dropped from Transcripts, SegmentAnalyses, AnalysisResults
+            // AIConfig.hasMany(models.Transcript, { foreignKey: 'configId', as: 'transcripts' });
+            // AIConfig.hasMany(models.SegmentAnalysis, { foreignKey: 'configId', as: 'segmentAnalyses' });
+            // AIConfig.hasMany(models.AnalysisResult, { foreignKey: 'configId', as: 'analysisResults' });
         }
     }
 

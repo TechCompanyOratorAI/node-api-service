@@ -6,7 +6,9 @@ module.exports = (sequelize, DataTypes) => {
         static associate(models) {
             Transcript.belongsTo(models.Presentation, { foreignKey: 'presentationId', as: 'presentation' });
             Transcript.belongsTo(models.AudioRecord, { foreignKey: 'audioId', as: 'audioRecord' });
-            Transcript.belongsTo(models.AIConfig, { foreignKey: 'configId', as: 'config' });
+            // configId column has been dropped – AIConfig association removed
+            // Transcript.belongsTo(models.AIConfig, { foreignKey: 'configId', as: 'config' });
+
 
             Transcript.hasMany(models.TranscriptSegment, { foreignKey: 'transcriptId', as: 'segments' });
         }
@@ -17,7 +19,8 @@ module.exports = (sequelize, DataTypes) => {
             transcriptId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
             presentationId: { type: DataTypes.INTEGER, allowNull: false },
             audioId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
-            configId: { type: DataTypes.INTEGER },
+            // configId: { type: DataTypes.INTEGER }, // column dropped by cleanup migration
+
 
             fullTranscript: { type: DataTypes.TEXT },
             language: { type: DataTypes.STRING(10) },
