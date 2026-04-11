@@ -123,6 +123,27 @@ class PresentationController {
     }
   }
 
+  async resubmitPresentation(req, res) {
+    try {
+      const { presentationId } = req.params;
+      const parsedPresentationId = parseInt(presentationId);
+
+      if (Number.isNaN(parsedPresentationId)) {
+        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+      }
+
+      const result = await presentationService.resubmitPresentation(
+        parsedPresentationId,
+        req.user.userId
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Resubmit presentation controller error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
   async getPresentationById(req, res) {
     try {
       const { presentationId } = req.params;

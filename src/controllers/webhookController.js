@@ -801,10 +801,11 @@ const reportComplete = async (req, res) => {
       });
     }
 
-    // Verify job exists (skip in test/dev mode or if explicitly disabled)
+    // Verify job exists (skip only when explicitly disabled via env var)
+    // NOTE: removed `|| !process.env.NODE_ENV` guard – that caused verification
+    // to be silently bypassed on any deployment where NODE_ENV is not set.
     let job = null;
-    const skipJobCheck =
-      process.env.SKIP_JOB_VERIFICATION === "true" || !process.env.NODE_ENV;
+    const skipJobCheck = process.env.SKIP_JOB_VERIFICATION === "true";
     if (!skipJobCheck) {
       try {
         job = await jobService.getJobById(jobId);
@@ -879,7 +880,9 @@ const reportComplete = async (req, res) => {
       });
     }
 
-    // Handle success - Detect and process report format
+    // Handle success – any non-'failed' status is treated as success.
+    // Accepted values: 'success' (standard), 'completed', 'done' (legacy).
+    // py-report-worker now sends 'success' for consistency with ASR/Semantic workers.
     const reportFormat = reportService.detectReportFormat({
       segmentAnalyses,
       overallScores,
@@ -1080,11 +1083,31 @@ const slidesComplete = async (req, res) => {
       });
     }
 
-    const job = await jobService.getJobById(jobId);
+    let job;
+    try {
+      job = await jobService.getJobById(jobId);
+    } catch (jobLookupError) {
+      // Job not found (deleted) – acknowledge so worker stops retrying
+      console.warn(
+        `⚠️ Job ${jobId} not found in DB, acknowledging slides webhook to prevent retry loop`,
+      );
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
+      return res.json({
+        success: true,
+        message: `Job ${jobId} not found, webhook acknowledged`,
+        acknowledged: true,
+      });
+    }
     if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: `Job not found: ${jobId}`,
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
+      return res.json({
+        success: true,
+        message: `Job ${jobId} not found, webhook acknowledged`,
+        acknowledged: true,
       });
     }
 

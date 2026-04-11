@@ -16,8 +16,9 @@ app.set("trust proxy", 1);
 // CORS configuration
 app.use(
   cors({
-    origin: "*",
-  }),
+    origin: true,
+    credentials: true,
+  })
 );
 
 // Middleware

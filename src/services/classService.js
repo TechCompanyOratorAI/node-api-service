@@ -110,6 +110,12 @@ class ClassService {
     try {
       const where = { courseId };
 
+      // Student chỉ thấy lớp active và chưa hết hạn
+      if (userRole === "Student") {
+        where.status = "active";
+        where.endDate = { [Op.gte]: new Date() };
+      }
+
       // If Instructor (not admin or student), filter by instructor assignment
       if (userRole === "Instructor") {
         const instructorClassIds = await ClassInstructor.findAll({
@@ -123,7 +129,7 @@ class ClassService {
 
         where.classId = { [Op.in]: instructorClassIds };
       }
-      // Admin and Student can see all classes in course
+      // Admin can see all classes in course
 
       const classes = await Class.findAll({
         where,

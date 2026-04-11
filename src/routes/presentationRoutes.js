@@ -40,6 +40,12 @@ router.post('/:presentationId/submit',
   presentationController.submitPresentation
 );
 
+// Resubmit failed presentation for processing
+router.post('/:presentationId/resubmit',
+  generalRateLimit,
+  presentationController.resubmitPresentation
+);
+
 // Get presentation by ID
 router.get('/:presentationId',
   generalRateLimit,

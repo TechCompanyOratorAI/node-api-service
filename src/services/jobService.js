@@ -299,24 +299,30 @@ class JobService {
     try {
       const { presentationId, jobType } = completedJob;
 
-      let nextJobType = null;
-
       if (jobType === JOB_TYPES.ASR) {
-        nextJobType = JOB_TYPES.SEMANTIC;
-      }
-      // Report is triggered manually by aiReportService to ensure rubric metadata is included
+if (jobType === JOB_TYPES.ASR) {
 
-      if (nextJobType) {
+  nextJobType = JOB_TYPES.SEMANTIC;
+}
+
+// Report is triggered manually by aiReportService to ensure rubric metadata is included
+
+if (nextJobType) {
         console.log(
-          `⏭️ Triggering next job in pipeline: ${nextJobType} for presentation ${presentationId}`,
+          `⏭️ Triggering next job in pipeline: ${JOB_TYPES.SEMANTIC} for presentation ${presentationId}`,
         );
-        await this.createJob(presentationId, nextJobType, {
+        await this.createJob(presentationId, JOB_TYPES.SEMANTIC, {
           triggeredBy: completedJob.jobId,
           previousJobType: jobType,
         });
+      } else if (jobType === JOB_TYPES.SEMANTIC) {
+        // SEMANTIC completed – aiReportService will dispatch the report queue message.
+        // Nothing to do here in the job pipeline.
+        console.log(
+          `✅ Semantic job ${completedJob.jobId} done for presentation ${presentationId}. Report dispatch handled by aiReportService.`,
+        );
       } else if (jobType === JOB_TYPES.REPORT) {
         // Report is the last step – mark presentation as 'done'
-        // Use retry logic to handle lock wait timeouts from concurrent transactions
         await this._updatePresentationStatusWithRetry(presentationId, "done");
         console.log(`🎉 Presentation ${presentationId} status → done (pipeline complete)`);
       }
