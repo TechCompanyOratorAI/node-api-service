@@ -588,7 +588,6 @@ const analysisComplete = async (req, res) => {
               },
               defaults: {
                 slideId: slideId,
-                configId: null,
                 relevanceScore: segAnalysis.relevanceScore,
                 semanticScore: segAnalysis.semanticScore,
                 alignmentScore: segAnalysis.alignmentScore,
@@ -608,7 +607,6 @@ const analysisComplete = async (req, res) => {
             await segmentAnalysisRecord.update(
               {
                 slideId: slideId,
-                configId: null,
                 relevanceScore: segAnalysis.relevanceScore,
                 semanticScore: segAnalysis.semanticScore,
                 alignmentScore: segAnalysis.alignmentScore,
@@ -680,7 +678,6 @@ const analysisComplete = async (req, res) => {
       const [analysisResult, created] = await AnalysisResult.upsert(
         {
           presentationId,
-          configId: null,
           overallScore: analysis.overallScores?.overallScore || 0,
           analyzedAt: new Date(),
           status: "done",
