@@ -303,10 +303,8 @@ class JobService {
 
       if (jobType === JOB_TYPES.ASR) {
         nextJobType = JOB_TYPES.SEMANTIC;
-      } else if (jobType === JOB_TYPES.SEMANTIC) {
-        nextJobType = JOB_TYPES.REPORT;
       }
-      // Report is final step, no next job
+      // Report is triggered manually by aiReportService to ensure rubric metadata is included
 
       if (nextJobType) {
         console.log(

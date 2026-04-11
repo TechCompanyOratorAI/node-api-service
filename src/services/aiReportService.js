@@ -12,6 +12,7 @@ import { Op } from "sequelize";
 import db from "../models";
 import queueService from "../services/queueService";
 import classGradeSyncService from "./classGradeSyncService";
+import jobService from "./jobService.js";
 
 const VALID_REPORT_STATUSES = [
   "waiting",
@@ -208,7 +209,14 @@ class AIReportService {
         });
         
         console.log(`[AIReportService] Triggering report regeneration for presentation ${presentationId}`);
-        await this._sendToReportQueue(presentationId, existingReport.reportId, classId, jobId, classCriteria, aiSettings);
+        
+        // Create a new dedicated report job
+        const reportJob = await jobService.createJob(presentationId, "report", {
+          reportId: existingReport.reportId,
+          triggeredBy: jobId,
+        });
+        
+        await this._sendToReportQueue(presentationId, existingReport.reportId, classId, reportJob.jobId, classCriteria, aiSettings);
         
         return {
           success: true,
@@ -234,7 +242,14 @@ class AIReportService {
 
       console.log(`[AIReportService] Created report ${report.reportId} for presentation ${presentationId}`);
       await report.update({ reportStatus: "generating" });
-      await this._sendToReportQueue(presentationId, report.reportId, classId, jobId, classCriteria, aiSettings);
+      
+      // Create a new dedicated report job
+      const reportJob = await jobService.createJob(presentationId, "report", {
+        reportId: report.reportId,
+        triggeredBy: jobId,
+      });
+
+      await this._sendToReportQueue(presentationId, report.reportId, classId, reportJob.jobId, classCriteria, aiSettings);
 
       return {
         success: true,
@@ -704,4 +719,4 @@ class AIReportService {
   }
 }
 
-module.exports = new AIReportService();
+export default new AIReportService();
