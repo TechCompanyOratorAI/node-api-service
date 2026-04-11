@@ -75,28 +75,9 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: 'Associated segment text'
       },
-      beforeContext: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        comment: 'Text before hesitation'
-      },
-      afterContext: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        comment: 'Text after hesitation'
-      },
-      
-      // Additional Metrics
-      spectralComplexity: {
-        type: DataTypes.FLOAT,
-        allowNull: true,
-        comment: 'Spectral complexity score for filler detection'
-      },
-      energyLevel: {
-        type: DataTypes.FLOAT,
-        allowNull: true,
-        comment: 'Energy level during hesitation'
-      },
+
+      // Removed unused fields: beforeContext, afterContext, spectralComplexity, energyLevel
+
     },
     {
       sequelize,

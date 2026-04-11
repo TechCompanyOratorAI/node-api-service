@@ -33,24 +33,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
-      
-      // Segment-specific Speech Quality Scores
-      segmentFluency: {
-        type: DataTypes.DECIMAL(5, 4),
-        allowNull: true,
-        validate: { min: 0, max: 1 }
-      },
-      segmentClarity: {
-        type: DataTypes.DECIMAL(5, 4),
-        allowNull: true,
-        validate: { min: 0, max: 1 }
-      },
-      segmentConfidence: {
-        type: DataTypes.DECIMAL(5, 4),
-        allowNull: true,
-        validate: { min: 0, max: 1 }
-      },
-      
+
       // Segment Hesitation Metrics
       segmentHesitationCount: {
         type: DataTypes.INTEGER,
@@ -69,30 +52,7 @@ module.exports = (sequelize, DataTypes) => {
         validate: { min: 0, max: 1 },
         comment: 'Hesitation time / segment duration'
       },
-      
-      // Segment Speech Metrics
-      segmentSpeakingRate: {
-        type: DataTypes.DECIMAL(8, 2),
-        allowNull: true,
-        comment: 'Speaking rate for this segment (syllables/min)'
-      },
-      segmentPitchMean: {
-        type: DataTypes.DECIMAL(8, 2),
-        allowNull: true,
-        comment: 'Average pitch in this segment'
-      },
-      segmentEnergyMean: {
-        type: DataTypes.DECIMAL(8, 4),
-        allowNull: true,
-        comment: 'Average energy in this segment'
-      },
-      segmentSilenceRatio: {
-        type: DataTypes.DECIMAL(5, 4),
-        allowNull: true,
-        validate: { min: 0, max: 1 },
-        comment: 'Silence ratio in this segment'
-      },
-      
+
       // Segment Quality Issues and Suggestions
       qualityIssues: {
         type: DataTypes.JSON,
@@ -104,8 +64,8 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: 'Speech quality suggestions for this segment'
       },
-      
-      // Timing Information
+
+      // Timing Information (from TranscriptSegments)
       segmentStartTime: {
         type: DataTypes.DECIMAL(8, 3),
         allowNull: true,
@@ -121,6 +81,9 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: 'Segment duration in seconds'
       },
+
+      // Removed unused fields: segmentFluency, segmentClarity, segmentConfidence,
+      // segmentSpeakingRate, segmentPitchMean, segmentEnergyMean, segmentSilenceRatio
     },
     {
       sequelize,

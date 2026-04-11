@@ -13,7 +13,6 @@ module.exports = (sequelize, DataTypes) => {
         {
             alignmentId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
             segAnalysisId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
-            resultId: { type: DataTypes.INTEGER },
 
             alignmentStatus: {
                 type: DataTypes.ENUM('aligned', 'off_slide', 'misaligned', 'unknown'),

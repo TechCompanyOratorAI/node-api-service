@@ -13,13 +13,10 @@ module.exports = (sequelize, DataTypes) => {
         {
             relevanceId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
             segAnalysisId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
-            // link contributes_to analysis_result (optional but aligns ERD)
-            resultId: { type: DataTypes.INTEGER },
 
             relevanceScore: { type: DataTypes.FLOAT },
-            matchedConcepts: { type: DataTypes.TEXT },
-            missingConcepts: { type: DataTypes.TEXT },
-            explanation: { type: DataTypes.TEXT },
+            matchedConcepts: { type: DataTypes.TEXT }, // Joined topicKeywordsFound
+            explanation: { type: DataTypes.TEXT },     // Joined issues list
         },
         { sequelize, modelName: 'ContentRelevance', tableName: 'ContentRelevance' }
     );
