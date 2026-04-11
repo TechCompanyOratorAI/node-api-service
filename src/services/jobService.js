@@ -300,7 +300,6 @@ class JobService {
       const { presentationId, jobType } = completedJob;
 
       if (jobType === JOB_TYPES.ASR) {
-if (jobType === JOB_TYPES.ASR) {
 
   nextJobType = JOB_TYPES.SEMANTIC;
 }
