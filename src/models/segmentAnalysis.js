@@ -12,10 +12,6 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "slideId",
         as: "slide",
       });
-      SegmentAnalysis.belongsTo(models.AIConfig, {
-        foreignKey: "configId",
-        as: "config",
-      });
 
       SegmentAnalysis.hasOne(models.ContentRelevance, {
         foreignKey: "segAnalysisId",
