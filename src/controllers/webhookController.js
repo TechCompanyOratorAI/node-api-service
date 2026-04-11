@@ -1212,11 +1212,31 @@ const slidesComplete = async (req, res) => {
       });
     }
 
-    const job = await jobService.getJobById(jobId);
+    let job;
+    try {
+      job = await jobService.getJobById(jobId);
+    } catch (jobLookupError) {
+      // Job not found (deleted) – acknowledge so worker stops retrying
+      console.warn(
+        `⚠️ Job ${jobId} not found in DB, acknowledging slides webhook to prevent retry loop`,
+      );
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
+      return res.json({
+        success: true,
+        message: `Job ${jobId} not found, webhook acknowledged`,
+        acknowledged: true,
+      });
+    }
     if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: `Job not found: ${jobId}`,
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
+      return res.json({
+        success: true,
+        message: `Job ${jobId} not found, webhook acknowledged`,
+        acknowledged: true,
       });
     }
 
