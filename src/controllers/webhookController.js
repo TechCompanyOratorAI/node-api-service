@@ -502,8 +502,19 @@ const analysisComplete = async (req, res) => {
       });
     }
 
-    const job = await jobService.getJobById(jobId);
+    let job;
+    try {
+      job = await jobService.getJobById(jobId);
+    } catch (e) {
+      if (e.message && e.message.includes('Job not found')) {
+        console.log(`⚠️ Webhook for already-deleted job ${jobId}, ignoring`);
+        if (transaction && !transaction.finished) await transaction.rollback();
+        return res.json({ success: true, message: 'Job already processed' });
+      }
+      throw e;
+    }
     if (!job) {
+      if (transaction && !transaction.finished) await transaction.rollback();
       return res.status(404).json({
         success: false,
         message: `Job not found: ${jobId}`,
