@@ -10,6 +10,9 @@ import cors from "cors";
 
 let app = express();
 
+// Trust proxy (required when running behind nginx/load balancer with X-Forwarded-For)
+app.set("trust proxy", 1);
+
 // CORS configuration
 app.use(
   cors({
@@ -24,7 +27,7 @@ app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // Static file serving for uploads
-app.use('/uploads', express.static('uploads'));
+app.use("/uploads", express.static("uploads"));
 
 viewEngine(app);
 initWebRoutes(app);

@@ -170,7 +170,16 @@ const asrComplete = async (req, res) => {
       });
 
       if (!presentation) {
-        throw new Error(`Presentation not found: ${presentationId}`);
+        // Stale webhook for a deleted presentation – acknowledge to stop retries
+        console.warn(
+          `⚠️ Presentation ${presentationId} not found, acknowledging stale ASR webhook for job ${jobId}`,
+        );
+        if (transaction && !transaction.finished) await transaction.rollback();
+        return res.json({
+          success: true,
+          message: `Presentation ${presentationId} not found, webhook acknowledged`,
+          acknowledged: true,
+        });
       }
 
       if (!presentation.audioRecord) {
@@ -502,8 +511,19 @@ const analysisComplete = async (req, res) => {
       });
     }
 
-    const job = await jobService.getJobById(jobId);
+    let job;
+    try {
+      job = await jobService.getJobById(jobId);
+    } catch (e) {
+      if (e.message && e.message.includes('Job not found')) {
+        console.log(`⚠️ Webhook for already-deleted job ${jobId}, ignoring`);
+        if (transaction && !transaction.finished) await transaction.rollback();
+        return res.json({ success: true, message: 'Job already processed' });
+      }
+      throw e;
+    }
     if (!job) {
+      if (transaction && !transaction.finished) await transaction.rollback();
       return res.status(404).json({
         success: false,
         message: `Job not found: ${jobId}`,
@@ -914,10 +934,11 @@ const reportComplete = async (req, res) => {
       });
     }
 
-    // Verify job exists (skip in test/dev mode or if explicitly disabled)
+    // Verify job exists (skip only when explicitly disabled via env var)
+    // NOTE: removed `|| !process.env.NODE_ENV` guard – that caused verification
+    // to be silently bypassed on any deployment where NODE_ENV is not set.
     let job = null;
-    const skipJobCheck =
-      process.env.SKIP_JOB_VERIFICATION === "true" || !process.env.NODE_ENV;
+    const skipJobCheck = process.env.SKIP_JOB_VERIFICATION === "true";
     if (!skipJobCheck) {
       try {
         job = await jobService.getJobById(jobId);
@@ -954,11 +975,36 @@ const reportComplete = async (req, res) => {
 
     // Handle failure status
     if (status === "failed") {
-      await jobService.markJobFailed(
-        jobId,
-        error || "Report generation failed",
-        true,
-      );
+      // Guard: only mark the job as failed if it is a report-type job.
+      // AIReportService may pass a semantic jobId in the queue message,
+      // which would incorrectly corrupt the semantic job's status.
+      if (job && job.jobType === "report") {
+        await jobService.markJobFailed(
+          jobId,
+          error || "Report generation failed",
+          false,   // never retry – py-report-worker retries via SQS visibility timeout
+        );
+      } else if (job) {
+        // jobId points to a non-report job (e.g. semantic) – do NOT touch its status.
+        // Just log and acknowledge.
+        console.warn(
+          `⚠️ Report failure webhook received with non-report jobId ${jobId} (type: ${job.jobType}). Skipping markJobFailed to protect semantic job status.`
+        );
+      }
+
+      // If a reportId was provided, mark the AIReport as failed
+      if (reportId) {
+        try {
+          const aiReport = await db.AIReport.findOne({ where: { reportId } });
+          if (aiReport) {
+            await aiReport.update({ reportStatus: "failed" });
+            console.log(`📋 Marked AIReport ${reportId} as failed`);
+          }
+        } catch (reportUpdateErr) {
+          console.error(`⚠️ Failed to update AIReport ${reportId} status:`, reportUpdateErr.message);
+        }
+      }
+
       await transaction.commit();
 
       return res.json({
@@ -967,7 +1013,9 @@ const reportComplete = async (req, res) => {
       });
     }
 
-    // Handle success - Detect and process report format
+    // Handle success – any non-'failed' status is treated as success.
+    // Accepted values: 'success' (standard), 'completed', 'done' (legacy).
+    // py-report-worker now sends 'success' for consistency with ASR/Semantic workers.
     const reportFormat = reportService.detectReportFormat({
       segmentAnalyses,
       overallScores,
@@ -1167,11 +1215,31 @@ const slidesComplete = async (req, res) => {
       });
     }
 
-    const job = await jobService.getJobById(jobId);
+    let job;
+    try {
+      job = await jobService.getJobById(jobId);
+    } catch (jobLookupError) {
+      // Job not found (deleted) – acknowledge so worker stops retrying
+      console.warn(
+        `⚠️ Job ${jobId} not found in DB, acknowledging slides webhook to prevent retry loop`,
+      );
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
+      return res.json({
+        success: true,
+        message: `Job ${jobId} not found, webhook acknowledged`,
+        acknowledged: true,
+      });
+    }
     if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: `Job not found: ${jobId}`,
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
+      return res.json({
+        success: true,
+        message: `Job ${jobId} not found, webhook acknowledged`,
+        acknowledged: true,
       });
     }
 
