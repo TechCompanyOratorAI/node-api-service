@@ -946,10 +946,11 @@ const reportComplete = async (req, res) => {
       });
     }
 
-    // Verify job exists (skip in test/dev mode or if explicitly disabled)
+    // Verify job exists (skip only when explicitly disabled via env var)
+    // NOTE: removed `|| !process.env.NODE_ENV` guard – that caused verification
+    // to be silently bypassed on any deployment where NODE_ENV is not set.
     let job = null;
-    const skipJobCheck =
-      process.env.SKIP_JOB_VERIFICATION === "true" || !process.env.NODE_ENV;
+    const skipJobCheck = process.env.SKIP_JOB_VERIFICATION === "true";
     if (!skipJobCheck) {
       try {
         job = await jobService.getJobById(jobId);
@@ -1024,7 +1025,9 @@ const reportComplete = async (req, res) => {
       });
     }
 
-    // Handle success - Detect and process report format
+    // Handle success – any non-'failed' status is treated as success.
+    // Accepted values: 'success' (standard), 'completed', 'done' (legacy).
+    // py-report-worker now sends 'success' for consistency with ASR/Semantic workers.
     const reportFormat = reportService.detectReportFormat({
       segmentAnalyses,
       overallScores,
