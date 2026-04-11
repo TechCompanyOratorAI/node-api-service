@@ -986,13 +986,36 @@ const reportComplete = async (req, res) => {
 
     // Handle failure status
     if (status === "failed") {
-      // shouldRetry = false: report failures should NOT re-queue the semantic job.
-      // The report worker has its own retry mechanism via SQS visibility timeout.
-      await jobService.markJobFailed(
-        jobId,
-        error || "Report generation failed",
-        false,   // ← do NOT retry – prevents semantic job from being re-queued
-      );
+      // Guard: only mark the job as failed if it is a report-type job.
+      // AIReportService may pass a semantic jobId in the queue message,
+      // which would incorrectly corrupt the semantic job's status.
+      if (job && job.jobType === "report") {
+        await jobService.markJobFailed(
+          jobId,
+          error || "Report generation failed",
+          false,   // never retry – py-report-worker retries via SQS visibility timeout
+        );
+      } else if (job) {
+        // jobId points to a non-report job (e.g. semantic) – do NOT touch its status.
+        // Just log and acknowledge.
+        console.warn(
+          `⚠️ Report failure webhook received with non-report jobId ${jobId} (type: ${job.jobType}). Skipping markJobFailed to protect semantic job status.`
+        );
+      }
+
+      // If a reportId was provided, mark the AIReport as failed
+      if (reportId) {
+        try {
+          const aiReport = await db.AIReport.findOne({ where: { reportId } });
+          if (aiReport) {
+            await aiReport.update({ reportStatus: "failed" });
+            console.log(`📋 Marked AIReport ${reportId} as failed`);
+          }
+        } catch (reportUpdateErr) {
+          console.error(`⚠️ Failed to update AIReport ${reportId} status:`, reportUpdateErr.message);
+        }
+      }
+
       await transaction.commit();
 
       return res.json({
