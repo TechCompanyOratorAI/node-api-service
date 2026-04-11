@@ -300,10 +300,13 @@ class JobService {
       const { presentationId, jobType } = completedJob;
 
       if (jobType === JOB_TYPES.ASR) {
-        // ASR → SEMANTIC is the only auto-trigger in the pipeline.
-        // The report step is NOT triggered here to avoid duplicate SQS messages.
-        // aiReportService.triggerReportAfterAnalysis() handles report queue
-        // dispatch (with rubricData, reportId, classId) after semantic completes.
+
+  nextJobType = JOB_TYPES.SEMANTIC;
+}
+
+// Report is triggered manually by aiReportService to ensure rubric metadata is included
+
+if (nextJobType) {
         console.log(
           `⏭️ Triggering next job in pipeline: ${JOB_TYPES.SEMANTIC} for presentation ${presentationId}`,
         );

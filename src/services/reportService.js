@@ -53,7 +53,7 @@ class ReportService {
 
       const resultData = {
         presentationId,
-        overallScore: overallScores.weightedOverallScore || 0,
+        overallScore: overallScores.weightedOverallScore || overallScores.overallScore || 0,
         analyzedAt: metadata?.processedAt || new Date().toISOString(),
         // processingTimeSeconds and aiModelVersion dropped by cleanup migration
         status: "done",
@@ -99,60 +99,89 @@ class ReportService {
         for (const segment of segmentAnalyses) {
           try {
             // bestMatchingSlide from AI is SLIDE NUMBER, not slideId
-            // We need to find the actual slideId using slideNumber
             let slideIdToUse = null;
 
             if (segment.bestMatchingSlide && slideNumberMap[segment.bestMatchingSlide]) {
               slideIdToUse = slideNumberMap[segment.bestMatchingSlide];
             } else if (segment.bestMatchingSlide) {
-              console.log(`   ⚠️ Slide with number ${segment.bestMatchingSlide} not found for segment ${segment.segmentId}, setting to null`);
-            } else if (segment.slideId && slideIdMap[segment.slideId]) {
-              slideIdToUse = slideIdMap[segment.slideId];
+              console.log(`   ⚠️ Slide with number ${segment.bestMatchingSlide} not found for segment ${segment.segmentId}`);
             }
 
             segmentDataToCreate.push({
               segmentId: segment.segmentId,
               slideId: slideIdToUse,
               analyzedAt: new Date(),
-              analysisResultId: analysisResult.resultId,
-              segment: segment
+              relevanceScore: segment.relevanceScore || 0,
+              semanticScore: segment.semanticScore || 0,
+              alignmentScore: segment.alignmentScore || 0,
+              bestMatchingSlide: segment.bestMatchingSlide,
+              expectedSlideNumber: segment.expectedSlideNumber,
+              timingDeviation: segment.timingDeviation,
+              issues: segment.issues || [],
+              suggestions: segment.suggestions || [],
+              topicKeywordsFound: segment.topicKeywordsFound || [],
+              analysisResultId: analysisResult.resultId
             });
             processedSegments++;
           } catch (segmentError) {
-            console.error(
-              `⚠️ Error preparing segment ${segment.segmentId}:`,
-              segmentError.message,
-            );
+            console.error(`⚠️ Error preparing segment ${segment.segmentId}:`, segmentError.message);
           }
         }
         console.log(`✅ Prepared ${processedSegments} segments for processing`);
 
-        // 3. Sử dụng bulkCreate với updateOnDuplicate để xử lý nhanh và tránh block table lâu
-        // Điều này giúp fix lỗi lock wait timeout do transaction kéo dài quá 50s
-        let createdSegments = 0;
-        let upsertErrors = 0;
-        
+        // 3. Sử dụng bulkCreate với updateOnDuplicate để xử lý nhanh
         try {
-          // Prepare exact objects for SegmentAnalysis table
-          const recordsToBulkCreate = segmentDataToCreate.map(segData => ({
-             segmentId: segData.segmentId,
-             slideId: segData.slideId,
-             analyzedAt: segData.analyzedAt,
-             analysisResultId: analysisResult.resultId
-          }));
-          
-          if (recordsToBulkCreate.length > 0) {
-            await SegmentAnalysis.bulkCreate(recordsToBulkCreate, {
+          if (segmentDataToCreate.length > 0) {
+            const createdRecords = await SegmentAnalysis.bulkCreate(segmentDataToCreate, {
                transaction,
-               updateOnDuplicate: ['slideId', 'analyzedAt']
+               updateOnDuplicate: [
+                 'slideId', 'analyzedAt', 'relevanceScore', 'semanticScore', 
+                 'alignmentScore', 'bestMatchingSlide', 'expectedSlideNumber', 
+                 'timingDeviation', 'issues', 'suggestions', 'topicKeywordsFound'
+               ]
             });
-            createdSegments = recordsToBulkCreate.length;
+
+            // 4. Save to detail tables (ContentRelevance, SemanticSimilarity, AlignmentChecks)
+            // We need the segAnalysisId for these, so we fetch records if needed
+            // However, SegmentAnalysis has segmentId as unique, so we can find them
+            const dbRecords = await SegmentAnalysis.findAll({
+              where: { segmentId: segmentDataToCreate.map(s => s.segmentId) },
+              transaction
+            });
+
+            const segIdToAnalysisId = {};
+            dbRecords.forEach(r => { segIdToAnalysisId[r.segmentId] = r.segAnalysisId; });
+
+            for (const segData of segmentDataToCreate) {
+              const segAnalysisId = segIdToAnalysisId[segData.segmentId];
+              if (!segAnalysisId) continue;
+
+              await ContentRelevance.upsert({
+                segAnalysisId: segAnalysisId,
+                relevanceScore: segData.relevanceScore,
+                matchedConcepts: segData.topicKeywordsFound ? segData.topicKeywordsFound.join(", ") : null,
+                explanation: segData.issues && segData.issues.length > 0 ? segData.issues.join("; ") : null,
+              }, { transaction });
+
+              await SemanticSimilarity.upsert({
+                segAnalysisId: segAnalysisId,
+                similarityScore: segData.semanticScore,
+              }, { transaction });
+
+              await AlignmentCheck.upsert({
+                segAnalysisId: segAnalysisId,
+                alignmentStatus: segData.alignmentScore >= 80 ? "aligned" : "misaligned",
+                timingSyncScore: segData.alignmentScore,
+                expectedSlideNumber: segData.expectedSlideNumber,
+                misalignmentReason: segData.timingDeviation > 0 ? `Timing deviation: ${segData.timingDeviation}s` : null,
+              }, { transaction });
+            }
           }
         } catch (error) {
            console.error(`⚠️ Error bulk upserting segments: ${error.message}`);
-           upsertErrors = segmentDataToCreate.length;
+           throw error;
         }
-        console.log(`✅ Successfully upserted ${createdSegments} segments (${upsertErrors} errors)`);
+        console.log(`✅ Successfully saved segments and detail analysis data`);
       } else {
         console.log("⚠️ No segmentAnalyses to process, skipping");
       }
