@@ -931,11 +931,31 @@ const reportComplete = async (req, res) => {
     const skipJobCheck =
       process.env.SKIP_JOB_VERIFICATION === "true" || !process.env.NODE_ENV;
     if (!skipJobCheck) {
-      job = await jobService.getJobById(jobId);
+      try {
+        job = await jobService.getJobById(jobId);
+      } catch (jobLookupError) {
+        // Job not found - acknowledge the webhook so worker stops retrying
+        // This happens when jobs are stale (cleaned up or from old runs)
+        console.warn(
+          `⚠️ Job ${jobId} not found in DB, acknowledging webhook to prevent retry loop`,
+        );
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return res.json({
+          success: true,
+          message: `Job ${jobId} not found, webhook acknowledged`,
+          acknowledged: true,
+        });
+      }
       if (!job) {
-        return res.status(404).json({
-          success: false,
-          message: `Job not found: ${jobId}`,
+        if (transaction && !transaction.finished) {
+          await transaction.rollback();
+        }
+        return res.json({
+          success: true,
+          message: `Job ${jobId} not found, webhook acknowledged`,
+          acknowledged: true,
         });
       }
     } else {
