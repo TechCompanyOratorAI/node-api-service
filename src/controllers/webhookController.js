@@ -1315,15 +1315,32 @@ async function saveSpeechQualityAnalysis(
     const speechAnalysisData = {
       presentationId: presentationId,
       jobId: jobId,
+      // Primary quality scores from overallScores
       fluencyScore: overallScores.speechFluency,
       clarityScore: overallScores.speechClarity,
       confidenceScore: overallScores.speechConfidence,
       overallScore: overallScores.speechOverall,
       analyzedAt: new Date(),
+      // Processing info from metadata
       processingTime: metadata?.processingTime,
       opensmileConfig: metadata?.opensmileConfig || "eGeMAPSv02",
       sampleRate: metadata?.sampleRate || 16000,
+      // Rich speech metrics from metadata (sent by Python worker)
+      speakingRate: metadata?.speakingRate ?? null,
+      pitchMean: metadata?.pitchMean ?? null,
+      pitchStd: metadata?.pitchStd ?? null,
+      energyMean: metadata?.energyMean ?? null,
+      energyStd: metadata?.energyStd ?? null,
+      pitchVariation: metadata?.pitchVariation ?? null,
+      volumeVariation: metadata?.volumeVariation ?? null,
+      speechRhythmScore: metadata?.speechRhythmScore ?? null,
+      silenceRatio: metadata?.silenceRatio ?? null,
+      voicedRatio: metadata?.voicedRatio ?? null,
+      spectralCentroidMean: metadata?.spectralCentroidMean ?? null,
+      mfccFeatures: metadata?.mfccFeatures ?? null,
+      audioDuration: metadata?.audioDuration ?? null,
     };
+
 
     // Remove undefined values
     Object.keys(speechAnalysisData).forEach((key) => {
