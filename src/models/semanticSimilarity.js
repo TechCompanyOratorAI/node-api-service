@@ -13,12 +13,8 @@ module.exports = (sequelize, DataTypes) => {
         {
             similarityId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
             segAnalysisId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
-            resultId: { type: DataTypes.INTEGER },
 
-            similarityScore: { type: DataTypes.FLOAT },
-            embeddingModel: { type: DataTypes.STRING(100) },
-            cosineDistance: { type: DataTypes.FLOAT },
-            comparisonMethod: { type: DataTypes.STRING(100) },
+            similarityScore: { type: DataTypes.FLOAT }, // Cosine similarity vs slide content
         },
         { sequelize, modelName: 'SemanticSimilarity', tableName: 'SemanticSimilarity' }
     );

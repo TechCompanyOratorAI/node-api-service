@@ -40,26 +40,23 @@ module.exports = (sequelize, DataTypes) => {
         autoIncrement: true,
       },
       segmentId: { type: DataTypes.INTEGER, allowNull: false },
-      slideId: { type: DataTypes.INTEGER, allowNull: true }, // Allow null for cases where no slide match found
-      configId: { type: DataTypes.INTEGER },
+      slideId: { type: DataTypes.INTEGER, allowNull: true }, // null when no slide match found
 
       analyzedAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
       },
-      processingTimeMs: { type: DataTypes.INTEGER },
-      
-      // Add fields that semantic worker actually provides
-      relevanceScore: { type: DataTypes.FLOAT }, // Content relevance score
-      semanticScore: { type: DataTypes.FLOAT },  // Semantic similarity score
-      alignmentScore: { type: DataTypes.FLOAT }, // Timing alignment score
-      bestMatchingSlide: { type: DataTypes.INTEGER }, // Best matching slide number (not slideId)
-      expectedSlideNumber: { type: DataTypes.INTEGER }, // Expected slide based on timing
-      timingDeviation: { type: DataTypes.FLOAT }, // Timing deviation
-      issues: { type: DataTypes.JSON }, // Array of issues found
-      suggestions: { type: DataTypes.JSON }, // Array of suggestions
-      topicKeywordsFound: { type: DataTypes.JSON }, // Array of topic keywords found
+
+      relevanceScore: { type: DataTypes.FLOAT },       // Content relevance vs topic
+      semanticScore: { type: DataTypes.FLOAT },        // Semantic similarity vs slides
+      alignmentScore: { type: DataTypes.FLOAT },       // Timing alignment score
+      bestMatchingSlide: { type: DataTypes.INTEGER },  // Best matching slide number
+      expectedSlideNumber: { type: DataTypes.INTEGER },// Expected slide based on timing
+      timingDeviation: { type: DataTypes.FLOAT },      // Timing deviation (seconds)
+      issues: { type: DataTypes.JSON },                // Array of issues found
+      suggestions: { type: DataTypes.JSON },           // Array of suggestions
+      topicKeywordsFound: { type: DataTypes.JSON },    // Topic keywords found in segment
     },
     { sequelize, modelName: "SegmentAnalysis", tableName: "SegmentAnalyses" },
   );
