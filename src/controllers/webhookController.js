@@ -181,7 +181,16 @@ const asrComplete = async (req, res) => {
       });
 
       if (!presentation) {
-        throw new Error(`Presentation not found: ${presentationId}`);
+        // Stale webhook for a deleted presentation – acknowledge to stop retries
+        console.warn(
+          `⚠️ Presentation ${presentationId} not found, acknowledging stale ASR webhook for job ${jobId}`,
+        );
+        if (transaction && !transaction.finished) await transaction.rollback();
+        return res.json({
+          success: true,
+          message: `Presentation ${presentationId} not found, webhook acknowledged`,
+          acknowledged: true,
+        });
       }
 
       if (!presentation.audioRecord) {
