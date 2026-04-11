@@ -38,8 +38,17 @@ module.exports = (sequelize, DataTypes) => {
         { fields: ["reportId"] },
         { fields: ["classRubricCriteriaId"] },
         { fields: ["instructorId"] },
-        { unique: true, fields: ["reportId", "classRubricCriteriaId"], name: "uq_criterion_feedback_report_criteria" },
+        {
+          unique: true,
+          fields: ["reportId", "classRubricCriteriaId"],
+          name: "uq_criterion_feedback_report_criteria",
+        },
       ],
+      uniqueKeys: {
+        report_criteria_unique: {
+          fields: ["reportId", "classRubricCriteriaId"],
+        },
+      },
     }
   );
 

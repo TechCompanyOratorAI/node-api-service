@@ -82,7 +82,15 @@ class ClassScoreService {
       // Get all confirmed AI reports for all students in this class
       const aiReports = await AIReport.findAll({
         where: { classId },
-        attributes: ["reportId", "presentationId", "overallScore", "reportStatus", "criterionScores"],
+        attributes: [
+          "reportId",
+          "presentationId",
+          "overallScore",
+          "gradeForInstructor",
+          "reportStatus",
+          "criterionScores",
+          "confirmedAt",
+        ],
       });
 
       // Filter only confirmed reports
@@ -147,12 +155,28 @@ class ClassScoreService {
         );
 
         let overallAverageScore = null;
+        let instructorAverageScore = null;
         if (studentConfirmedReports.length > 0) {
+          // Diem trung binh AI (overallScore)
           const totalScore = studentConfirmedReports.reduce(
             (sum, r) => sum + parseFloat(r.overallScore || 0),
             0
           );
           overallAverageScore = parseFloat((totalScore / studentConfirmedReports.length).toFixed(2));
+
+          // Diem trung binh GV (gradeForInstructor)
+          const reportsWithInstructorGrade = studentConfirmedReports.filter(
+            (r) => r.gradeForInstructor !== null && r.gradeForInstructor !== undefined
+          );
+          if (reportsWithInstructorGrade.length > 0) {
+            const totalInstructorScore = reportsWithInstructorGrade.reduce(
+              (sum, r) => sum + parseFloat(r.gradeForInstructor),
+              0
+            );
+            instructorAverageScore = parseFloat(
+              (totalInstructorScore / reportsWithInstructorGrade.length).toFixed(2)
+            );
+          }
         }
 
         // Build rubric score breakdown per criteria
@@ -190,7 +214,11 @@ class ClassScoreService {
             status: p.status,
             hasReport: !!report,
             overallScore: report ? parseFloat(report.overallScore) : null,
+            gradeForInstructor: report && report.gradeForInstructor !== null
+              ? parseFloat(report.gradeForInstructor)
+              : null,
             reportStatus: report ? report.reportStatus : null,
+            confirmedAt: report ? report.confirmedAt : null,
           };
         });
 
@@ -205,7 +233,10 @@ class ClassScoreService {
             lastName: student.lastName,
             email: student.email,
           },
+          // Diem trung binh AI
           overallAverageScore,
+          // Diem trung binh GV confirm (tu finalGrade da sync)
+          instructorAverageScore,
           rubricScores,
           presentations: presentationsSummary,
           totalPresentations: studentPresentations.length,
