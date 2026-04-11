@@ -55,8 +55,7 @@ class ReportService {
         presentationId,
         overallScore: overallScores.weightedOverallScore || 0,
         analyzedAt: metadata?.processedAt || new Date().toISOString(),
-        processingTimeSeconds: overallScores.processingTimeSeconds,
-        aiModelVersion: overallScores.aiModelVersion,
+        // processingTimeSeconds and aiModelVersion dropped by cleanup migration
         status: "done",
       };
 
