@@ -300,17 +300,12 @@ class JobService {
       const { presentationId, jobType } = completedJob;
 
       if (jobType === JOB_TYPES.ASR) {
-        // ASR → SEMANTIC is the only auto-trigger in the pipeline.
-        // The report step is NOT triggered here to avoid duplicate SQS messages.
-        // aiReportService.triggerReportAfterAnalysis() handles report queue
-        // dispatch (with rubricData, reportId, classId) after semantic completes.
+        // ASR completed – do NOT auto-dispatch semantic here.
+        // checkAndDispatchSemanticIfReady() handles semantic dispatch after
+        // BOTH ASR and all slide jobs are confirmed completed.
         console.log(
-          `⏭️ Triggering next job in pipeline: ${JOB_TYPES.SEMANTIC} for presentation ${presentationId}`,
+          `✅ ASR job ${completedJob.jobId} done for presentation ${presentationId}. Semantic dispatch handled by checkAndDispatchSemanticIfReady.`,
         );
-        await this.createJob(presentationId, JOB_TYPES.SEMANTIC, {
-          triggeredBy: completedJob.jobId,
-          previousJobType: jobType,
-        });
       } else if (jobType === JOB_TYPES.SEMANTIC) {
         // SEMANTIC completed – aiReportService will dispatch the report queue message.
         // Nothing to do here in the job pipeline.
@@ -325,6 +320,115 @@ class JobService {
     } catch (error) {
       console.error("❌ Error triggering next job in pipeline:", error);
       // Don't throw, just log - pipeline continuation failure shouldn't fail current job
+    }
+  }
+
+  /**
+   * Dispatch semantic job only when BOTH conditions are met:
+   *   1. ASR job for this presentation is completed
+   *   2. All slide jobs for this presentation are completed (or there are none)
+   *
+   * Called from both asrComplete and slidesComplete webhook handlers.
+   * The audioFilename needed by py-semantic-worker is read from the completed
+   * ASR job's metadata (stored there by the asrComplete handler).
+   *
+   * @param {number} presentationId
+   * @returns {Promise<{dispatched: boolean, jobId?: number, reason?: string}>}
+   */
+  async checkAndDispatchSemanticIfReady(presentationId) {
+    try {
+      // 1. Verify ASR job is completed
+      const asrJob = await Job.findOne({
+        where: {
+          presentationId,
+          jobType: JOB_TYPES.ASR,
+          status: JOB_STATUS.COMPLETED,
+        },
+        order: [["createdAt", "DESC"]],
+      });
+
+      if (!asrJob) {
+        console.log(
+          `⏳ [Semantic gate] ASR not yet completed for presentation ${presentationId} – waiting`,
+        );
+        return { dispatched: false, reason: "ASR not completed" };
+      }
+
+      // 2. Check slide jobs – if any exist, all must be completed
+      const totalSlideJobs = await Job.count({
+        where: { presentationId, jobType: JOB_TYPES.SLIDES },
+      });
+
+      if (totalSlideJobs > 0) {
+        const pendingSlideJobs = await Job.count({
+          where: {
+            presentationId,
+            jobType: JOB_TYPES.SLIDES,
+            status: { [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING] },
+          },
+        });
+
+        if (pendingSlideJobs > 0) {
+          console.log(
+            `⏳ [Semantic gate] ${pendingSlideJobs}/${totalSlideJobs} slide jobs still pending for presentation ${presentationId} – waiting`,
+          );
+          return {
+            dispatched: false,
+            reason: `${pendingSlideJobs}/${totalSlideJobs} slide jobs still pending`,
+          };
+        }
+
+        console.log(
+          `✅ [Semantic gate] All ${totalSlideJobs} slide jobs completed for presentation ${presentationId}`,
+        );
+      } else {
+        console.log(
+          `ℹ️ [Semantic gate] No slide jobs found for presentation ${presentationId} – proceeding without slides`,
+        );
+      }
+
+      // 3. Guard: skip if an active semantic job already exists (idempotency)
+      const existingSemanticJob = await Job.findOne({
+        where: {
+          presentationId,
+          jobType: JOB_TYPES.SEMANTIC,
+          status: { [Op.in]: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING] },
+        },
+      });
+
+      if (existingSemanticJob) {
+        console.log(
+          `⚠️ [Semantic gate] Semantic job ${existingSemanticJob.jobId} already active for presentation ${presentationId} – skipping duplicate dispatch`,
+        );
+        return { dispatched: false, reason: "Semantic job already active" };
+      }
+
+      // 4. Read audioFilename from ASR job metadata (stored by asrComplete handler)
+      const audioFilename = asrJob.metadata?.audioFilename || null;
+      if (!audioFilename) {
+        console.warn(
+          `⚠️ [Semantic gate] No audioFilename in ASR job ${asrJob.jobId} metadata – speech quality analysis will be skipped`,
+        );
+      }
+
+      // 5. Dispatch semantic job – all prerequisites satisfied
+      const semanticJob = await this.createJob(presentationId, JOB_TYPES.SEMANTIC, {
+        triggeredBy: asrJob.jobId,
+        previousJobType: JOB_TYPES.ASR,
+        audioFilename,
+        totalSlideJobs,
+      });
+
+      console.log(
+        `🚀 [Semantic gate] Semantic job ${semanticJob.jobId} dispatched for presentation ${presentationId} (ASR ✅ + ${totalSlideJobs} slides ✅)`,
+      );
+      return { dispatched: true, jobId: semanticJob.jobId };
+    } catch (error) {
+      console.error(
+        `❌ [Semantic gate] checkAndDispatchSemanticIfReady failed for presentation ${presentationId}:`,
+        error,
+      );
+      return { dispatched: false, reason: error.message };
     }
   }
 

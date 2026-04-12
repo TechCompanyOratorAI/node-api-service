@@ -316,78 +316,37 @@ const asrComplete = async (req, res) => {
       }
     }
 
-    // Enqueue semantic job for py-semantic-worker
+    // Resolve S3 audio key and store it in the ASR job metadata so that
+    // checkAndDispatchSemanticIfReady can pass it to the semantic worker later
+    // (needed for speech quality analysis).
+    let s3AudioKey = null;
     try {
-      // Get audio filename for speech quality analysis
-      // console.log(`🔍 DEBUG: Fetching presentation ${presentationId} with audioRecord...`);
       const presentation = await Presentation.findByPk(presentationId, {
         include: ["audioRecord"],
       });
-      
-      console.log(`🔍 DEBUG: Presentation found:`, {
-        presentationId: presentation?.presentationId,
-        hasAudioRecord: !!presentation?.audioRecord,
-        audioRecordId: presentation?.audioRecord?.audioId,
-        audioFileName: presentation?.audioRecord?.fileName,
-      });
-      
-      let s3AudioKey = null;
+
       if (presentation?.audioRecord?.filePath) {
-        try {
-          if (presentation.audioRecord.filePath.startsWith('http')) {
-            const url = new URL(presentation.audioRecord.filePath);
-            s3AudioKey = url.pathname.substring(1); // Remove leading slash
-          } else {
-            s3AudioKey = presentation.audioRecord.filePath;
-          }
-        } catch (e) {
-          s3AudioKey = presentation.audioRecord.fileName || null;
+        if (presentation.audioRecord.filePath.startsWith("http")) {
+          const url = new URL(presentation.audioRecord.filePath);
+          s3AudioKey = url.pathname.substring(1); // Remove leading slash
+        } else {
+          s3AudioKey = presentation.audioRecord.filePath;
         }
       } else {
         s3AudioKey = presentation?.audioRecord?.fileName || null;
       }
-      
-      // console.log(`🔍 DEBUG: audioFilename extracted:`, {
-      //   audioFilename: s3AudioKey,
-      //   type: typeof s3AudioKey,
-      //   isNull: s3AudioKey === null,
-      // });
-      
-      const semanticJobMetadata = {
-        transcriptSegments: transcript?.segments?.length || 0,
-        uniqueSpeakers: diarization?.speakers?.length || 0,
-        asrJobId: jobId,
-        audioFilename: s3AudioKey,  // 🎤 Pass audio filename/key for speech quality analysis
-      };
-      
-      console.log(`🔍 DEBUG: Creating semantic job with metadata:`, JSON.stringify(semanticJobMetadata, null, 2));
-      
-      const semanticJob = await jobService.createJob(
-        presentationId,
-        "semantic",
-        semanticJobMetadata,
-      );
-      
-      console.log(`🔍 DEBUG: Semantic job created:`, {
-        jobId: semanticJob.jobId,
-        metadata: semanticJob.metadata,
-      });
-      
-      console.log(
-        `✅ Semantic job ${semanticJob.jobId} enqueued for presentation ${presentationId}`,
-      );
+
       if (s3AudioKey) {
-        console.log(`   - Audio filename for speech quality: ${s3AudioKey}`);
+        console.log(`🎤 Audio S3 key resolved: ${s3AudioKey}`);
       } else {
-        console.log(`   ⚠️ WARNING: No audio filename found for speech quality analysis`);
+        console.warn(`⚠️ No audio S3 key found for presentation ${presentationId} – speech quality will be skipped`);
       }
-    } catch (enqueueError) {
-      console.error("⚠️ Failed to enqueue semantic job:", enqueueError);
-      console.error("Error stack:", enqueueError.stack);
-      // Don't fail the request - ASR completed successfully
+    } catch (audioKeyError) {
+      console.warn(`⚠️ Failed to resolve audio S3 key:`, audioKeyError.message);
     }
 
-    // Mark job as completed (skip if job doesn't exist)
+    // Mark ASR job as completed and persist audioFilename in metadata
+    // so checkAndDispatchSemanticIfReady can read it when called from slidesComplete later.
     if (job) {
       try {
         await jobService.markJobCompleted(jobId, {
@@ -395,12 +354,28 @@ const asrComplete = async (req, res) => {
           segmentCount: transcript?.segments?.length || 0,
           speakerCount: diarization?.speakers?.length || 0,
         });
+
+        // Enrich ASR job metadata with audioFilename for semantic dispatch
+        if (s3AudioKey) {
+          await job.update({
+            metadata: { ...(job.metadata || {}), audioFilename: s3AudioKey },
+          });
+        }
       } catch (jobError) {
-        console.error(
-          `⚠️ Failed to mark job ${jobId} as completed:`,
-          jobError.message,
-        );
+        console.error(`⚠️ Failed to mark job ${jobId} as completed:`, jobError.message);
       }
+    }
+
+    // Try to dispatch semantic job (gated: both ASR done AND all slides done)
+    try {
+      const semanticDispatch = await jobService.checkAndDispatchSemanticIfReady(presentationId);
+      if (semanticDispatch.dispatched) {
+        console.log(`⏭️ Semantic job ${semanticDispatch.jobId} dispatched after ASR completed for presentation ${presentationId}`);
+      } else {
+        console.log(`⏳ Semantic not yet ready after ASR: ${semanticDispatch.reason}`);
+      }
+    } catch (semanticErr) {
+      console.error(`⚠️ Failed to check semantic readiness after ASR:`, semanticErr.message);
     }
 
     console.log(`✅ ASR webhook processed successfully for job ${jobId}`);
@@ -1320,7 +1295,28 @@ const slidesComplete = async (req, res) => {
 
     await transaction.commit();
 
+    // Try to dispatch semantic job now that this slide job is done.
+    // checkAndDispatchSemanticIfReady will only proceed if:
+    //   • The ASR job is already completed, AND
+    //   • ALL slide jobs for this presentation are completed (including this one)
+    try {
+      const semanticDispatch = await jobService.checkAndDispatchSemanticIfReady(presentationId);
+      if (semanticDispatch.dispatched) {
+        console.log(
+          `⏭️ Semantic job ${semanticDispatch.jobId} dispatched after slide job ${jobId} completed for presentation ${presentationId}`,
+        );
+      } else {
+        console.log(`⏳ Semantic not yet ready after slide: ${semanticDispatch.reason}`);
+      }
+    } catch (semanticErr) {
+      console.error(
+        `⚠️ Failed to check semantic readiness after slide completion:`,
+        semanticErr.message,
+      );
+    }
+
     console.log(`✅ Slides webhook processed successfully for job ${jobId}`);
+
 
     return res.json({
       success: true,
