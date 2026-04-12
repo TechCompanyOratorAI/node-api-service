@@ -117,9 +117,9 @@ class ReportService {
               bestMatchingSlide: segment.bestMatchingSlide,
               expectedSlideNumber: segment.expectedSlideNumber,
               timingDeviation: segment.timingDeviation,
-              issues: segment.issues || [],
-              suggestions: segment.suggestions || [],
-              topicKeywordsFound: segment.topicKeywordsFound || [],
+              issues: Array.isArray(segment.issues) ? segment.issues : [],
+              suggestions: Array.isArray(segment.suggestions) ? segment.suggestions : [],
+              topicKeywordsFound: Array.isArray(segment.topicKeywordsFound) ? segment.topicKeywordsFound : [],
               analysisResultId: analysisResult.resultId
             });
             processedSegments++;
@@ -159,8 +159,8 @@ class ReportService {
               await ContentRelevance.upsert({
                 segAnalysisId: segAnalysisId,
                 relevanceScore: segData.relevanceScore,
-                matchedConcepts: segData.topicKeywordsFound ? segData.topicKeywordsFound.join(", ") : null,
-                explanation: segData.issues && segData.issues.length > 0 ? segData.issues.join("; ") : null,
+                matchedConcepts: Array.isArray(segData.topicKeywordsFound) ? segData.topicKeywordsFound.join(", ") : null,
+                explanation: Array.isArray(segData.issues) && segData.issues.length > 0 ? segData.issues.join("; ") : null,
               }, { transaction });
 
               await SemanticSimilarity.upsert({
@@ -226,11 +226,11 @@ class ReportService {
         segAnalysisId: segAnalysis.segAnalysisId,
         resultId: analysisResultId,
         relevanceScore: segment.relevanceScore,
-        matchedConcepts: segment.topicKeywordsFound
+        matchedConcepts: Array.isArray(segment.topicKeywordsFound)
           ? segment.topicKeywordsFound.join(", ")
           : null,
         explanation:
-          segment.issues && segment.issues.length > 0
+          Array.isArray(segment.issues) && segment.issues.length > 0
             ? segment.issues.join("; ")
             : null,
       },
