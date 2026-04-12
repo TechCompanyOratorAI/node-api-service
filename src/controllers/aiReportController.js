@@ -1,5 +1,5 @@
-const { validationResult } = require("express-validator");
-const aiReportService = require("../services/aiReportService");
+import { validationResult } from "express-validator";
+import aiReportService from "../services/aiReportService.js";
 
 class AIReportController {
   /**
@@ -404,4 +404,4 @@ class AIReportController {
   }
 }
 
-module.exports = new AIReportController();
+export default new AIReportController();
