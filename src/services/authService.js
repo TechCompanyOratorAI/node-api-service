@@ -221,7 +221,7 @@ class AuthService {
   // Login user
   async login(loginData) {
     try {
-      const { emailOrUsername, password } = loginData;
+      const { emailOrUsername, password, selectedRole } = loginData;
 
       // Find user by email or username
       const user = await User.findOne({
@@ -291,12 +291,23 @@ class AuthService {
         { where: { userId: user.userId } }
       );
 
-      // Generate tokens
-      const tokens = this.generateTokens(user.userId);
-
       // Get user roles
       const userRolesResult = await roleService.getUserRoles(user.userId);
       const roles = userRolesResult.success ? userRolesResult.roles : [];
+
+      // Validate selected role if provided
+      if (selectedRole) {
+        const userRoleNames = roles.map((role) => role.roleName);
+        if (!userRoleNames.includes(selectedRole)) {
+          return {
+            success: false,
+            message: `Bạn không có quyền truy cập với vai trò ${selectedRole}`,
+          };
+        }
+      }
+
+      // Generate tokens
+      const tokens = this.generateTokens(user.userId);
 
       return {
         success: true,
@@ -308,6 +319,7 @@ class AuthService {
           firstName: user.firstName,
           lastName: user.lastName,
           isEmailVerified: user.isEmailVerified,
+          avatar: user.avatar,
           lastLoginAt: new Date(),
           roles: roles.map((role) => ({
             roleId: role.roleId,

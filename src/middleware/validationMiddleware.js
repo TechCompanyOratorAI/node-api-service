@@ -87,6 +87,11 @@ export const validateLogin = [
     .trim(),
 
   body("password").notEmpty().withMessage("Password is required"),
+
+  body("selectedRole")
+    .optional()
+    .isIn(["Student", "Instructor", "Admin"])
+    .withMessage("Invalid role selected"),
 ];
 
 // Email validation

@@ -99,6 +99,7 @@ const verifyWebhookAuth = (req, res, next) => {
  */
 const asrComplete = async (req, res) => {
   const transaction = await db.sequelize.transaction();
+  let transactionCommitted = false;
 
   try {
     const { jobId, presentationId, status, error, transcript, diarization } =
@@ -110,13 +111,7 @@ const asrComplete = async (req, res) => {
 
     // Validate required fields
     if (!jobId || !presentationId || !status) {
-      if (transaction && !transaction.finished) {
-        try {
-          await transaction.rollback();
-        } catch (rollbackError) {
-          console.error("❌ Transaction rollback failed:", rollbackError);
-        }
-      }
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: "Missing required fields: jobId, presentationId, status",
@@ -128,13 +123,6 @@ const asrComplete = async (req, res) => {
     try {
       job = await jobService.getJobById(jobId);
     } catch (jobError) {
-      if (transaction && !transaction.finished) {
-        try {
-          await transaction.rollback();
-        } catch (rollbackError) {
-          console.error("❌ Transaction rollback failed:", rollbackError);
-        }
-      }
       console.error(`⚠️ Job not found: ${jobId}`);
 
       // Still process the webhook data even if job record is missing
@@ -165,6 +153,7 @@ const asrComplete = async (req, res) => {
       );
 
       await transaction.commit();
+      transactionCommitted = true;
 
       return res.json({
         success: true,
@@ -255,10 +244,18 @@ const asrComplete = async (req, res) => {
         `✅ Created transcript with ${createdSegments.length} segments`,
       );
 
-      // Commit transcript and segments immediately to avoid timeout rollback
+      // Commit transcript and segments
       await transaction.commit();
+      transactionCommitted = true;
       console.log(`✅ Transcript transaction committed`);
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // EVERYTHING BELOW runs AFTER transaction is committed.
+    // All operations here have their own error handling and will NOT
+    // propagate to the main catch block (which would try to rollback
+    // the already-committed transaction).
+    // ═══════════════════════════════════════════════════════════════
 
     // Process diarization if available (outside main transaction)
     if (
@@ -335,7 +332,6 @@ const asrComplete = async (req, res) => {
       } else {
         s3AudioKey = presentation?.audioRecord?.fileName || null;
       }
-
       if (s3AudioKey) {
         console.log(`🎤 Audio S3 key resolved: ${s3AudioKey}`);
       } else {
@@ -391,14 +387,12 @@ const asrComplete = async (req, res) => {
       },
     });
   } catch (error) {
-    // Only rollback if transaction is still pending (not committed yet)
-    if (!transaction.finished) {
-      if (transaction && !transaction.finished) {
-        try {
-          await transaction.rollback();
-        } catch (rollbackError) {
-          console.error("❌ Transaction rollback failed:", rollbackError);
-        }
+    // Only rollback if transaction has NOT been committed yet
+    if (!transactionCommitted) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error("❌ Transaction rollback failed:", rollbackError);
       }
     }
     console.error("❌ ASR webhook error:", error);
@@ -553,148 +547,16 @@ const analysisComplete = async (req, res) => {
       });
     }
 
-    // Handle success - Save analysis results
-    if (analysis) {
-      console.log(
-        `📊 Saving analysis results for presentation ${presentationId}`,
-      );
-      console.log(
-        `📊 Analysis payload: segmentAnalyses count = ${analysis.segmentAnalyses ? analysis.segmentAnalyses.length : 0}`,
-      );
-      console.log(
-        `📊 First segment sample:`,
-        analysis.segmentAnalyses && analysis.segmentAnalyses[0]
-          ? JSON.stringify(analysis.segmentAnalyses[0])
-          : "null",
+      // Use reportService to handle centralized data saving (SegmentAnalysis and detail tables)
+      const reportResult = await reportService.processEnhancedReport(
+        presentationId,
+        analysis.segmentAnalyses,
+        analysis.overallScores,
+        analysis.metadata,
+        transaction
       );
 
-      // Save segment-level analyses using findOrCreate to handle duplicates
-      if (analysis.segmentAnalyses && analysis.segmentAnalyses.length > 0) {
-        let createdCount = 0;
-        let updatedCount = 0;
-
-        for (const segAnalysis of analysis.segmentAnalyses) {
-          // Find slideId based on bestMatchingSlide
-          let slideId = null;
-          if (segAnalysis.bestMatchingSlide) {
-            const slide = await Slide.findOne({
-              where: {
-                presentationId: presentationId,
-                slideNumber: segAnalysis.bestMatchingSlide,
-              },
-            });
-            slideId = slide ? slide.slideId : null;
-          }
-
-          // Use findOrCreate to handle duplicates - update if exists, create if not
-          // Only use segmentId as unique key since slideId can change between analyses
-          const [segmentAnalysisRecord, created] =
-            await SegmentAnalysis.findOrCreate({
-              where: {
-                segmentId: segAnalysis.segmentId,
-              },
-              defaults: {
-                slideId: slideId,
-                relevanceScore: segAnalysis.relevanceScore,
-                semanticScore: segAnalysis.semanticScore,
-                alignmentScore: segAnalysis.alignmentScore,
-                bestMatchingSlide: segAnalysis.bestMatchingSlide,
-                expectedSlideNumber: segAnalysis.expectedSlideNumber,
-                timingDeviation: segAnalysis.timingDeviation,
-                issues: segAnalysis.issues || [],
-                suggestions: segAnalysis.suggestions || [],
-                topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
-                analyzedAt: new Date(),
-              },
-              transaction,
-            });
-
-          // If record already exists, update it with new values
-          if (!created) {
-            await segmentAnalysisRecord.update(
-              {
-                slideId: slideId,
-                relevanceScore: segAnalysis.relevanceScore,
-                semanticScore: segAnalysis.semanticScore,
-                alignmentScore: segAnalysis.alignmentScore,
-                bestMatchingSlide: segAnalysis.bestMatchingSlide,
-                expectedSlideNumber: segAnalysis.expectedSlideNumber,
-                timingDeviation: segAnalysis.timingDeviation,
-                issues: segAnalysis.issues || [],
-                suggestions: segAnalysis.suggestions || [],
-                topicKeywordsFound: segAnalysis.topicKeywordsFound || [],
-                analyzedAt: new Date(),
-              },
-              { transaction },
-            );
-            updatedCount++;
-          } else {
-            createdCount++;
-          }
-
-  
-          try {
-            await ContentRelevance.upsert(
-              {
-                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
-                relevanceScore: segAnalysis.relevanceScore || 0,
-                matchedConcepts: segAnalysis.topicKeywordsFound
-                  ? segAnalysis.topicKeywordsFound.join(", ")
-                  : null,
-                explanation:
-                  segAnalysis.issues && segAnalysis.issues.length > 0
-                    ? segAnalysis.issues.join("; ")
-                    : null,
-              },
-              { transaction },
-            );
-
-            await SemanticSimilarity.upsert(
-              {
-                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
-                similarityScore: segAnalysis.semanticScore || 0,
-              },
-              { transaction },
-            );
-
-            await AlignmentCheck.upsert(
-              {
-                segAnalysisId: segmentAnalysisRecord.segAnalysisId,
-                alignmentStatus:
-                  segAnalysis.alignmentScore >= 80 ? "aligned" : "misaligned",
-                timingSyncScore: segAnalysis.alignmentScore || 0,
-                expectedSlideNumber: segAnalysis.expectedSlideNumber,
-                misalignmentReason:
-                  segAnalysis.timingDeviation > 0
-                    ? `Timing deviation: ${segAnalysis.timingDeviation}s`
-                    : null,
-              },
-              { transaction },
-            );
-          } catch (upsertError) {
-            console.error(`   ❌ Failed to upsert detail tables: ${upsertError.message}`);
-          }
-        }
-
-        console.log(
-          `✅ Processed ${analysis.segmentAnalyses.length} segment analyses (${createdCount} created, ${updatedCount} updated)`,
-        );
-      }
-
-      // Save overall analysis result using upsert
-      const [analysisResult, created] = await AnalysisResult.upsert(
-        {
-          presentationId,
-          overallScore: analysis.overallScores?.overallScore || 0,
-          analyzedAt: new Date(),
-          status: "done",
-        },
-        { transaction },
-      );
-
-      console.log(
-        `✅ ${created ? "Created" : "Updated"} overall analysis result`,
-      );
+      console.log(`✅ Saved ${reportResult.processedSegments} segment analyses via ReportService`);
 
       // Note: Speech quality analysis will be saved after main transaction
       if (hasSpeechQuality) {
@@ -702,7 +564,6 @@ const analysisComplete = async (req, res) => {
           `🎤 Speech quality data detected for presentation ${presentationId}`,
         );
       }
-    }
 
     // Commit transaction before marking job completed to release locks
     await transaction.commit();
@@ -1123,6 +984,7 @@ const reportComplete = async (req, res) => {
       // Don't fail request - report already saved
     }
 
+    console.log(`✅ Report stored and Job ${jobId} marked COMPLETED`);
     console.log(`✅ Report webhook processed successfully for job ${jobId}`);
 
     return res.json({
