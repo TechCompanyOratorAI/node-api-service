@@ -16,6 +16,104 @@ const { Enrollment, Presentation, AIReport } = db;
  */
 class ClassGradeSyncService {
   /**
+   * Sync finalGrade cho TẤT CẢ thành viên trong nhóm (theo groupId)
+   * Khi instructor confirm điểm → gán cho cả nhóm, không chỉ người tạo presentation
+   */
+  async syncEnrollmentFinalGradeByGroup(groupId) {
+    try {
+      const { GroupStudent, Group } = db;
+
+      // Lấy classId từ Group để biết lớp nào
+      const group = await Group.findByPk(groupId, {
+        attributes: ["groupId", "classId"],
+      });
+
+      if (!group) {
+        console.warn(`[ClassGradeSync] Group ${groupId} not found`);
+        return;
+      }
+
+      const classId = group.classId;
+
+      // Lấy tất cả studentId trong nhóm
+      const groupStudents = await GroupStudent.findAll({
+        where: { groupId },
+        attributes: ["studentId"],
+      });
+
+      if (!groupStudents.length) {
+        console.warn(`[ClassGradeSync] No students in group ${groupId}`);
+        return;
+      }
+
+      const studentIds = groupStudents.map((gs) => gs.studentId);
+
+      // Lấy tất cả presentation của các student trong nhóm này (cùng class và cùng topic nhóm)
+      const presentations = await Presentation.findAll({
+        where: { classId, studentId: studentIds },
+        attributes: ["presentationId", "studentId"],
+      });
+      const presentationMap = new Map();
+      presentations.forEach((p) => presentationMap.set(p.presentationId, p.studentId));
+      const presentationIds = presentations.map((p) => p.presentationId);
+
+      if (!presentationIds.length) {
+        return;
+      }
+
+      // Lay TAT CA confirmed AI Reports cua cac presentation nay
+      const confirmedReports = await AIReport.findAll({
+        where: {
+          presentationId: presentationIds,
+          reportStatus: "confirmed",
+        },
+        attributes: ["reportId", "presentationId", "overallScore", "gradeForInstructor"],
+      });
+
+      // Map reportId -> studentId
+      const reportStudentMap = new Map();
+      confirmedReports.forEach((r) => {
+        const sid = presentationMap.get(r.presentationId);
+        if (sid) reportStudentMap.set(r.reportId, sid);
+      });
+
+      // Tinh finalGrade cho tung student trong nhom
+      const gradeUpdates = new Map();
+      studentIds.forEach((sid) => {
+        if (!gradeUpdates.has(sid)) gradeUpdates.set(sid, []);
+      });
+
+      confirmedReports.forEach((r) => {
+        const sid = reportStudentMap.get(r.reportId);
+        if (!sid || !gradeUpdates.has(sid)) return;
+
+        const score =
+          r.gradeForInstructor !== null && r.gradeForInstructor !== undefined
+            ? parseFloat(r.gradeForInstructor)
+            : parseFloat(r.overallScore);
+
+        if (!isNaN(score)) {
+          gradeUpdates.get(sid).push(score);
+        }
+      });
+
+      // Cap nhat finalGrade vao Enrollment cho TAT CA thành viên nhóm
+      for (const [sid, scores] of gradeUpdates) {
+        const finalGrade =
+          scores.length > 0
+            ? parseFloat(
+                (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2)
+              )
+            : null;
+
+        await Enrollment.update({ finalGrade }, { where: { studentId: sid, classId } });
+      }
+    } catch (error) {
+      console.error("Sync enrollment finalGrade by group error:", error);
+    }
+  }
+
+  /**
    * Sync finalGrade cho 1 student hoac tat ca student trong class
    * Accessible by Admin or assigned instructor
    */
