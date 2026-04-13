@@ -53,6 +53,9 @@ module.exports = (sequelize, DataTypes) => {
       issues: { type: DataTypes.JSON },                // Array of issues found
       suggestions: { type: DataTypes.JSON },           // Array of suggestions
       topicKeywordsFound: { type: DataTypes.JSON },    // Topic keywords found in segment
+      // Speaker label from ASR diarization (e.g. SPEAKER_00)
+      // Added to track per-speaker analysis results.
+      speakerLabel: { type: DataTypes.STRING(50), allowNull: true },
     },
     { sequelize, modelName: "SegmentAnalysis", tableName: "SegmentAnalyses" },
   );

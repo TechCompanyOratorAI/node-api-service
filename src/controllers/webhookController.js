@@ -465,10 +465,6 @@ const analysisComplete = async (req, res) => {
     console.log(
       `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
     );
-    
-    console.log(
-      `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
-    );
 
     // Check for idempotency key to prevent duplicate processing
     if (idempotencyKey && processedRequests.has(idempotencyKey)) {
@@ -1134,28 +1130,36 @@ const slidesComplete = async (req, res) => {
       }
 
       await slide.update(updateData, { transaction });
-
       console.log(`✅ Updated slide ${slideId} with OCR results`);
 
-      // Note: Embedding storage can be added later if needed
-      // For now, we'll just log that we received it
+      // Bug 5 fix: Slide model has no embedding column yet.
+      // Persist embedding vector in job metadata so it is not lost.
+      // When a dedicated Slides.embedding column is added via migration,
+      // move this into updateData above.
       if (result.embedding && result.embedding.length > 0) {
         console.log(
-          `📊 Received embedding vector of length ${result.embedding.length} for slide ${slideId}`,
+          `📊 Received embedding vector of length ${result.embedding.length} for slide ${slideId} — storing in job metadata`,
         );
-        // TODO: Store embedding in a dedicated table or add metadata field to Slides table
       }
     }
 
-    // Mark job as completed
+    // Bug 4 fix: Commit transaction BEFORE markJobCompleted.
+    // markJobCompleted → checkAndDispatchSemanticIfReady reads all slide job
+    // statuses from DB. If we commit after, this slide appears still
+    // pending and semantic dispatch is incorrectly blocked.
+    await transaction.commit();
+
+    // Mark job as completed (outside transaction so semantic gate sees committed data)
     await jobService.markJobCompleted(jobId, {
       slideProcessed: true,
       slideId,
-      extractedText: result?.extractedText ? result.extractedText.length : 0,
+      extractedTextLength: result?.extractedText ? result.extractedText.length : 0,
       hasEmbedding: !!(result?.embedding && result.embedding.length > 0),
+      // Persist embedding in metadata until dedicated DB column is added
+      embedding: (result?.embedding && result.embedding.length > 0)
+        ? result.embedding
+        : undefined,
     });
-
-    await transaction.commit();
 
     // Try to dispatch semantic job now that this slide job is done.
     // checkAndDispatchSemanticIfReady will only proceed if:
@@ -1190,7 +1194,14 @@ const slidesComplete = async (req, res) => {
       },
     });
   } catch (error) {
-    await transaction.rollback();
+    // Only rollback if transaction has not been committed yet
+    if (transaction && !transaction.finished) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error("❌ Transaction rollback failed:", rollbackError);
+      }
+    }
     console.error("❌ Slides webhook error:", error);
 
     try {
