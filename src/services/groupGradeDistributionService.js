@@ -1,7 +1,7 @@
 "use strict";
 
 const db = require("../models");
-const { GroupGradeDistribution, GroupGradeMember, AIReport, Presentation, GroupStudent, Group, Enrollment } = db;
+const { GroupGradeDistribution, GroupGradeMember, AIReport, Presentation, GroupStudent, Group, Enrollment, ClassInstructor } = db;
 
 class GroupGradeDistributionService {
   /**
@@ -39,7 +39,6 @@ class GroupGradeDistributionService {
       const topicEnrollment = await TopicEnrollment.findOne({
         where: {
           topicId: presentation.topicId,
-          classId: presentation.classId,
           status: "enrolled",
         },
       });
@@ -237,7 +236,6 @@ class GroupGradeDistributionService {
       const topicEnrollment = await TopicEnrollment.findOne({
         where: {
           topicId: presentation.topicId,
-          classId: presentation.classId,
           status: "enrolled",
         },
       });
@@ -313,17 +311,29 @@ class GroupGradeDistributionService {
    */
   async getDistributionsByGroup(groupId, userId) {
     try {
-      // Validate user là thành viên nhóm hoặc instructor
+      // Validate user là thành viên nhóm hoặc instructor của lớp
       const membership = await GroupStudent.findOne({
         where: { groupId, studentId: userId },
       });
 
       if (!membership) {
-        return {
-          success: false,
-          message: "Bạn không phải thành viên của nhóm này",
-          code: "NOT_MEMBER",
-        };
+        // Kiểm tra xem user có phải là instructor của lớp chứa nhóm này không
+        const groupData = await Group.findByPk(groupId, { attributes: ["groupId", "classId"] });
+        let isInstructor = false;
+        if (groupData?.classId) {
+          const instructorRecord = await ClassInstructor.findOne({
+            where: { classId: groupData.classId, instructorId: userId },
+          });
+          isInstructor = !!instructorRecord;
+        }
+
+        if (!isInstructor) {
+          return {
+            success: false,
+            message: "Bạn không phải thành viên của nhóm này",
+            code: "NOT_MEMBER",
+          };
+        }
       }
 
       const distributions = await GroupGradeDistribution.findAll({
@@ -344,9 +354,38 @@ class GroupGradeDistributionService {
         order: [["distributedAt", "DESC"]],
       });
 
+      // Enrich members với thông tin student (tên, email)
+      const allStudentIds = new Set();
+      distributions.forEach((d) => {
+        d.members?.forEach((m) => allStudentIds.add(m.studentId));
+      });
+
+      let studentMap = new Map();
+      if (allStudentIds.size > 0) {
+        const students = await db.User.findAll({
+          where: { userId: [...allStudentIds] },
+          attributes: ["userId", "firstName", "lastName", "email"],
+        });
+        studentMap = new Map(students.map((s) => [s.userId, s]));
+      }
+
+      const enrichedDistributions = distributions.map((d) => {
+        const plain = d.toJSON ? d.toJSON() : d;
+        return {
+          ...plain,
+          instructorGrade: parseFloat(plain.instructorGrade),
+          members: (plain.members || []).map((m) => ({
+            ...m,
+            percentage: parseFloat(m.percentage),
+            receivedGrade: parseFloat(m.receivedGrade),
+            student: studentMap.get(m.studentId) || null,
+          })),
+        };
+      });
+
       return {
         success: true,
-        data: distributions,
+        data: enrichedDistributions,
       };
     } catch (error) {
       console.error("Get distributions by group error:", error);
@@ -409,4 +448,4 @@ class GroupGradeDistributionService {
   }
 }
 
-export default new GroupGradeDistributionService();
+module.exports = new GroupGradeDistributionService();
