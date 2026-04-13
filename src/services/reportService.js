@@ -120,6 +120,8 @@ class ReportService {
               issues: Array.isArray(segment.issues) ? segment.issues : [],
               suggestions: Array.isArray(segment.suggestions) ? segment.suggestions : [],
               topicKeywordsFound: Array.isArray(segment.topicKeywordsFound) ? segment.topicKeywordsFound : [],
+              // Speaker label from diarization (SPEAKER_00 / SPEAKER_01 / etc.)
+              speakerLabel: segment.speakerLabel || null,
               analysisResultId: analysisResult.resultId
             });
             processedSegments++;
@@ -137,7 +139,8 @@ class ReportService {
                updateOnDuplicate: [
                  'slideId', 'analyzedAt', 'relevanceScore', 'semanticScore', 
                  'alignmentScore', 'bestMatchingSlide', 'expectedSlideNumber', 
-                 'timingDeviation', 'issues', 'suggestions', 'topicKeywordsFound'
+                 'timingDeviation', 'issues', 'suggestions', 'topicKeywordsFound',
+                 'speakerLabel'
                ]
             });
 
