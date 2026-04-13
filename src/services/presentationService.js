@@ -323,24 +323,10 @@ class PresentationService {
 
       await transaction.commit();
 
-      // Create job and send to slides queue for OCR + embeddings processing
-      try {
-        const job = await jobService.createJob(
-          presentation.presentationId,
-          "slides",
-          {
-            slideId: slide.slideId,
-            slideUrl: uploadResult.url,
-            slideNumber: finalSlideNumber,
-            pageCount: pageCount, // Also include detected page count
-            fileName: file.originalname,
-            fileFormat: file.mimetype,
-          },
-        );
-      } catch (jobError) {
-        // Log error but don't fail the upload
-        console.error("⚠️ Failed to create slides job:", jobError);
-      }
+      // NOTE: Slide job (OCR) is NOT created here.
+      // Jobs are created only when the user clicks Submit or Resubmit,
+      // keeping upload consistent with uploadMedia() and avoiding race
+      // conditions from stale SQS messages.
 
       return { success: true, slide };
     } catch (error) {
@@ -563,15 +549,13 @@ class PresentationService {
         // If no active job after cleanup, allow re-submit
       }
 
-      // If resubmitting from "failed" status, clean up old analysis data
-      if (presentation.status === "failed") {
+      // ─── Cleanup stale jobs and old analysis data (for all non-draft statuses) ───
+      // This runs for every submit so stale SQS workers that callback later will
+      // receive "job not found" and safely acknowledge without side effects.
+      if (presentation.status !== "draft") {
+        await Job.destroy({ where: { presentationId } });
+        console.log(`🧹 [Submit] Cleared old jobs for presentation ${presentationId}`);
 
-        // Delete all jobs for this presentation
-        await Job.destroy({
-          where: { presentationId },
-        });
-
-        // Get transcript IDs to delete segments
         const transcripts = await Transcript.findAll({
           where: { presentationId },
           attributes: ["transcriptId"],
@@ -579,7 +563,6 @@ class PresentationService {
         const transcriptIds = transcripts.map((t) => t.transcriptId);
 
         if (transcriptIds.length > 0) {
-          // Delete segment analyses
           await SegmentAnalysis.destroy({
             where: {
               segmentId: {
@@ -589,49 +572,16 @@ class PresentationService {
               },
             },
           });
-          // Delete transcript segments
           await TranscriptSegment.destroy({
             where: { transcriptId: { [db.Sequelize.Op.in]: transcriptIds } },
           });
-          // Delete transcripts
-        await Transcript.destroy({
-          where: { presentationId },
-        });
+          await Transcript.destroy({ where: { presentationId } });
         }
 
-        // Delete old feedbacks
-        await Feedback.destroy({
-          where: { presentationId },
-        });
-
-        // Delete old analysis results
-        await AnalysisResult.destroy({
-          where: { presentationId },
-        });
-
-        // Recreate slides jobs if slides exist
-        const slides = await Slide.findAll({
-          where: { presentationId },
-        });
-        for (const slide of slides) {
-          try {
-            const slideJob = await jobService.createJob(
-              presentationId,
-              "slides",
-              {
-                slideId: slide.slideId,
-                slideUrl: slide.filePath,
-                slideNumber: slide.slideNumber,
-                fileName: slide.fileName,
-                fileFormat: slide.fileFormat,
-                resubmitted: true,
-              },
-            );
-          } catch (slideJobError) {
-            console.error("⚠️ Failed to recreate slides job:", slideJobError);
-          }
-        }
+        await Feedback.destroy({ where: { presentationId } });
+        await AnalysisResult.destroy({ where: { presentationId } });
       }
+      // ─────────────────────────────────────────────────────────────────────────
 
       // Update presentation status
       await Presentation.update(
@@ -641,6 +591,23 @@ class PresentationService {
         },
         { where: { presentationId } },
       );
+
+      // Create slide jobs for all existing slides (unified: always at submit time)
+      const slides = await Slide.findAll({ where: { presentationId } });
+      for (const slide of slides) {
+        try {
+          await jobService.createJob(presentationId, "slides", {
+            slideId: slide.slideId,
+            slideUrl: slide.filePath,
+            slideNumber: slide.slideNumber,
+            fileName: slide.fileName,
+            fileFormat: slide.fileFormat,
+          });
+          console.log(`📤 [Submit] Slide OCR job created for slide ${slide.slideId}`);
+        } catch (slideJobError) {
+          console.error("⚠️ [Submit] Failed to create slide job:", slideJobError);
+        }
+      }
 
       // Create ASR job (this will also push to SQS queue)
       const job = await jobService.createJob(presentationId, "asr", {
@@ -707,6 +674,66 @@ class PresentationService {
           validation: validationResult,
         };
       }
+
+      // ─── Full cleanup before restarting pipeline ────────────────────────────
+      // CRITICAL: Delete ALL old jobs so that stale SQS messages processed by
+      // workers after this point will get a "job not found" response from the
+      // webhook and be safely acknowledged without side-effects.
+
+      // 1. Delete all existing jobs for this presentation
+      await Job.destroy({
+        where: { presentationId },
+      });
+      console.log(`🧹 Cleared all jobs for presentation ${presentationId} before resubmit`);
+
+      // 2. Clear old analysis data
+      const transcripts = await Transcript.findAll({
+        where: { presentationId },
+        attributes: ["transcriptId"],
+      });
+      const transcriptIds = transcripts.map((t) => t.transcriptId);
+
+      if (transcriptIds.length > 0) {
+        await SegmentAnalysis.destroy({
+          where: {
+            segmentId: {
+              [db.Sequelize.Op.in]: db.sequelize.literal(
+                `(SELECT segmentId FROM TranscriptSegments WHERE transcriptId IN (${transcriptIds.join(",")}))`,
+              ),
+            },
+          },
+        });
+        await TranscriptSegment.destroy({
+          where: { transcriptId: { [db.Sequelize.Op.in]: transcriptIds } },
+        });
+        await Transcript.destroy({
+          where: { presentationId },
+        });
+      }
+
+      await Feedback.destroy({ where: { presentationId } });
+      await AnalysisResult.destroy({ where: { presentationId } });
+
+      // 3. Recreate slide jobs for all existing slides so OCR restarts cleanly
+      const slides = await Slide.findAll({ where: { presentationId } });
+      for (const slide of slides) {
+        try {
+          await jobService.createJob(presentationId, "slides", {
+            slideId: slide.slideId,
+            slideUrl: slide.filePath,
+            slideNumber: slide.slideNumber,
+            fileName: slide.fileName,
+            fileFormat: slide.fileFormat,
+            resubmitted: true,
+          });
+          console.log(
+            `📤 Recreated slide OCR job for slide ${slide.slideId} (presentation ${presentationId})`,
+          );
+        } catch (slideJobError) {
+          console.error("⚠️ Failed to recreate slides job:", slideJobError);
+        }
+      }
+      // ────────────────────────────────────────────────────────────────────────
 
       // Update presentation status back to processing
       await Presentation.update(
