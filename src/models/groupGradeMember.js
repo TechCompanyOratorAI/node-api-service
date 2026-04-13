@@ -42,6 +42,19 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
+      memberFeedback: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      feedbackAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      feedbackStatus: {
+        type: DataTypes.ENUM('pending', 'accepted', 'rejected'),
+        allowNull: true,
+        defaultValue: null,
+      },
     },
     {
       sequelize,

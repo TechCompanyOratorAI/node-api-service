@@ -54,6 +54,20 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
+      status: {
+        type: DataTypes.ENUM('submitted', 'reopened', 'finalized'),
+        allowNull: false,
+        defaultValue: 'submitted',
+      },
+      submittedCount: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+      },
+      finalizedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
     },
     {
       sequelize,

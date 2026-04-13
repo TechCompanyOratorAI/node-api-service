@@ -42,5 +42,11 @@ router.delete('/:groupId/topic', groupController.removeGroupTopic);
 router.get('/:groupId/grade-distributions', groupGradeDistributionController.getDistributionsByGroup);
 // [GET]    /api/groups/:groupId/members/:studentId/grades - Lấy điểm cá nhân của thành viên trong nhóm
 router.get('/:groupId/members/:studentId/grades', groupGradeDistributionController.getMemberGradesInGroup);
+// [POST]   /api/groups/:groupId/grade-distributions/:distributionId/feedback - Thành viên phản hồi
+router.post('/:groupId/grade-distributions/:distributionId/feedback', groupGradeDistributionController.submitMemberFeedback);
+// [PUT]    /api/groups/:groupId/grade-distributions/:distributionId/reopen - Instructor mở lại
+router.put('/:groupId/grade-distributions/:distributionId/reopen', groupGradeDistributionController.reopenDistribution);
+// [PUT]    /api/groups/:groupId/grade-distributions/:distributionId/finalize - Instructor chốt điểm
+router.put('/:groupId/grade-distributions/:distributionId/finalize', groupGradeDistributionController.finalizeDistribution);
 
 module.exports = router;

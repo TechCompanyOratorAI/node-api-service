@@ -5,8 +5,12 @@ const { GroupGradeDistribution, GroupGradeMember, AIReport, Presentation, GroupS
 
 class GroupGradeDistributionService {
   /**
-   * Tạo mới hoặc cập nhật phân chia điểm cho các thành viên nhóm
-   * Chỉ leader mới được phép thực hiện
+   * Leader nộp / cập nhật điểm cho nhóm.
+   *
+   * Luật:
+   *  - Lần 1: distribution chưa tồn tại → tạo mới, status = submitted, submittedCount = 1
+   *  - Lần 2: status = reopened (instructor đã mở lại) → update, status = submitted, submittedCount = 2
+   *  - Mọi trường hợp khác (submitted / finalized) → từ chối
    */
   async distributeGrade({ reportId, leaderStudentId, reason, members }) {
     const transaction = await db.sequelize.transaction();
@@ -27,23 +31,18 @@ class GroupGradeDistributionService {
         };
       }
 
-      // 2. Lấy presentation để biết topicId, classId
+      // 2. Lấy presentation
       const presentation = await Presentation.findByPk(report.presentationId);
       if (!presentation) {
         await transaction.rollback();
         return { success: false, message: "Presentation không tìm thấy" };
       }
 
-      // 3. Tìm TopicEnrollment để lấy groupId
-      const { TopicEnrollment } = db;
-      const topicEnrollment = await TopicEnrollment.findOne({
-        where: {
-          topicId: presentation.topicId,
-          status: "enrolled",
-        },
+      // 3. Tìm TopicEnrollment → groupId
+      const topicEnrollment = await db.TopicEnrollment.findOne({
+        where: { topicId: presentation.topicId, status: "enrolled" },
       });
-
-      if (!topicEnrollment || !topicEnrollment.groupId) {
+      if (!topicEnrollment?.groupId) {
         await transaction.rollback();
         return {
           success: false,
@@ -51,10 +50,9 @@ class GroupGradeDistributionService {
           code: "NOT_GROUP_TOPIC",
         };
       }
-
       const groupId = topicEnrollment.groupId;
 
-      // 4. Validate leader là leader thật sự của nhóm
+      // 4. Validate leader
       const leaderMembership = await GroupStudent.findOne({
         where: { groupId, studentId: leaderStudentId, role: "leader" },
       });
@@ -67,83 +65,72 @@ class GroupGradeDistributionService {
         };
       }
 
-      // 5. Validate tất cả studentId trong members đều thuộc nhóm
+      // 5. Validate members
       const groupStudents = await GroupStudent.findAll({
         where: { groupId },
         attributes: ["studentId"],
       });
       const groupStudentIds = groupStudents.map((gs) => gs.studentId);
+      const seenIds = new Set();
 
       for (const member of members) {
         if (!groupStudentIds.includes(member.studentId)) {
           await transaction.rollback();
-          return {
-            success: false,
-            message: `Sinh viên ID ${member.studentId} không thuộc nhóm này`,
-            code: "INVALID_MEMBER",
-          };
+          return { success: false, message: `Sinh viên ID ${member.studentId} không thuộc nhóm này`, code: "INVALID_MEMBER" };
         }
-        if (
-          member.percentage === undefined ||
-          member.percentage === null ||
-          isNaN(Number(member.percentage))
-        ) {
+        if (member.percentage === undefined || member.percentage === null || isNaN(Number(member.percentage))) {
           await transaction.rollback();
-          return {
-            success: false,
-            message: `Phần trăm của sinh viên ID ${member.studentId} không hợp lệ`,
-            code: "INVALID_PERCENTAGE",
-          };
+          return { success: false, message: `Phần trăm của sinh viên ID ${member.studentId} không hợp lệ`, code: "INVALID_PERCENTAGE" };
         }
         if (member.percentage < 0 || member.percentage > 100) {
           await transaction.rollback();
-          return {
-            success: false,
-            message: `Phần trăm của sinh viên ID ${member.studentId} phải từ 0 đến 100`,
-            code: "INVALID_PERCENTAGE_RANGE",
-          };
+          return { success: false, message: `Phần trăm của sinh viên ID ${member.studentId} phải từ 0 đến 100`, code: "INVALID_PERCENTAGE_RANGE" };
         }
-      }
-
-      // 6. Kiểm tra trùng studentId trong members
-      const seenStudentIds = new Set();
-      for (const member of members) {
-        if (seenStudentIds.has(member.studentId)) {
+        if (seenIds.has(member.studentId)) {
           await transaction.rollback();
-          return {
-            success: false,
-            message: `Sinh viên ID ${member.studentId} xuất hiện nhiều hơn 1 lần trong danh sách chia điểm`,
-            code: "DUPLICATE_MEMBER",
-          };
+          return { success: false, message: `Sinh viên ID ${member.studentId} xuất hiện nhiều hơn 1 lần`, code: "DUPLICATE_MEMBER" };
         }
-        seenStudentIds.add(member.studentId);
+        seenIds.add(member.studentId);
       }
 
       const instructorGrade = parseFloat(report.gradeForInstructor) || parseFloat(report.overallScore);
 
-      // 7. Xóa distribution cũ nếu có (update or create)
-      let distribution = await GroupGradeDistribution.findOne({
-        where: { groupId, reportId },
-      });
+      // 6. Kiểm tra state machine
+      let distribution = await GroupGradeDistribution.findOne({ where: { groupId, reportId } });
 
       if (distribution) {
-        // Xóa members cũ trước
-        await GroupGradeMember.destroy({
-          where: { distributionId: distribution.id },
-          transaction,
-        });
-        // Update distribution
+        // Đã tồn tại → chỉ cho sửa khi status = reopened
+        if (distribution.status === "finalized") {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Điểm đã được chốt và không thể thay đổi",
+            code: "ALREADY_FINALIZED",
+          };
+        }
+        if (distribution.status === "submitted") {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Bạn đã nộp điểm rồi. Chờ instructor mở lại mới được sửa.",
+            code: "ALREADY_SUBMITTED",
+          };
+        }
+        // status = reopened → cho phép cập nhật
+        await GroupGradeMember.destroy({ where: { distributionId: distribution.id }, transaction });
         await distribution.update(
           {
             leaderStudentId,
             instructorGrade,
             reason,
             distributedAt: new Date(),
+            status: "submitted",
+            submittedCount: distribution.submittedCount + 1,
           },
           { transaction }
         );
       } else {
-        // Tạo mới distribution
+        // Lần đầu nộp
         distribution = await GroupGradeDistribution.create(
           {
             groupId,
@@ -152,68 +139,157 @@ class GroupGradeDistributionService {
             instructorGrade,
             reason,
             distributedAt: new Date(),
+            status: "submitted",
+            submittedCount: 1,
           },
           { transaction }
         );
       }
 
-      // 8. Tạo GroupGradeMember cho từng thành viên
+      // 7. Tạo members
       const gradeMembers = members.map((member) => {
         const percentage = parseFloat(member.percentage);
-        const receivedGrade = parseFloat(
-          (instructorGrade * percentage / 100).toFixed(2)
-        );
+        const receivedGrade = parseFloat(((instructorGrade * percentage) / 100).toFixed(2));
         return {
           distributionId: distribution.id,
           studentId: member.studentId,
           percentage,
           receivedGrade,
           reason: member.reason || null,
+          memberFeedback: null,
+          feedbackAt: null,
+          feedbackStatus: null,
         };
       });
-
       await GroupGradeMember.bulkCreate(gradeMembers, { transaction });
 
-      // 9. Cập nhật Enrollment.finalGrade cho từng thành viên
+      // 8. Cập nhật Enrollment.finalGrade
       for (const member of gradeMembers) {
         await Enrollment.update(
           { finalGrade: member.receivedGrade },
-          {
-            where: { studentId: member.studentId, classId: presentation.classId },
-            transaction,
-          }
+          { where: { studentId: member.studentId, classId: presentation.classId }, transaction }
         );
       }
 
       await transaction.commit();
 
-      // 10. Load lại distribution với members để trả về
-      const result = await GroupGradeDistribution.findByPk(distribution.id, {
-        include: [
-          { model: GroupGradeMember, as: "members" },
-          { model: Group, as: "group", attributes: ["groupId", "groupName"] },
-          { model: AIReport, as: "report", attributes: ["reportId"] },
-          {
-            model: db.User,
-            as: "leader",
-            attributes: ["userId", "firstName", "lastName", "email"],
-          },
-        ],
-      });
-
-      return {
-        success: true,
-        data: result,
-        message: "Đã phân chia điểm thành công",
-      };
+      // 9. Load lại để trả về
+      const result = await this._loadDistributionWithStudents(distribution.id);
+      return { success: true, data: result, message: "Đã phân chia điểm thành công" };
     } catch (error) {
       await transaction.rollback();
       console.error("Distribute grade error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi phân chia điểm",
-        error: error.message,
-      };
+      return { success: false, message: "Lỗi khi phân chia điểm", error: error.message };
+    }
+  }
+
+  /**
+   * Thành viên phản hồi về điểm được chia
+   */
+  async submitMemberFeedback({ distributionId, studentId, feedback }) {
+    try {
+      const distribution = await GroupGradeDistribution.findByPk(distributionId);
+      if (!distribution) {
+        return { success: false, message: "Không tìm thấy thông tin phân chia điểm" };
+      }
+      if (distribution.status === "finalized") {
+        return { success: false, message: "Điểm đã chốt, không thể phản hồi", code: "ALREADY_FINALIZED" };
+      }
+
+      const memberRecord = await GroupGradeMember.findOne({
+        where: { distributionId, studentId },
+      });
+      if (!memberRecord) {
+        return { success: false, message: "Bạn không có trong danh sách chia điểm này", code: "NOT_MEMBER" };
+      }
+
+      await memberRecord.update({
+        memberFeedback: feedback || null,
+        feedbackAt: new Date(),
+        feedbackStatus: "pending",
+      });
+
+      return { success: true, message: "Đã gửi phản hồi thành công", data: memberRecord };
+    } catch (error) {
+      console.error("Submit member feedback error:", error);
+      return { success: false, message: "Lỗi khi gửi phản hồi", error: error.message };
+    }
+  }
+
+  /**
+   * Instructor mở lại phân chia điểm (chỉ 1 lần, khi submittedCount < 2)
+   */
+  async reopenDistribution({ distributionId, instructorId, groupId }) {
+    try {
+      // Verify instructor quyền với lớp chứa nhóm
+      const group = await Group.findByPk(groupId, { attributes: ["groupId", "classId"] });
+      if (!group) return { success: false, message: "Nhóm không tìm thấy" };
+
+      const isInstructor = await ClassInstructor.findOne({
+        where: { classId: group.classId, instructorId },
+      });
+      if (!isInstructor) {
+        return { success: false, message: "Bạn không có quyền với lớp này", code: "FORBIDDEN" };
+      }
+
+      const distribution = await GroupGradeDistribution.findByPk(distributionId);
+      if (!distribution || distribution.groupId !== groupId) {
+        return { success: false, message: "Không tìm thấy bản phân chia điểm" };
+      }
+      if (distribution.status === "finalized") {
+        return { success: false, message: "Điểm đã chốt, không thể mở lại", code: "ALREADY_FINALIZED" };
+      }
+      if (distribution.status === "reopened") {
+        return { success: false, message: "Đã mở lại rồi, chờ leader cập nhật", code: "ALREADY_REOPENED" };
+      }
+      if (distribution.submittedCount >= 2) {
+        return {
+          success: false,
+          message: "Đã đạt giới hạn số lần chỉnh sửa (1 lần). Hãy chốt điểm.",
+          code: "MAX_REOPEN_REACHED",
+        };
+      }
+
+      await distribution.update({ status: "reopened" });
+
+      const result = await this._loadDistributionWithStudents(distributionId);
+      return { success: true, data: result, message: "Đã mở lại để leader chỉnh sửa" };
+    } catch (error) {
+      console.error("Reopen distribution error:", error);
+      return { success: false, message: "Lỗi khi mở lại phân chia điểm", error: error.message };
+    }
+  }
+
+  /**
+   * Instructor chốt điểm vĩnh viễn
+   */
+  async finalizeDistribution({ distributionId, instructorId, groupId }) {
+    try {
+      const group = await Group.findByPk(groupId, { attributes: ["groupId", "classId"] });
+      if (!group) return { success: false, message: "Nhóm không tìm thấy" };
+
+      const isInstructor = await ClassInstructor.findOne({
+        where: { classId: group.classId, instructorId },
+      });
+      if (!isInstructor) {
+        return { success: false, message: "Bạn không có quyền với lớp này", code: "FORBIDDEN" };
+      }
+
+      const distribution = await GroupGradeDistribution.findByPk(distributionId);
+      if (!distribution || distribution.groupId !== groupId) {
+        return { success: false, message: "Không tìm thấy bản phân chia điểm" };
+      }
+      if (distribution.status === "finalized") {
+        return { success: false, message: "Điểm đã được chốt rồi", code: "ALREADY_FINALIZED" };
+      }
+
+      await distribution.update({ status: "finalized", finalizedAt: new Date() });
+
+      const result = await this._loadDistributionWithStudents(distributionId);
+      return { success: true, data: result, message: "Đã chốt điểm thành công" };
+    } catch (error) {
+      console.error("Finalize distribution error:", error);
+      return { success: false, message: "Lỗi khi chốt điểm", error: error.message };
     }
   }
 
@@ -223,24 +299,15 @@ class GroupGradeDistributionService {
   async getDistributionByReport(reportId, userId) {
     try {
       const report = await AIReport.findByPk(reportId);
-      if (!report) {
-        return { success: false, message: "AI Report không tìm thấy" };
-      }
+      if (!report) return { success: false, message: "AI Report không tìm thấy" };
 
       const presentation = await Presentation.findByPk(report.presentationId);
-      if (!presentation) {
-        return { success: false, message: "Presentation không tìm thấy" };
-      }
+      if (!presentation) return { success: false, message: "Presentation không tìm thấy" };
 
-      const { TopicEnrollment } = db;
-      const topicEnrollment = await TopicEnrollment.findOne({
-        where: {
-          topicId: presentation.topicId,
-          status: "enrolled",
-        },
+      const topicEnrollment = await db.TopicEnrollment.findOne({
+        where: { topicId: presentation.topicId, status: "enrolled" },
       });
-
-      if (!topicEnrollment || !topicEnrollment.groupId) {
+      if (!topicEnrollment?.groupId) {
         return { success: false, message: "Presentation không thuộc nhóm nào" };
       }
 
@@ -249,23 +316,14 @@ class GroupGradeDistributionService {
         include: [
           { model: GroupGradeMember, as: "members" },
           { model: Group, as: "group", attributes: ["groupId", "groupName"] },
-          {
-            model: db.User,
-            as: "leader",
-            attributes: ["userId", "firstName", "lastName", "email"],
-          },
+          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email"] },
         ],
       });
 
       if (!distribution) {
-        return {
-          success: true,
-          data: null,
-          message: "Chưa có phân chia điểm cho report này",
-        };
+        return { success: true, data: null, message: "Chưa có phân chia điểm cho report này" };
       }
 
-      // Load student info cho từng member
       const memberStudentIds = distribution.members.map((m) => m.studentId);
       const students = await db.User.findAll({
         where: { userId: memberStudentIds },
@@ -273,51 +331,34 @@ class GroupGradeDistributionService {
       });
       const studentMap = new Map(students.map((s) => [s.userId, s]));
 
-      const membersWithStudentInfo = distribution.members.map((m) => ({
-        id: m.id,
-        studentId: m.studentId,
-        percentage: parseFloat(m.percentage),
-        receivedGrade: parseFloat(m.receivedGrade),
-        reason: m.reason,
-        student: studentMap.get(m.studentId),
-      }));
-
+      const plain = distribution.toJSON();
       return {
         success: true,
         data: {
-          id: distribution.id,
-          groupId: distribution.groupId,
-          reportId: distribution.reportId,
-          instructorGrade: parseFloat(distribution.instructorGrade),
-          reason: distribution.reason,
-          distributedAt: distribution.distributedAt,
-          group: distribution.group,
-          leader: distribution.leader,
-          members: membersWithStudentInfo,
+          ...plain,
+          instructorGrade: parseFloat(plain.instructorGrade),
+          members: plain.members.map((m) => ({
+            ...m,
+            percentage: parseFloat(m.percentage),
+            receivedGrade: parseFloat(m.receivedGrade),
+            student: studentMap.get(m.studentId) || null,
+          })),
         },
       };
     } catch (error) {
       console.error("Get distribution by report error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi lấy thông tin phân chia điểm",
-        error: error.message,
-      };
+      return { success: false, message: "Lỗi khi lấy thông tin phân chia điểm", error: error.message };
     }
   }
 
   /**
-   * Lấy tất cả phân chia điểm của 1 nhóm
+   * Lấy tất cả phân chia điểm của 1 nhóm (student + instructor)
    */
   async getDistributionsByGroup(groupId, userId) {
     try {
-      // Validate user là thành viên nhóm hoặc instructor của lớp
-      const membership = await GroupStudent.findOne({
-        where: { groupId, studentId: userId },
-      });
+      const membership = await GroupStudent.findOne({ where: { groupId, studentId: userId } });
 
       if (!membership) {
-        // Kiểm tra xem user có phải là instructor của lớp chứa nhóm này không
         const groupData = await Group.findByPk(groupId, { attributes: ["groupId", "classId"] });
         let isInstructor = false;
         if (groupData?.classId) {
@@ -326,13 +367,8 @@ class GroupGradeDistributionService {
           });
           isInstructor = !!instructorRecord;
         }
-
         if (!isInstructor) {
-          return {
-            success: false,
-            message: "Bạn không phải thành viên của nhóm này",
-            code: "NOT_MEMBER",
-          };
+          return { success: false, message: "Bạn không phải thành viên của nhóm này", code: "NOT_MEMBER" };
         }
       }
 
@@ -340,25 +376,15 @@ class GroupGradeDistributionService {
         where: { groupId },
         include: [
           { model: GroupGradeMember, as: "members" },
-          {
-            model: AIReport,
-            as: "report",
-            attributes: ["reportId", "reportStatus", "overallScore", "gradeForInstructor"],
-          },
-          {
-            model: db.User,
-            as: "leader",
-            attributes: ["userId", "firstName", "lastName"],
-          },
+          { model: AIReport, as: "report", attributes: ["reportId", "reportStatus", "overallScore", "gradeForInstructor"] },
+          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName"] },
         ],
         order: [["distributedAt", "DESC"]],
       });
 
-      // Enrich members với thông tin student (tên, email)
+      // Enrich members với student info
       const allStudentIds = new Set();
-      distributions.forEach((d) => {
-        d.members?.forEach((m) => allStudentIds.add(m.studentId));
-      });
+      distributions.forEach((d) => d.members?.forEach((m) => allStudentIds.add(m.studentId)));
 
       let studentMap = new Map();
       if (allStudentIds.size > 0) {
@@ -369,7 +395,7 @@ class GroupGradeDistributionService {
         studentMap = new Map(students.map((s) => [s.userId, s]));
       }
 
-      const enrichedDistributions = distributions.map((d) => {
+      const enriched = distributions.map((d) => {
         const plain = d.toJSON ? d.toJSON() : d;
         return {
           ...plain,
@@ -383,17 +409,10 @@ class GroupGradeDistributionService {
         };
       });
 
-      return {
-        success: true,
-        data: enrichedDistributions,
-      };
+      return { success: true, data: enriched };
     } catch (error) {
       console.error("Get distributions by group error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi lấy danh sách phân chia điểm",
-        error: error.message,
-      };
+      return { success: false, message: "Lỗi khi lấy danh sách phân chia điểm", error: error.message };
     }
   }
 
@@ -402,49 +421,58 @@ class GroupGradeDistributionService {
    */
   async getMemberGradesInGroup(groupId, studentId) {
     try {
-      // Validate user là thành viên nhóm
-      const membership = await GroupStudent.findOne({
-        where: { groupId, studentId },
-      });
-
+      const membership = await GroupStudent.findOne({ where: { groupId, studentId } });
       if (!membership) {
-        return {
-          success: false,
-          message: "Bạn không phải thành viên của nhóm này",
-          code: "NOT_MEMBER",
-        };
+        return { success: false, message: "Bạn không phải thành viên của nhóm này", code: "NOT_MEMBER" };
       }
 
-      // Lấy tất cả distributions của nhóm
       const distributions = await GroupGradeDistribution.findAll({
         where: { groupId },
         include: [
-          {
-            model: GroupGradeMember,
-            as: "members",
-            where: { studentId },
-            required: true,
-          },
-          {
-            model: AIReport,
-            as: "report",
-            attributes: ["reportId", "overallScore", "gradeForInstructor"],
-          },
+          { model: GroupGradeMember, as: "members", where: { studentId }, required: true },
+          { model: AIReport, as: "report", attributes: ["reportId", "overallScore", "gradeForInstructor"] },
         ],
       });
 
-      return {
-        success: true,
-        data: distributions,
-      };
+      return { success: true, data: distributions };
     } catch (error) {
       console.error("Get member grades in group error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi lấy điểm của thành viên",
-        error: error.message,
-      };
+      return { success: false, message: "Lỗi khi lấy điểm của thành viên", error: error.message };
     }
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  async _loadDistributionWithStudents(distributionId) {
+    const dist = await GroupGradeDistribution.findByPk(distributionId, {
+      include: [
+        { model: GroupGradeMember, as: "members" },
+        { model: Group, as: "group", attributes: ["groupId", "groupName"] },
+        { model: AIReport, as: "report", attributes: ["reportId"] },
+        { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email"] },
+      ],
+    });
+
+    if (!dist) return null;
+
+    const memberStudentIds = dist.members.map((m) => m.studentId);
+    const students = await db.User.findAll({
+      where: { userId: memberStudentIds },
+      attributes: ["userId", "firstName", "lastName", "email"],
+    });
+    const studentMap = new Map(students.map((s) => [s.userId, s]));
+
+    const plain = dist.toJSON();
+    return {
+      ...plain,
+      instructorGrade: parseFloat(plain.instructorGrade),
+      members: plain.members.map((m) => ({
+        ...m,
+        percentage: parseFloat(m.percentage),
+        receivedGrade: parseFloat(m.receivedGrade),
+        student: studentMap.get(m.studentId) || null,
+      })),
+    };
   }
 }
 
