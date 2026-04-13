@@ -22,6 +22,8 @@ const {
   Course,
   Class,
   Enrollment,
+  GroupStudent,
+  Group,
 } = db;
 
 const sanitizeFileName = (filename) => {
@@ -145,8 +147,6 @@ class PresentationService {
       // Step 5: Check topic enrollment via group (if student is in a group)
       // Nếu sinh viên thuộc nhóm → kiểm tra nhóm đã chọn topic này chưa
       // Nếu không thuộc nhóm → kiểm tra individual enrollment
-      const { GroupStudent, Group } = db;
-
       const groupMembership = await GroupStudent.findOne({
         where: { studentId },
         include: [
@@ -445,9 +445,6 @@ class PresentationService {
           message: "Presentation not found or access denied",
         };
       }
-
-      // Check topic enrollment via group (if student is in a group for this class)
-      const { GroupStudent, Group } = db;
 
       const groupMembership = await GroupStudent.findOne({
         where: { studentId },
@@ -869,19 +866,62 @@ class PresentationService {
     try {
       const { status, classId, topicId, limit = 50, offset = 0 } = options;
 
-      const where = { studentId };
-      if (status) {
-        where.status = status;
-      }
-      if (classId) {
-        where.classId = parseInt(classId);
-      }
-      if (topicId) {
-        where.topicId = parseInt(topicId);
+      // ── 1. Presentations tự làm (owner) ──
+      const ownWhere = { studentId };
+      if (status) ownWhere.status = status;
+      if (classId) ownWhere.classId = parseInt(classId);
+      if (topicId) ownWhere.topicId = parseInt(topicId);
+
+      // ── 2. Tìm presentation của nhóm mình thuộc ──
+      // Lấy tất cả group mà sinh viên là member
+      const memberships = await GroupStudent.findAll({
+        where: { studentId },
+        include: [{ model: Group, as: "group", attributes: ["groupId", "classId"] }],
+      });
+
+      let groupPresentationIds = [];
+      if (memberships.length > 0) {
+        for (const m of memberships) {
+          const group = m.group;
+          if (!group) continue;
+
+          // Lấy tất cả studentId trong nhóm này
+          const groupMembers = await GroupStudent.findAll({
+            where: { groupId: group.groupId },
+            attributes: ["studentId"],
+          });
+          const memberIds = groupMembers.map((gm) => gm.studentId).filter((id) => id !== studentId);
+
+          if (memberIds.length === 0) continue;
+
+          // Tìm presentation của các member khác trong cùng group + cùng class
+          const groupPresentationWhere = {
+            studentId: { [db.Sequelize.Op.in]: memberIds },
+            classId: group.classId,
+          };
+          if (status) groupPresentationWhere.status = status;
+          if (topicId) groupPresentationWhere.topicId = parseInt(topicId);
+
+          const gps = await Presentation.findAll({
+            where: groupPresentationWhere,
+            attributes: ["presentationId"],
+          });
+          groupPresentationIds.push(...gps.map((p) => p.presentationId));
+        }
       }
 
+      // ── 3. Merge: own presentations OR group presentations ──
+      const mergedWhere = groupPresentationIds.length > 0
+        ? {
+            [db.Sequelize.Op.or]: [
+              ownWhere,
+              { presentationId: { [db.Sequelize.Op.in]: groupPresentationIds } },
+            ],
+          }
+        : ownWhere;
+
       const presentations = await Presentation.findAndCountAll({
-        where,
+        where: mergedWhere,
         limit,
         offset,
         order: [["createdAt", "DESC"]],
@@ -900,6 +940,11 @@ class PresentationService {
             model: AudioRecord,
             as: "audioRecord",
             attributes: ["audioId", "durationSeconds"],
+          },
+          {
+            model: User,
+            as: "student",
+            attributes: ["userId", "firstName", "lastName"],
           },
         ],
       });
@@ -1249,7 +1294,34 @@ class PresentationService {
       ) {
         return true;
       }
-      // Check if user is enrolled in same course
+
+      // ── Group member access ──
+      // Nếu người dùng thuộc cùng nhóm với owner của presentation thì cho phép truy cập
+      if (presentation.classId) {
+        // Lấy group của owner trong class này
+        const ownerGroup = await GroupStudent.findOne({
+          where: { studentId: presentation.studentId },
+          include: [{
+            model: Group,
+            as: "group",
+            where: { classId: presentation.classId },
+            attributes: ["groupId"],
+          }],
+        });
+
+        if (ownerGroup) {
+          // Kiểm tra userId có trong cùng group không
+          const isMember = await GroupStudent.findOne({
+            where: {
+              studentId: userId,
+              groupId: ownerGroup.group.groupId,
+            },
+          });
+          if (isMember) return true;
+        }
+      }
+
+      // Check if user is enrolled in same course (fallback)
       if (presentation.courseId) {
         const enrollment = await TopicEnrollment.findOne({
           where: {
