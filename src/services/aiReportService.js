@@ -6,12 +6,11 @@ import {
   ClassRubricCriteria,
   Presentation,
   Class,
-  User
+  User,
 } from "../models";
 import { Op } from "sequelize";
 import db from "../models";
 import queueService from "../services/queueService";
-import classGradeSyncService from "./classGradeSyncService";
 import jobService from "./jobService.js";
 
 const VALID_REPORT_STATUSES = [
@@ -415,20 +414,14 @@ class AIReportService {
         gradeForInstructor: gradeForInstructor,
       });
 
-      // Dong bo finalGrade vao Enrollment sau khi confirm
-      // studentId nam trong Presentation, khong nam trong AIReport
-      const presentation = await Presentation.findByPk(report.presentationId, {
-        attributes: ["studentId"],
-      });
-      await classGradeSyncService.syncEnrollmentFinalGrade(
-        report.classId,
-        presentation ? presentation.studentId : null
-      );
+      // Không sync điểm vào Enrollment ở đây nữa
+      // Leader sẽ là người chia điểm cho các thành viên nhóm sau khi confirm
+      // thông qua API: POST /api/ai-reports/:reportId/distribute-grade
 
       return {
         success: true,
         data: report,
-        message: "Đã xác nhận AI report",
+        message: "Đã xác nhận AI report. Trưởng nhóm sẽ phân chia điểm cho các thành viên.",
       };
     } catch (error) {
       console.error("Confirm AI report error:", error);

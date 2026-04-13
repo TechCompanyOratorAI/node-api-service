@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const groupController = require('../controllers/groupController');
+const groupGradeDistributionController = require('../controllers/groupGradeDistributionController');
 const { authenticateToken, requireEmailVerification } = require('../middleware/authMiddleware');
 
 // Tất cả routes cần xác thực
@@ -33,5 +34,13 @@ router.post('/:groupId/topic', groupController.selectGroupTopic);
 router.get('/:groupId/topic', groupController.getGroupTopic);
 // [DELETE] /api/groups/:groupId/topic - Huỷ chọn topic (leader only)
 router.delete('/:groupId/topic', groupController.removeGroupTopic);
+
+// ============================================================
+// GRADE DISTRIBUTION ROUTES
+// ============================================================
+// [GET]    /api/groups/:groupId/grade-distributions - Lấy tất cả phân chia điểm của nhóm
+router.get('/:groupId/grade-distributions', groupGradeDistributionController.getDistributionsByGroup);
+// [GET]    /api/groups/:groupId/members/:studentId/grades - Lấy điểm cá nhân của thành viên trong nhóm
+router.get('/:groupId/members/:studentId/grades', groupGradeDistributionController.getMemberGradesInGroup);
 
 module.exports = router;

@@ -1,5 +1,6 @@
 import express from "express";
 import aiReportController from "../controllers/aiReportController.js";
+import groupGradeDistributionController from "../controllers/groupGradeDistributionController.js";
 import {
   authenticateToken,
   requireEmailVerification,
@@ -90,6 +91,18 @@ router.get(
   "/",
   requireRole(["Admin", "Instructor"]),
   aiReportController.getAllReports
+);
+
+// POST /ai-reports/:reportId/distribute-grade - Leader chia điểm cho các thành viên nhóm
+router.post(
+  "/:reportId/distribute-grade",
+  groupGradeDistributionController.distributeGrade
+);
+
+// GET /ai-reports/:reportId/grade-distribution - Lấy thông tin phân chia điểm của 1 report
+router.get(
+  "/:reportId/grade-distribution",
+  groupGradeDistributionController.getDistributionByReport
 );
 
 export default router;
