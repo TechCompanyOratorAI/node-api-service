@@ -8,11 +8,12 @@ module.exports = (sequelize, DataTypes) => {
             // configId column has been dropped — AIConfig association removed
 
             // These sub-tables still use resultId (different sub-system, not semantic worker)
-            AnalysisResult.hasOne(models.ContentQuality, { foreignKey: 'resultId', as: 'contentQuality' });
-            AnalysisResult.hasOne(models.DeliveryQuality, { foreignKey: 'resultId', as: 'deliveryQuality' });
-            AnalysisResult.hasOne(models.StructureQuality, { foreignKey: 'resultId', as: 'structureQuality' });
-            AnalysisResult.hasOne(models.EngagementMetric, { foreignKey: 'resultId', as: 'engagementMetric' });
-            AnalysisResult.hasOne(models.SpeechPattern, { foreignKey: 'resultId', as: 'speechPattern' });
+            // Commented out as they are causing errors in the worker due to missing tables
+            // AnalysisResult.hasOne(models.ContentQuality, { foreignKey: 'resultId', as: 'contentQuality' });
+            // AnalysisResult.hasOne(models.DeliveryQuality, { foreignKey: 'resultId', as: 'deliveryQuality' });
+            // AnalysisResult.hasOne(models.StructureQuality, { foreignKey: 'resultId', as: 'structureQuality' });
+            // AnalysisResult.hasOne(models.EngagementMetric, { foreignKey: 'resultId', as: 'engagementMetric' });
+            // AnalysisResult.hasOne(models.SpeechPattern, { foreignKey: 'resultId', as: 'speechPattern' });
 
             // resultId dropped from ContentRelevance/SemanticSimilarity/AlignmentChecks
             // Those tables now link only via segAnalysisId → SegmentAnalyses
