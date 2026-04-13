@@ -1,5 +1,5 @@
-import { validationResult } from "express-validator";
-import groupGradeDistributionService from "../services/groupGradeDistributionService.js";
+const { validationResult } = require("express-validator");
+const groupGradeDistributionService = require("../services/groupGradeDistributionService");
 
 class GroupGradeDistributionController {
   /**
@@ -187,4 +187,4 @@ class GroupGradeDistributionController {
   }
 }
 
-export default new GroupGradeDistributionController();
+module.exports = new GroupGradeDistributionController();
