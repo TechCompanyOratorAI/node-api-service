@@ -7,8 +7,11 @@ import viewEngine from "./config/viewEngine.js";
 import initWebRoutes from "./route/web.js";
 import connectDB from "./config/conectDB.js";
 import cors from "cors";
+import http from "http";
+import { initSocketIO } from "./websocket/index.js";
 
 let app = express();
+let httpServer = http.createServer(app); // keep raw server so Socket.IO can attach
 
 // Trust proxy (required when running behind nginx/load balancer with X-Forwarded-For)
 app.set("trust proxy", 1);
@@ -34,9 +37,9 @@ initWebRoutes(app);
 
 connectDB();
 
-let port = process.env.PORT || 8080; //Port === undefined => Port = 6060
+let port = process.env.PORT || 8080;
 
-app.listen(port, () => {
-  //callback
+httpServer.listen(port, () => {
   console.log("Backend Nodejs is running on the port: " + port);
+  initSocketIO(httpServer);
 });

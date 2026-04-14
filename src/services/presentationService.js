@@ -4,6 +4,7 @@ import db from "../models/index.js";
 import storageService from "./storageService.js";
 import jobService from "./jobService.js";
 import speakerService from "./speakerService.js";
+import { emitJobEvent } from "../websocket/emitters.js";
 
 const {
   Presentation,
@@ -641,6 +642,14 @@ class PresentationService {
       });
 
       const isResubmit = presentation.status === "failed";
+
+      // Emit WebSocket event so student UI knows processing started
+      emitJobEvent("started", presentationId, {
+        jobType: "asr",
+        jobId: job.jobId,
+        message: "Đang xử lý bài thuyết trình...",
+      });
+
       return {
         success: true,
         message: isResubmit
@@ -774,6 +783,13 @@ class PresentationService {
         resubmittedBy: studentId,
         resubmittedAt: new Date().toISOString(),
         reason: "Resubmit after failure",
+      });
+
+      // Emit WebSocket event so student UI knows processing restarted
+      emitJobEvent("started", presentationId, {
+        jobType: "asr",
+        jobId: job.jobId,
+        message: "Đang xử lý lại bài thuyết trình...",
       });
 
       return {
