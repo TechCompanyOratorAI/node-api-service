@@ -24,6 +24,7 @@ import classRubricCriteriaRoutes from "./classRubricCriteriaRoutes.js";
 import aiReportRoutes from "./aiReportRoutes.js";
 import aiReportFeedbackRoutes from "./aiReportFeedbackRoutes.js";
 import shareRoutes from "./shareRoutes.js";
+import instructorRoutes from "./instructorRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -63,6 +64,9 @@ router.use("/ai-reports", aiReportFeedbackRoutes);
 // ─── Share routes ───────────────────────────────────────────────
 // Public view: GET /share/:token (no authentication needed)
 router.use("/share", shareRoutes);
+
+// ─── Instructor routes ───────────────────────────────────────────
+router.use("/instructor", instructorRoutes);
 
 router.get(
   "/me/classes",

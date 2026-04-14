@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
   class Presentation extends Model {
     static associate(models) {
       Presentation.belongsTo(models.User, { foreignKey: 'studentId', as: 'student' });
+      Presentation.belongsTo(models.User, { foreignKey: 'approvedBy', as: 'approver' });
       Presentation.belongsTo(models.Course, { foreignKey: 'courseId', as: 'course' });
       Presentation.belongsTo(models.Class, { foreignKey: 'classId', as: 'class' });
       Presentation.belongsTo(models.Topic, { foreignKey: 'topicId', as: 'topic' });
@@ -55,6 +56,20 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       versionNumber: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+
+      instructorApproved: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      approvedBy: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      approvedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
     },
     {
       sequelize,

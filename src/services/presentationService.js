@@ -228,6 +228,20 @@ class PresentationService {
 
       const presentation = accessResult.presentation;
 
+      // Kiểm tra upload permission nếu có classId
+      if (presentation.classId) {
+        const { Class } = db;
+        const classRecord = await Class.findByPk(presentation.classId);
+        if (classRecord && !classRecord.isUploadEnabled) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
+            uploadLocked: true,
+          };
+        }
+      }
+
 
       // Get existing slides to delete their files from storage
       const existingSlides = await Slide.findAll({
@@ -358,6 +372,20 @@ class PresentationService {
       }
 
       const presentation = accessResult.presentation;
+
+      // Kiểm tra upload permission nếu có classId
+      if (presentation.classId) {
+        const { Class } = db;
+        const classRecord = await Class.findByPk(presentation.classId);
+        if (classRecord && !classRecord.isUploadEnabled) {
+          return {
+            success: false,
+            message: "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
+            uploadLocked: true,
+          };
+        }
+      }
+
       const extension = path.extname(file.originalname || "");
       const uniqueSuffix = crypto.randomBytes(6).toString("hex");
       const safeName = sanitizeFileName(

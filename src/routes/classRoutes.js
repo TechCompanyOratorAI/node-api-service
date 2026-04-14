@@ -140,4 +140,23 @@ router.delete(
   classController.deleteTopic
 );
 
+// ============================================================
+// UPLOAD PERMISSION ROUTES
+// ============================================================
+// GET  /api/classes/:classId/upload-permission - Lấy trạng thái upload
+router.get(
+  "/:classId/upload-permission",
+  authenticateToken,
+  requireEmailVerification,
+  classController.getUploadPermission
+);
+
+// POST /api/classes/:classId/upload-permission - Bật/tắt upload
+router.post(
+  "/:classId/upload-permission",
+  requireRole(["Admin", "Instructor"]),
+  requireClassInstructorOrAdmin,
+  classController.setUploadPermission
+);
+
 export default router;
