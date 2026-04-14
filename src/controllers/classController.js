@@ -499,6 +499,81 @@ class ClassController {
       return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
     }
   }
+
+  // ============================================================
+  // UPLOAD PERMISSION HANDLERS
+  // ============================================================
+
+  // POST /api/classes/:classId/upload-permission - Bật/tắt cho phép upload
+  async setUploadPermission(req, res) {
+    try {
+      const { classId } = req.params;
+      const { isUploadEnabled, uploadStartDate, uploadEndDate } = req.body;
+
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const instructorId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin")
+        ? "Admin"
+        : req.userRoles?.includes("Instructor")
+        ? "Instructor"
+        : null;
+
+      if (!userRole) {
+        return res.status(403).json({
+          success: false,
+          message: "Chỉ giảng viên hoặc admin mới có quyền thực hiện",
+        });
+      }
+
+      const result = await classService.setUploadPermission(
+        parseInt(classId),
+        {
+          isUploadEnabled: isUploadEnabled ?? true,
+          uploadStartDate: uploadStartDate || null,
+          uploadEndDate: uploadEndDate || null,
+        },
+        instructorId,
+        userRole
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Set upload permission error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  // GET /api/classes/:classId/upload-permission - Lấy trạng thái upload
+  async getUploadPermission(req, res) {
+    try {
+      const { classId } = req.params;
+
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const result = await classService.getUploadPermission(parseInt(classId));
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Get upload permission error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
 }
 
 module.exports = new ClassController();

@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
@@ -38,6 +38,22 @@ module.exports = (sequelize, DataTypes) => {
       createdBy: {
         type: DataTypes.INTEGER,
         allowNull: false,
+      },
+      // Cho phép sinh viên upload presentation
+      isUploadEnabled: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      // Ngày bắt đầu cho phép upload (optional - để set thời gian cụ thể)
+      uploadStartDate: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      // Ngày kết thúc cho phép upload (optional)
+      uploadEndDate: {
+        type: DataTypes.DATE,
+        allowNull: true,
       },
     },
     {

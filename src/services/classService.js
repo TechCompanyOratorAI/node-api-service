@@ -864,6 +864,106 @@ class ClassService {
       return { success: false, message: "Không thể xóa topic", error: error.message };
     }
   }
+
+  // ============================================================
+  // UPLOAD PERMISSION METHODS
+  // ============================================================
+
+  /**
+   * Set upload permission for a class
+   */
+  async setUploadPermission(classId, data, instructorId, userRole) {
+    try {
+      const { Class, ClassInstructor } = require("../models");
+
+      // Find the class
+      const classRecord = await Class.findByPk(classId);
+      if (!classRecord) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Check permission: Admin hoặc Instructor phụ trách lớp này
+      let hasPermission = false;
+
+      if (userRole === "Admin") {
+        hasPermission = true;
+      } else if (userRole === "Instructor") {
+        // Kiểm tra instructor có phụ trách lớp này không qua bảng ClassInstructor
+        const classInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId },
+        });
+        hasPermission = !!classInstructor;
+      }
+
+      if (!hasPermission) {
+        return {
+          success: false,
+          message: "Bạn không có quyền thay đổi cài đặt của lớp học này",
+        };
+      }
+
+      // Update class
+      await classRecord.update({
+        isUploadEnabled: data.isUploadEnabled,
+        uploadStartDate: data.uploadStartDate || null,
+        uploadEndDate: data.uploadEndDate || null,
+      });
+
+      return {
+        success: true,
+        message: data.isUploadEnabled
+          ? "Đã mở cho phép upload bài thuyết trình"
+          : "Đã đóng không cho phép upload bài thuyết trình",
+        data: {
+          classId,
+          isUploadEnabled: classRecord.isUploadEnabled,
+          uploadStartDate: classRecord.uploadStartDate,
+          uploadEndDate: classRecord.uploadEndDate,
+        },
+      };
+    } catch (error) {
+      console.error("Set upload permission error:", error);
+      return {
+        success: false,
+        message: "Không thể cập nhật cài đặt upload",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get upload permission for a class
+   */
+  async getUploadPermission(classId) {
+    try {
+      const { Class } = require("../models");
+
+      const classRecord = await Class.findByPk(classId, {
+        attributes: ["classId", "isUploadEnabled", "uploadStartDate", "uploadEndDate"],
+      });
+
+      if (!classRecord) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      return {
+        success: true,
+        data: {
+          classId: classRecord.classId,
+          isUploadEnabled: classRecord.isUploadEnabled,
+          uploadStartDate: classRecord.uploadStartDate,
+          uploadEndDate: classRecord.uploadEndDate,
+        },
+      };
+    } catch (error) {
+      console.error("Get upload permission error:", error);
+      return {
+        success: false,
+        message: "Không thể lấy cài đặt upload",
+        error: error.message,
+      };
+    }
+  }
 }
 
 module.exports = new ClassService();
