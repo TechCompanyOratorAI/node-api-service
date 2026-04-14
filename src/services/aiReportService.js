@@ -12,6 +12,7 @@ import { Op } from "sequelize";
 import db from "../models";
 import queueService from "../services/queueService";
 import jobService from "./jobService.js";
+import { emitReportEvent } from "../websocket/emitters.js";
 
 const VALID_REPORT_STATUSES = [
   "waiting",
@@ -84,8 +85,8 @@ class AIReportService {
         where: { presentationId: presentationId },
       });
 
-      const initialStatus = aiSettings.requireInstructorConfirmation 
-        ? "pending_review" 
+      const initialStatus = aiSettings.requireInstructorConfirmation
+        ? "pending_review"
         : "confirmed";
 
       const rubricData = classCriteria.map((c) => ({
@@ -206,17 +207,17 @@ class AIReportService {
           reportStatus: "generating",
           classAiSettingId: aiSettings.classAiSettingId,
         });
-        
+
         console.log(`[AIReportService] Triggering report regeneration for presentation ${presentationId}`);
-        
+
         // Create a new dedicated report job
         const reportJob = await jobService.createJob(presentationId, "report", {
           reportId: existingReport.reportId,
           triggeredBy: jobId,
         });
-        
+
         await this._sendToReportQueue(presentationId, existingReport.reportId, classId, reportJob.jobId, classCriteria, aiSettings);
-        
+
         return {
           success: true,
           reportId: existingReport.reportId,
@@ -241,7 +242,7 @@ class AIReportService {
 
       console.log(`[AIReportService] Created report ${report.reportId} for presentation ${presentationId}`);
       await report.update({ reportStatus: "generating" });
-      
+
       // Create a new dedicated report job
       const reportJob = await jobService.createJob(presentationId, "report", {
         reportId: report.reportId,
@@ -414,6 +415,14 @@ class AIReportService {
         gradeForInstructor: gradeForInstructor,
       });
 
+      // Emit WebSocket: report confirmed by instructor
+      emitReportEvent("confirmed", report.presentationId, {
+        reportId,
+        instructorId,
+        overallScore: report.overallScore,
+        message: "Giảng viên đã xác nhận báo cáo",
+      });
+
       // Không sync điểm vào Enrollment ở đây nữa
       // Leader sẽ là người chia điểm cho các thành viên nhóm sau khi confirm
       // thông qua API: POST /api/ai-reports/:reportId/distribute-grade
@@ -521,6 +530,13 @@ class AIReportService {
         reportStatus: "rejected",
         confirmedByInstructorId: instructorId,
         confirmedAt: new Date(),
+      });
+
+      // Emit WebSocket: report rejected by instructor
+      emitReportEvent("rejected", report.presentationId, {
+        reportId,
+        instructorId,
+        message: "Giảng viên đã từ chối báo cáo",
       });
 
       return {
