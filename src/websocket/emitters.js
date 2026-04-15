@@ -94,3 +94,57 @@ export const emitUploadPermissionChanged = (classId, payload) => {
     console.error(`[SocketEmitter] ❌ emitUploadPermissionChanged failed: ${err.message}`);
   }
 };
+
+/**
+ * Emit grade distribution submitted by leader.
+ * Room: "group:{groupId}"
+ *
+ * @param {number} groupId
+ * @param {number} reportId
+ * @param {object} distribution - full distribution with members
+ */
+export const emitGradeDistributed = (groupId, reportId, distribution) => {
+  try {
+    const io = getIO();
+    const payload = {
+      groupId,
+      reportId,
+      distribution,
+      _ts: Date.now(),
+    };
+    console.log(`[SocketEmitter] EMIT → room="group:${groupId}" event="grade:distributed" payload=`, payload);
+    io.to(`group:${groupId}`).emit("grade:distributed", payload);
+    console.log(`[SocketEmitter] ✅ emitGradeDistributed succeeded`);
+  } catch (err) {
+    console.error(`[SocketEmitter] ❌ emitGradeDistributed failed: ${err.message}`);
+    console.error(`[SocketEmitter]   → Did you restart the backend after code changes?`);
+    console.error(`[SocketEmitter]   → getIO() threw because Socket.IO is not initialized`);
+  }
+};
+
+/**
+ * Emit grade distribution finalized by instructor.
+ * Room: "group:{groupId}"
+ *
+ * @param {number} groupId
+ * @param {number} reportId
+ * @param {object} distribution - full distribution with members
+ */
+export const emitGradeFinalized = (groupId, reportId, distribution) => {
+  try {
+    const io = getIO();
+    const payload = {
+      groupId,
+      reportId,
+      distribution,
+      _ts: Date.now(),
+    };
+    console.log(`[SocketEmitter] EMIT → room="group:${groupId}" event="grade:finalized" payload=`, payload);
+    io.to(`group:${groupId}`).emit("grade:finalized", payload);
+    console.log(`[SocketEmitter] ✅ emitGradeFinalized succeeded`);
+  } catch (err) {
+    console.error(`[SocketEmitter] ❌ emitGradeFinalized failed: ${err.message}`);
+    console.error(`[SocketEmitter]   → Did you restart the backend after code changes?`);
+    console.error(`[SocketEmitter]   → getIO() threw because Socket.IO is not initialized`);
+  }
+};

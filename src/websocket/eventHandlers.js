@@ -72,4 +72,13 @@ export const registerEventHandlers = (io, socket) => {
   socket.on("class:unsubscribe", ({ classId }) => {
     socket.leave(`class:${classId}`);
   });
+
+  socket.on("join:group", (groupId) => {
+    console.log(`[Socket.IO] join:group received → socket.join("group:${groupId}")`);
+    socket.join(`group:${groupId}`);
+  });
+
+  socket.on("leave:group", (groupId) => {
+    socket.leave(`group:${groupId}`);
+  });
 };
