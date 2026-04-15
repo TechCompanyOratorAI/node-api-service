@@ -2,6 +2,7 @@
 
 const db = require("../models");
 const { GroupGradeDistribution, GroupGradeMember, AIReport, Presentation, GroupStudent, Group, Enrollment, ClassInstructor } = db;
+const { emitGradeDistributed, emitGradeFinalized } = require("../websocket/emitters");
 
 class GroupGradeDistributionService {
   /**
@@ -175,6 +176,10 @@ class GroupGradeDistributionService {
 
       // 9. Load lại để trả về
       const result = await this._loadDistributionWithStudents(distribution.id);
+
+      // 10. Emit socket event cho tất cả thành viên nhóm
+      emitGradeDistributed(groupId, reportId, result);
+
       return { success: true, data: result, message: "Đã phân chia điểm thành công" };
     } catch (error) {
       await transaction.rollback();
@@ -286,6 +291,10 @@ class GroupGradeDistributionService {
       await distribution.update({ status: "finalized", finalizedAt: new Date() });
 
       const result = await this._loadDistributionWithStudents(distributionId);
+
+      // Emit socket event cho tất cả thành viên nhóm
+      emitGradeFinalized(groupId, reportId, result);
+
       return { success: true, data: result, message: "Đã chốt điểm thành công" };
     } catch (error) {
       console.error("Finalize distribution error:", error);
