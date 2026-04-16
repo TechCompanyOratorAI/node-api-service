@@ -267,6 +267,13 @@ const asrComplete = async (req, res) => {
         status: "completed",
         message: "Đã ghi âm xong, đang phân tích nội dung...",
       });
+
+      // Emit WebSocket: ASR job completed
+      emitJobEvent("completed", presentationId, {
+        jobType: "asr",
+        jobId,
+        message: "Xử lý ASR hoàn tất",
+      });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -614,6 +621,13 @@ const analysisComplete = async (req, res) => {
       progress: 75,
       status: "completed",
       message: "Đang tạo báo cáo AI...",
+    });
+
+    // Emit WebSocket: semantic job completed
+    emitJobEvent("completed", presentationId, {
+      jobType: "semantic",
+      jobId,
+      message: "Phân tích ngữ nghĩa hoàn tất",
     });
 
     console.log(`✅ Analysis webhook processed successfully for job ${jobId}`);
@@ -1045,6 +1059,14 @@ const reportComplete = async (req, res) => {
       message: "Báo cáo AI đã sẵn sàng!",
     });
 
+    // Emit WebSocket: report job completed
+    emitJobEvent("completed", presentationId, {
+      jobType: "report",
+      jobId,
+      reportId,
+      message: "Báo cáo AI hoàn tất",
+    });
+
     return res.json({
       success: true,
       message: "Report saved successfully",
@@ -1255,6 +1277,13 @@ const slidesComplete = async (req, res) => {
 
     console.log(`✅ Slides webhook processed successfully for job ${jobId}`);
 
+    // Emit WebSocket: slide job completed
+    emitJobEvent("completed", presentationId, {
+      jobType: "slides",
+      jobId,
+      slideId,
+      message: "Xử lý slide hoàn tất",
+    });
 
     return res.json({
       success: true,
