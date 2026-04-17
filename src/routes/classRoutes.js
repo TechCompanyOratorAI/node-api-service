@@ -41,7 +41,8 @@ router.get(
 
 router.put(
   "/:classId",
-  requireRole(["Admin"]),
+  requireRole(["Admin", "Instructor"]),
+  requireClassInstructorOrAdmin,
   validateUpdateClass,
   classController.updateClass
 );

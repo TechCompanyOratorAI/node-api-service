@@ -285,9 +285,23 @@ class ClassController {
           ? "Instructor"
           : "Student";
 
+      const normalizedUpdates = { ...req.body };
+      if (
+        normalizedUpdates.expiresAt !== undefined &&
+        normalizedUpdates.keyExpiresAt === undefined
+      ) {
+        normalizedUpdates.keyExpiresAt = normalizedUpdates.expiresAt;
+      }
+      if (
+        normalizedUpdates.maxUses !== undefined &&
+        normalizedUpdates.keyMaxUses === undefined
+      ) {
+        normalizedUpdates.keyMaxUses = normalizedUpdates.maxUses;
+      }
+
       const result = await classService.updateClass(
         parseInt(classId),
-        req.body,
+        normalizedUpdates,
         userId,
         userRole
       );
