@@ -613,7 +613,7 @@ class PresentationService {
       await Presentation.update(
         {
           status: "processing",
-          submittedAt: new Date(),
+          submissionDate: new Date(),
         },
         { where: { presentationId } },
       );
@@ -773,7 +773,7 @@ class PresentationService {
       await Presentation.update(
         {
           status: "processing",
-          submittedAt: new Date(),
+          submissionDate: new Date(),
         },
         { where: { presentationId } },
       );
@@ -1168,7 +1168,7 @@ class PresentationService {
       }
 
       const presentation = await Presentation.findByPk(presentationId, {
-        attributes: ["presentationId", "title", "status", "submittedAt"],
+        attributes: ["presentationId", "title", "status", "submissionDate"],
       });
 
       if (!presentation) {
@@ -1226,7 +1226,7 @@ class PresentationService {
         success: true,
         status: {
           presentationStatus: presentation.status,
-          submittedAt: presentation.submittedAt,
+          submittedAt: presentation.submissionDate,
           pipeline,
           jobs: jobs.length,
           statistics: stats,
@@ -1541,7 +1541,7 @@ class PresentationService {
           limit,
           offset,
           order: [
-            ["submittedAt", "DESC"],
+            ["submissionDate", "DESC"],
             ["createdAt", "DESC"],
           ],
           include: [

@@ -1,6 +1,6 @@
 import db from '../models/index.js';
 
-const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class } = db;
+const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group } = db;
 
 class CourseService {
     // Create new course (with multi-instructor support)
@@ -751,7 +751,14 @@ class CourseService {
                     {
                         model: Presentation,
                         as: 'presentations',
-                        attributes: ['presentationId', 'title', 'status', 'studentId', 'submissionDate']
+                        attributes: ['presentationId', 'title', 'status', 'studentId', 'submissionDate', 'groupCode'],
+                        include: [
+                            {
+                                model: User,
+                                as: 'student',
+                                attributes: ['userId', 'firstName', 'lastName', 'email']
+                            }
+                        ]
                     }
                 ]
             });
@@ -762,6 +769,45 @@ class CourseService {
                     message: 'Topic not found'
                 };
             }
+
+            // Flatten group info into each presentation for easier consumption
+            const presentationsWithGroup = await Promise.all(
+                (topic.presentations || []).map(async (p) => {
+                    let groupName = null;
+
+                    // Try to get group name via TopicEnrollment → Group
+                    if (p.studentId) {
+                        const enrollment = await TopicEnrollment.findOne({
+                            where: {
+                                topicId: topic.topicId,
+                                studentId: p.studentId,
+                                status: 'enrolled'
+                            },
+                            include: [
+                                {
+                                    model: Group,
+                                    as: 'group',
+                                    attributes: ['groupId', 'groupName']
+                                }
+                            ]
+                        });
+                        if (enrollment && enrollment.group) {
+                            groupName = enrollment.group.groupName;
+                        }
+                    }
+
+                    return {
+                        presentationId: p.presentationId,
+                        title: p.title,
+                        status: p.status,
+                        studentId: p.studentId,
+                        groupCode: p.groupCode,
+                        submissionDate: p.submissionDate,
+                        student: p.student,
+                        groupName
+                    };
+                })
+            );
 
             return {
                 success: true,
@@ -775,7 +821,7 @@ class CourseService {
                     maxDurationMinutes: topic.maxDurationMinutes,
                     requirements: topic.requirements,
                     course: topic.course,
-                    presentations: topic.presentations,
+                    presentations: presentationsWithGroup,
                     createdAt: topic.createdAt,
                     updatedAt: topic.updatedAt
                 }
