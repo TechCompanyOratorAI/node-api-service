@@ -16,8 +16,8 @@ class EnrollKeyController {
                 });
             }
 
-            // Get classId from URL params
-            const { classId } = req.params;
+            // Support both /enroll-keys and /classes/:classId/enroll-key
+            const classId = req.params?.classId || req.body?.classId;
             if (!classId) {
                 return res.status(400).json({
                     success: false,

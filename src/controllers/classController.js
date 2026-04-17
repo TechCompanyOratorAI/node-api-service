@@ -1,6 +1,7 @@
 "use strict";
 
 const { validationResult } = require("express-validator");
+const db = require("../models");
 const classService = require("../services/classService");
 
 class ClassController {
@@ -26,17 +27,72 @@ class ClassController {
         });
       }
 
-      const classData = { ...req.body, courseId: parseInt(courseId) };
-      const result = await classService.createClass(
-        classData,
-        req.user.userId,
-        req.userRoles || []
-      );
+      const { Course, Class, ClassInstructor } = db;
+      const transaction = await db.sequelize.transaction();
 
-      if (result.success) {
-        return res.status(201).json(result);
-      } else {
-        return res.status(400).json(result);
+      try {
+        const classData = { ...req.body, courseId: parseInt(courseId) };
+        const { classCode, startDate, endDate, maxStudents, maxGroupMembers } =
+          classData;
+
+        const course = await Course.findByPk(classData.courseId, { transaction });
+        if (!course) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Không tìm thấy khóa học",
+          });
+        }
+
+        const existing = await Class.findOne({
+          where: { courseId: classData.courseId, classCode },
+          transaction,
+        });
+        if (existing) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Mã lớp đã tồn tại trong khóa học này",
+          });
+        }
+
+        const newClass = await Class.create(
+          {
+            courseId: classData.courseId,
+            classCode,
+            status: "active",
+            startDate,
+            endDate,
+            maxStudents,
+            maxGroupMembers,
+            createdBy: req.user.userId,
+          },
+          { transaction }
+        );
+
+        const isAdmin = (req.userRoles || []).includes("Admin");
+        const isInstructor = (req.userRoles || []).includes("Instructor");
+        if (isInstructor && !isAdmin) {
+          await ClassInstructor.create(
+            {
+              classId: newClass.classId,
+              instructorId: req.user.userId,
+              assignedBy: req.user.userId,
+            },
+            { transaction }
+          );
+        }
+
+        await transaction.commit();
+
+        return res.status(201).json({
+          success: true,
+          message: "Tạo lớp học thành công",
+          class: newClass,
+        });
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
       }
     } catch (error) {
       console.error("Create class controller error:", error);
@@ -133,8 +189,8 @@ class ClassController {
       const userRole = req.userRoles?.includes("Admin")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
-        ? "Instructor"
-        : "Student";
+          ? "Instructor"
+          : "Student";
 
       const result = await classService.getClassesByCourse(
         parseInt(courseId),
@@ -173,8 +229,8 @@ class ClassController {
       const userRole = req.userRoles?.includes("Admin")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
-        ? "Instructor"
-        : "Student";
+          ? "Instructor"
+          : "Student";
 
       const result = await classService.getClassById(
         parseInt(classId),
@@ -226,8 +282,8 @@ class ClassController {
       const userRole = req.userRoles?.includes("Admin")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
-        ? "Instructor"
-        : "Student";
+          ? "Instructor"
+          : "Student";
 
       const result = await classService.updateClass(
         parseInt(classId),
@@ -521,8 +577,8 @@ class ClassController {
       const userRole = req.userRoles?.includes("Admin")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
-        ? "Instructor"
-        : null;
+          ? "Instructor"
+          : null;
 
       if (!userRole) {
         return res.status(403).json({
