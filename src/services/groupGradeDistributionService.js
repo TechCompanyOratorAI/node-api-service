@@ -289,7 +289,7 @@ class GroupGradeDistributionService {
       }
 
       await distribution.update({ status: "finalized", finalizedAt: new Date() });
-
+      const reportId = distribution.reportId;
       const result = await this._loadDistributionWithStudents(distributionId);
 
       // Emit socket event cho tất cả thành viên nhóm
@@ -422,6 +422,75 @@ class GroupGradeDistributionService {
     } catch (error) {
       console.error("Get distributions by group error:", error);
       return { success: false, message: "Lỗi khi lấy danh sách phân chia điểm", error: error.message };
+    }
+  }
+
+  /**
+   * Lấy tất cả phân chia điểm của tất cả nhóm trong 1 lớp (Instructor)
+   */
+  async getGradeDistributionsByClass(classId, instructorId) {
+    try {
+      const isInstructor = await ClassInstructor.findOne({
+        where: { classId, instructorId },
+      });
+      if (!isInstructor) {
+        return { success: false, message: "Bạn không phải giảng viên của lớp này", code: "FORBIDDEN" };
+      }
+
+      const groups = await Group.findAll({
+        where: { classId },
+        attributes: ["groupId", "groupName"],
+      });
+
+      if (groups.length === 0) {
+        return { success: true, data: [], message: "Lớp này chưa có nhóm nào" };
+      }
+
+      const groupIds = groups.map((g) => g.groupId);
+
+      const distributions = await GroupGradeDistribution.findAll({
+        where: { groupId: groupIds },
+        include: [
+          { model: GroupGradeMember, as: "members" },
+          { model: Group, as: "group", attributes: ["groupId", "groupName"] },
+          { model: AIReport, as: "report", attributes: ["reportId", "reportStatus", "overallScore", "gradeForInstructor"] },
+          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName"] },
+        ],
+        order: [["distributedAt", "DESC"]],
+      });
+
+      const allStudentIds = new Set();
+      distributions.forEach((d) => d.members?.forEach((m) => allStudentIds.add(m.studentId)));
+
+      let studentMap = new Map();
+      if (allStudentIds.size > 0) {
+        const students = await db.User.findAll({
+          where: { userId: [...allStudentIds] },
+          attributes: ["userId", "firstName", "lastName", "email"],
+        });
+        studentMap = new Map(students.map((s) => [s.userId, s]));
+      }
+
+      const groupMap = new Map(groups.map((g) => [g.groupId, g]));
+
+      const enriched = distributions.map((d) => {
+        const plain = d.toJSON ? d.toJSON() : d;
+        return {
+          ...plain,
+          instructorGrade: parseFloat(plain.instructorGrade),
+          members: (plain.members || []).map((m) => ({
+            ...m,
+            percentage: parseFloat(m.percentage),
+            receivedGrade: parseFloat(m.receivedGrade),
+            student: studentMap.get(m.studentId) || null,
+          })),
+        };
+      });
+
+      return { success: true, data: enriched };
+    } catch (error) {
+      console.error("Get grade distributions by class error:", error);
+      return { success: false, message: "Lỗi khi lấy danh sách phân chia điểm theo lớp", error: error.message };
     }
   }
 
