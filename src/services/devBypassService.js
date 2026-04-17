@@ -281,7 +281,7 @@ class DevBypassService {
       const presentations = await Presentation.findAll({
         order: [["createdAt", "DESC"]],
         limit,
-        attributes: ["presentationId", "title", "status", "studentId", "createdAt", "submittedAt"],
+        attributes: ["presentationId", "title", "status", "studentId", "createdAt"],
       });
       return { success: true, presentations };
     } catch (error) {
