@@ -26,6 +26,7 @@ import aiReportFeedbackRoutes from "./aiReportFeedbackRoutes.js";
 import shareRoutes from "./shareRoutes.js";
 import instructorRoutes from "./instructorRoutes.js";
 import adminDashboardController from "../controllers/adminDashboardController.js";
+import devBypassRoutes from "./devBypassRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -77,6 +78,9 @@ router.get(
   requireRole(["Admin"]),
   adminDashboardController.getDashboard,
 );
+
+// ⚠️  DEV BYPASS — no auth, testing only ────────────────────────
+router.use("/dev/bypass", devBypassRoutes);
 
 router.get(
   "/me/classes",
