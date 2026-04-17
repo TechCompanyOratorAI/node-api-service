@@ -16,10 +16,10 @@ const { Op } = require("sequelize");
 
 class ClassService {
   /**
-   * Create new class with enrollment key (Admin only)
+   * Create new class (Admin only)
    */
   async createClass(classData, userId, userRoles = []) {
-    const { courseId, classCode, startDate, endDate, maxStudents, maxGroupMembers, enrollKey, keyExpiresAt, keyMaxUses } = classData;
+    const { courseId, classCode, startDate, endDate, maxStudents, maxGroupMembers } = classData;
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -55,17 +55,6 @@ class ClassService {
         createdBy: userId,
       }, { transaction });
 
-      // Create enrollment key for the new class
-      const enrollmentKey = await EnrollKey.create({
-        classId: newClass.classId,
-        keyValue: enrollKey,
-        expiresAt: keyExpiresAt ? new Date(keyExpiresAt) : null,
-        maxUses: keyMaxUses || null,
-        usedCount: 0,
-        isActive: true,
-        createdBy: userId,
-      }, { transaction });
-
       const isAdmin = userRoles.includes("Admin");
       const isInstructor = userRoles.includes("Instructor");
 
@@ -82,15 +71,8 @@ class ClassService {
 
       return {
         success: true,
-        message: "Tạo lớp học và mã đăng ký thành công",
+        message: "Tạo lớp học thành công",
         class: newClass,
-        enrollmentKey: {
-          keyId: enrollmentKey.keyId,
-          keyValue: enrollmentKey.keyValue,
-          expiresAt: enrollmentKey.expiresAt,
-          maxUses: enrollmentKey.maxUses,
-          isActive: enrollmentKey.isActive
-        }
       };
     } catch (error) {
       await transaction.rollback();
