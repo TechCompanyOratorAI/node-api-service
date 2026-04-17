@@ -185,6 +185,32 @@ class GroupGradeDistributionController {
   }
 
   /**
+   * GET /api/classes/:classId/group-grade-distributions
+   * Lấy tất cả phân chia điểm của tất cả nhóm trong 1 lớp (Instructor)
+   */
+  async getGradeDistributionsByClass(req, res) {
+    try {
+      const { classId } = req.params;
+      const userId = req.user?.userId;
+
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({ success: false, message: "ID lớp không hợp lệ" });
+      }
+
+      const result = await groupGradeDistributionService.getGradeDistributionsByClass(
+        parseInt(classId),
+        userId
+      );
+      if (result.success) return res.status(200).json(result);
+      if (result.code === "FORBIDDEN") return res.status(403).json(result);
+      return res.status(400).json(result);
+    } catch (error) {
+      console.error("Get grade distributions by class controller error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  /**
    * PUT /api/groups/:groupId/grade-distributions/:distributionId/finalize
    * Instructor chốt điểm vĩnh viễn
    */

@@ -3,6 +3,7 @@ import classController from "../controllers/classController.js";
 import classScoreController from "../controllers/classScoreController.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import enrollKeyController from "../controllers/enrollKeyController.js";
+import groupGradeDistributionController from "../controllers/groupGradeDistributionController.js";
 import {
   authenticateToken,
   requireEmailVerification,
@@ -76,6 +77,14 @@ router.get(
   requireRole(["Admin", "Instructor"]),
   requireClassInstructorOrAdmin,
   classScoreController.getClassScores
+);
+
+// Group grade distributions - get all grade distributions for all groups in a class (Instructor)
+router.get(
+  "/:classId/group-grade-distributions",
+  requireRole(["Admin", "Instructor"]),
+  requireClassInstructorOrAdmin,
+  groupGradeDistributionController.getGradeDistributionsByClass
 );
 
 // Enrollment key management
