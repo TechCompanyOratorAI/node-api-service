@@ -498,24 +498,13 @@ class ClassService {
       }
 
       // Extract enrollment key fields from updates
-      const { enrollKey, keyExpiresAt, keyMaxUses, ...classUpdates } = updates;
+      const { enrollKey, keyExpiresAt, keyMaxUses, ...rawClassUpdates } = updates;
+      let classUpdates = rawClassUpdates;
 
       if (userRole === "Instructor") {
-        const allowedClassFields = ["maxGroupMembers"];
-        const requestedClassFields = Object.keys(classUpdates).filter(
-          (field) => classUpdates[field] !== undefined
-        );
-        const invalidFields = requestedClassFields.filter(
-          (field) => !allowedClassFields.includes(field)
-        );
-
-        if (invalidFields.length > 0) {
-          await transaction.rollback();
-          return {
-            success: false,
-            message:
-              "Instructor chi duoc cap nhat maxGroupMembers, enrollKey, keyExpiresAt/expiresAt va keyMaxUses/maxUses",
-          };
+        classUpdates = {};
+        if (rawClassUpdates.maxGroupMembers !== undefined) {
+          classUpdates.maxGroupMembers = rawClassUpdates.maxGroupMembers;
         }
       }
 
