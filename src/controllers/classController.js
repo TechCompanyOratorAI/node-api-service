@@ -299,6 +299,12 @@ class ClassController {
         normalizedUpdates.keyMaxUses = normalizedUpdates.maxUses;
       }
 
+      Object.keys(normalizedUpdates).forEach((key) => {
+        if (normalizedUpdates[key] === null || normalizedUpdates[key] === undefined) {
+          delete normalizedUpdates[key];
+        }
+      });
+
       const result = await classService.updateClass(
         parseInt(classId),
         normalizedUpdates,

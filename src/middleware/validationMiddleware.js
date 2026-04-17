@@ -445,8 +445,24 @@ export const validateCreateClass = [
 
 // Class update validation
 export const validateUpdateClass = [
+  body().custom((value) => {
+    const requiredFields = ["classCode", "startDate", "endDate", "maxStudents"];
+
+    for (const field of requiredFields) {
+      if (!Object.prototype.hasOwnProperty.call(value, field)) {
+        throw new Error(`Thiếu trường bắt buộc: ${field}`);
+      }
+    }
+
+    if (value.classCode === null || value.classCode === undefined || value.classCode === "") {
+      throw new Error("classCode là bắt buộc");
+    }
+
+    return true;
+  }),
+
   body("classCode")
-    .optional()
+    .optional({ nullable: true })
     .trim()
     .isLength({ min: 1, max: 50 })
     .withMessage("Mã lớp học phải từ 1 đến 50 ký tự")
@@ -456,12 +472,12 @@ export const validateUpdateClass = [
     ),
 
   body("startDate")
-    .optional()
+    .optional({ nullable: true })
     .isISO8601()
     .withMessage("Ngày bắt đầu phải là định dạng ngày hợp lệ"),
 
   body("endDate")
-    .optional()
+    .optional({ nullable: true })
     .isISO8601()
     .withMessage("Ngày kết thúc phải là định dạng ngày hợp lệ")
     .custom((value, { req }) => {
@@ -476,34 +492,34 @@ export const validateUpdateClass = [
     }),
 
   body("maxStudents")
-    .optional()
+    .optional({ nullable: true })
     .isInt({ min: 1 })
     .withMessage("Số lượng sinh viên tối đa phải là số nguyên dương"),
 
   body("maxGroupMembers")
-    .optional()
+    .optional({ nullable: true })
     .isInt({ min: 1 })
     .withMessage("Số lượng thành viên nhóm tối đa phải là số nguyên dương"),
 
   body("status")
-    .optional()
+    .optional({ nullable: true })
     .isIn(["active", "closed", "archived"])
     .withMessage("Trạng thái phải là: active, closed hoặc archived"),
 
   // Enrollment key update fields (optional)
   body("enrollKey")
-    .optional()
+    .optional({ nullable: true })
     .trim()
     .isLength({ min: 6, max: 50 })
     .withMessage("Mã đăng ký phải từ 6-50 ký tự"),
 
   body("keyExpiresAt")
-    .optional()
+    .optional({ nullable: true })
     .isISO8601()
     .withMessage("Ngày hết hạn mã đăng ký phải là định dạng ngày hợp lệ"),
 
   body("keyMaxUses")
-    .optional()
+    .optional({ nullable: true })
     .isInt({ min: 1 })
     .withMessage("Số lần sử dụng tối đa phải là số nguyên dương"),
 ];
