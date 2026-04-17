@@ -21,6 +21,7 @@ module.exports = (sequelize, DataTypes) => {
 
       Presentation.hasMany(models.Job, { foreignKey: 'presentationId', as: 'jobs' });
       Presentation.hasMany(models.Speaker, { foreignKey: 'presentationId', as: 'speakers' });
+      Presentation.hasOne(models.AIReport, { foreignKey: 'presentationId', as: 'submission' });
     }
   }
 

@@ -25,6 +25,7 @@ import aiReportRoutes from "./aiReportRoutes.js";
 import aiReportFeedbackRoutes from "./aiReportFeedbackRoutes.js";
 import shareRoutes from "./shareRoutes.js";
 import instructorRoutes from "./instructorRoutes.js";
+import adminDashboardController from "../controllers/adminDashboardController.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -67,6 +68,15 @@ router.use("/share", shareRoutes);
 
 // ─── Instructor routes ───────────────────────────────────────────
 router.use("/instructor", instructorRoutes);
+
+// ─── Admin routes ───────────────────────────────────────────────
+router.get(
+  "/admin/dashboard",
+  authenticateToken,
+  requireEmailVerification,
+  requireRole(["Admin"]),
+  adminDashboardController.getDashboard,
+);
 
 router.get(
   "/me/classes",
