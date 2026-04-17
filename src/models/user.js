@@ -37,6 +37,11 @@ module.exports = (sequelize, DataTypes) => {
         otherKey: 'groupId',
         as: 'groups'
       });
+
+      User.hasMany(models.ClassInstructor, {
+        foreignKey: 'instructorId',
+        as: 'classInstructors'
+      });
     }
   }
 
