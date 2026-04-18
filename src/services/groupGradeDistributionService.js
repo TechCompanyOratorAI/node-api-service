@@ -2,7 +2,12 @@
 
 const db = require("../models");
 const { GroupGradeDistribution, GroupGradeMember, AIReport, Presentation, GroupStudent, Group, Enrollment, ClassInstructor } = db;
-const { emitGradeDistributed, emitGradeFinalized } = require("../websocket/emitters");
+const {
+  emitGradeDistributed,
+  emitGradeFinalized,
+  emitGradeReopened,
+  emitGradeFeedbackUpdated,
+} = require("../websocket/emitters");
 
 class GroupGradeDistributionService {
   /**
@@ -214,6 +219,9 @@ class GroupGradeDistributionService {
         feedbackStatus: "pending",
       });
 
+      const hydratedDistribution = await this._loadDistributionWithStudents(distributionId);
+      emitGradeFeedbackUpdated(distribution.groupId, distribution.reportId, hydratedDistribution);
+
       return { success: true, message: "Đã gửi phản hồi thành công", data: memberRecord };
     } catch (error) {
       console.error("Submit member feedback error:", error);
@@ -258,6 +266,7 @@ class GroupGradeDistributionService {
       await distribution.update({ status: "reopened" });
 
       const result = await this._loadDistributionWithStudents(distributionId);
+      emitGradeReopened(groupId, distribution.reportId, result);
       return { success: true, data: result, message: "Đã mở lại để leader chỉnh sửa" };
     } catch (error) {
       console.error("Reopen distribution error:", error);
