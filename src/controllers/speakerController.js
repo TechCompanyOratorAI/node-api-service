@@ -2,7 +2,8 @@
  * Speaker Controller - Manage speaker diarization and student mapping
  */
 
-const speakerService = require('../services/speakerService');
+const _speakerServiceModule = require('../services/speakerService');
+const speakerService = _speakerServiceModule.default || _speakerServiceModule;
 
 class SpeakerController {
     /**
@@ -246,6 +247,71 @@ class SpeakerController {
             });
         } catch (error) {
             console.error('Get student speaker summary error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * GET /api/v1/speakers/presentation/:presentationId/group-members
+     * Get group members for a presentation
+     */
+    async getGroupMembers(req, res) {
+        try {
+            const { presentationId } = req.params;
+            const parsedPresentationId = parseInt(presentationId);
+
+            if (Number.isNaN(parsedPresentationId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'presentationId must be a number'
+                });
+            }
+
+            const members = await speakerService.getGroupMembersForPresentation(parsedPresentationId);
+
+            return res.json({
+                success: true,
+                members
+            });
+        } catch (error) {
+            console.error('Get group members error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * POST /api/v1/speakers/presentation/:presentationId/auto-map
+     * Auto-map speakers to students based on speaking order
+     */
+    async autoMapSpeakers(req, res) {
+        try {
+            const { presentationId } = req.params;
+            const parsedPresentationId = parseInt(presentationId);
+
+            if (Number.isNaN(parsedPresentationId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'presentationId must be a number'
+                });
+            }
+
+            const result = await speakerService.autoMapSpeakers(parsedPresentationId);
+
+            return res.json({
+                success: true,
+                message: `Đã tự động ánh xạ ${result.mapped} diễn giả`,
+                result
+            });
+        } catch (error) {
+            console.error('Auto-map speakers error:', error);
             return res.status(500).json({
                 success: false,
                 message: 'Internal server error',

@@ -36,6 +36,18 @@ router.get('/presentation/:presentationId/suggestions',
     speakerController.suggestStudentMappings
 );
 
+// Get group members for a presentation
+router.get('/presentation/:presentationId/group-members',
+    generalRateLimit,
+    speakerController.getGroupMembers
+);
+
+// Auto-map speakers to students based on speaking order
+router.post('/presentation/:presentationId/auto-map',
+    generalRateLimit,
+    speakerController.autoMapSpeakers
+);
+
 // Get speaker by ID
 router.get('/:speakerId',
     generalRateLimit,
