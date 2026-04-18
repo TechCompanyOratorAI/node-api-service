@@ -13,6 +13,7 @@ const {
   Topic,
 } = db;
 const { Op } = require("sequelize");
+const { emitUploadPermissionChanged } = require("../websocket/emitters");
 
 class ClassService {
   /**
@@ -897,6 +898,12 @@ class ClassService {
         isUploadEnabled: data.isUploadEnabled,
         uploadStartDate: data.uploadStartDate || null,
         uploadEndDate: data.uploadEndDate || null,
+      });
+
+      emitUploadPermissionChanged(classId, {
+        isUploadEnabled: classRecord.isUploadEnabled,
+        uploadStartDate: classRecord.uploadStartDate,
+        uploadEndDate: classRecord.uploadEndDate,
       });
 
       return {

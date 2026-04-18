@@ -148,3 +148,79 @@ export const emitGradeFinalized = (groupId, reportId, distribution) => {
     console.error(`[SocketEmitter]   → getIO() threw because Socket.IO is not initialized`);
   }
 };
+
+/**
+ * Emit grade distribution reopened by instructor.
+ * Room: "group:{groupId}"
+ *
+ * @param {number} groupId
+ * @param {number} reportId
+ * @param {object} distribution
+ */
+export const emitGradeReopened = (groupId, reportId, distribution) => {
+  try {
+    const io = getIO();
+    const payload = {
+      groupId,
+      reportId,
+      distribution,
+      _ts: Date.now(),
+    };
+    console.log(`[SocketEmitter] EMIT → room="group:${groupId}" event="grade:reopened" payload=`, payload);
+    io.to(`group:${groupId}`).emit("grade:reopened", payload);
+    console.log(`[SocketEmitter] ✅ emitGradeReopened succeeded`);
+  } catch (err) {
+    console.error(`[SocketEmitter] ❌ emitGradeReopened failed: ${err.message}`);
+  }
+};
+
+/**
+ * Emit member feedback update for a grade distribution.
+ * Room: "group:{groupId}"
+ *
+ * @param {number} groupId
+ * @param {number} reportId
+ * @param {object} distribution
+ */
+export const emitGradeFeedbackUpdated = (groupId, reportId, distribution) => {
+  try {
+    const io = getIO();
+    const payload = {
+      groupId,
+      reportId,
+      distribution,
+      _ts: Date.now(),
+    };
+    console.log(`[SocketEmitter] EMIT → room="group:${groupId}" event="grade:feedback-updated" payload=`, payload);
+    io.to(`group:${groupId}`).emit("grade:feedback-updated", payload);
+    console.log(`[SocketEmitter] ✅ emitGradeFeedbackUpdated succeeded`);
+  } catch (err) {
+    console.error(`[SocketEmitter] ❌ emitGradeFeedbackUpdated failed: ${err.message}`);
+  }
+};
+
+/**
+ * Emit criterion feedback change for a presentation report.
+ * Room: "presentation:{presentationId}"
+ *
+ * @param {number} presentationId
+ * @param {number} reportId
+ * @param {object} payload
+ */
+export const emitCriterionFeedbackChanged = (presentationId, reportId, payload = {}) => {
+  try {
+    const io = getIO();
+    const room = `presentation:${presentationId}`;
+    const data = {
+      presentationId,
+      reportId,
+      ...payload,
+      _ts: Date.now(),
+    };
+    console.log(`[SocketEmitter] EMIT → room="${room}" event="report:criterion-feedback-changed" payload=`, data);
+    io.to(room).emit("report:criterion-feedback-changed", data);
+    console.log(`[SocketEmitter] ✅ emitCriterionFeedbackChanged succeeded`);
+  } catch (err) {
+    console.error(`[SocketEmitter] ❌ emitCriterionFeedbackChanged failed: ${err.message}`);
+  }
+};

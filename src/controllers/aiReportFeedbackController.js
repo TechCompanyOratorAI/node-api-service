@@ -1,5 +1,20 @@
 const { validationResult } = require("express-validator");
 const criterionFeedbackService = require('../services/aiReportFeedbackService');
+const { AIReport } = require("../models");
+const { emitCriterionFeedbackChanged } = require("../websocket/emitters");
+
+const emitCriterionFeedbackSocket = async (reportId, action, feedback) => {
+  const report = await AIReport.findByPk(reportId, {
+    attributes: ["reportId", "presentationId"],
+  });
+  if (!report?.presentationId) return;
+
+  emitCriterionFeedbackChanged(report.presentationId, report.reportId, {
+    action,
+    criterionFeedback: feedback || null,
+    classRubricCriteriaId: feedback?.classRubricCriteriaId || null,
+  });
+};
 
 class CriterionFeedbackController {
   async create(req, res) {
@@ -18,7 +33,10 @@ class CriterionFeedbackController {
         instructorId
       );
 
-      if (result.success) return res.status(201).json(result);
+      if (result.success) {
+        await emitCriterionFeedbackSocket(parseInt(reportId), "created", result.data);
+        return res.status(201).json(result);
+      }
       return res.status(result.code === "NOT_FOUND" ? 404 : 400).json(result);
     } catch (error) {
       console.error("Create criterion feedback controller error:", error);
@@ -43,7 +61,10 @@ class CriterionFeedbackController {
         instructorId
       );
 
-      if (result.success) return res.status(200).json(result);
+      if (result.success) {
+        await emitCriterionFeedbackSocket(parseInt(reportId), "updated", result.data);
+        return res.status(200).json(result);
+      }
       return res.status(result.code === "NOT_FOUND" ? 404 : 400).json(result);
     } catch (error) {
       console.error("Upsert criterion feedback controller error:", error);
@@ -62,7 +83,12 @@ class CriterionFeedbackController {
 
       const result = await criterionFeedbackService.delete(parseInt(reportId), parseInt(classRubricCriteriaId));
 
-      if (result.success) return res.status(200).json(result);
+      if (result.success) {
+        await emitCriterionFeedbackSocket(parseInt(reportId), "deleted", {
+          classRubricCriteriaId: parseInt(classRubricCriteriaId),
+        });
+        return res.status(200).json(result);
+      }
       return res.status(result.code === "NOT_FOUND" ? 404 : 400).json(result);
     } catch (error) {
       console.error("Delete criterion feedback controller error:", error);
