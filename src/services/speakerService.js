@@ -18,6 +18,13 @@ const { Op } = Sequelize;
 const { Speaker, TranscriptSegment, User, Presentation, GroupStudent, Group } = db;
 
 class SpeakerService {
+    _speakerLabelSortValue(label) {
+        if (!label) return Number.MAX_SAFE_INTEGER;
+
+        const match = String(label).match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER;
+    }
+
     /**
      * Tạo speakers từ diarization results
      * @param {number} presentationId 
@@ -297,10 +304,17 @@ class SpeakerService {
             const speakers = await Speaker.findAll({
                 where,
                 include,
-                order: [['totalDurationSeconds', 'DESC']]
+                order: [['aiSpeakerLabel', 'ASC']]
             });
 
-            return speakers;
+            return speakers.sort((a, b) => {
+                const labelDiff =
+                    this._speakerLabelSortValue(a.aiSpeakerLabel) -
+                    this._speakerLabelSortValue(b.aiSpeakerLabel);
+
+                if (labelDiff !== 0) return labelDiff;
+                return String(a.aiSpeakerLabel || '').localeCompare(String(b.aiSpeakerLabel || ''));
+            });
         } catch (error) {
             console.error('❌ Error getting speakers by presentation:', error);
             throw error;
@@ -383,7 +397,16 @@ class SpeakerService {
             const totalDuration = speakers.reduce((sum, s) => sum + s.totalDurationSeconds, 0);
             const totalSegments = speakers.reduce((sum, s) => sum + s.segmentCount, 0);
 
-            const speakerBreakdown = speakers.map(speaker => ({
+            const speakerBreakdown = [...speakers]
+                .sort((a, b) => {
+                    const labelDiff =
+                        this._speakerLabelSortValue(a.aiSpeakerLabel) -
+                        this._speakerLabelSortValue(b.aiSpeakerLabel);
+
+                    if (labelDiff !== 0) return labelDiff;
+                    return String(a.aiSpeakerLabel || '').localeCompare(String(b.aiSpeakerLabel || ''));
+                })
+                .map(speaker => ({
                 speakerId: speaker.speakerId,
                 aiSpeakerLabel: speaker.aiSpeakerLabel,
                 studentName: speaker.mappedStudent ? `${speaker.mappedStudent.firstName} ${speaker.mappedStudent.lastName}` : 'Unmapped',
