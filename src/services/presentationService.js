@@ -1316,13 +1316,21 @@ class PresentationService {
           ? await speakerService.getSpeakerStatistics(presentationId)
           : null;
 
+      const sortedSpeakers = [...presentation.speakers].sort((a, b) => {
+        const aNum = parseInt(String(a.aiSpeakerLabel || "").match(/(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER, 10);
+        const bNum = parseInt(String(b.aiSpeakerLabel || "").match(/(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER, 10);
+
+        if (aNum !== bNum) return aNum - bNum;
+        return String(a.aiSpeakerLabel || "").localeCompare(String(b.aiSpeakerLabel || ""));
+      });
+
       return {
         success: true,
         results: {
           presentationId,
           status: presentation.status,
           transcript: presentation.transcript,
-          speakers: presentation.speakers,
+          speakers: sortedSpeakers,
           speakerStatistics: speakerStats,
           feedback: presentation.feedbacks,
           analysisResults: presentation.analysisResults,
