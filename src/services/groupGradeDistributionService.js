@@ -334,7 +334,7 @@ class GroupGradeDistributionService {
         include: [
           { model: GroupGradeMember, as: "members" },
           { model: Group, as: "group", attributes: ["groupId", "groupName"] },
-          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email"] },
+          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email", "avatar"] },
         ],
       });
 
@@ -345,7 +345,7 @@ class GroupGradeDistributionService {
       const memberStudentIds = distribution.members.map((m) => m.studentId);
       const students = await db.User.findAll({
         where: { userId: memberStudentIds },
-        attributes: ["userId", "firstName", "lastName", "email"],
+        attributes: ["userId", "firstName", "lastName", "email", "avatar"],
       });
       const studentMap = new Map(students.map((s) => [s.userId, s]));
 
@@ -395,7 +395,7 @@ class GroupGradeDistributionService {
         include: [
           { model: GroupGradeMember, as: "members" },
           { model: AIReport, as: "report", attributes: ["reportId", "reportStatus", "overallScore", "gradeForInstructor"] },
-          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName"] },
+          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email", "avatar"] },
         ],
         order: [["distributedAt", "DESC"]],
       });
@@ -408,7 +408,7 @@ class GroupGradeDistributionService {
       if (allStudentIds.size > 0) {
         const students = await db.User.findAll({
           where: { userId: [...allStudentIds] },
-          attributes: ["userId", "firstName", "lastName", "email"],
+          attributes: ["userId", "firstName", "lastName", "email", "avatar"],
         });
         studentMap = new Map(students.map((s) => [s.userId, s]));
       }
@@ -463,7 +463,7 @@ class GroupGradeDistributionService {
           { model: GroupGradeMember, as: "members" },
           { model: Group, as: "group", attributes: ["groupId", "groupName"] },
           { model: AIReport, as: "report", attributes: ["reportId", "reportStatus", "overallScore", "gradeForInstructor"] },
-          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName"] },
+          { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email", "avatar"] },
         ],
         order: [["distributedAt", "DESC"]],
       });
@@ -475,7 +475,7 @@ class GroupGradeDistributionService {
       if (allStudentIds.size > 0) {
         const students = await db.User.findAll({
           where: { userId: [...allStudentIds] },
-          attributes: ["userId", "firstName", "lastName", "email"],
+          attributes: ["userId", "firstName", "lastName", "email", "avatar"],
         });
         studentMap = new Map(students.map((s) => [s.userId, s]));
       }
@@ -536,7 +536,7 @@ class GroupGradeDistributionService {
         { model: GroupGradeMember, as: "members" },
         { model: Group, as: "group", attributes: ["groupId", "groupName"] },
         { model: AIReport, as: "report", attributes: ["reportId"] },
-        { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email"] },
+        { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email", "avatar"] },
       ],
     });
 
@@ -545,7 +545,7 @@ class GroupGradeDistributionService {
     const memberStudentIds = dist.members.map((m) => m.studentId);
     const students = await db.User.findAll({
       where: { userId: memberStudentIds },
-      attributes: ["userId", "firstName", "lastName", "email"],
+      attributes: ["userId", "firstName", "lastName", "email", "avatar"],
     });
     const studentMap = new Map(students.map((s) => [s.userId, s]));
 
