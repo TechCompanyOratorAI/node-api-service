@@ -192,10 +192,16 @@ class ClassController {
           ? "Instructor"
           : "Student";
 
+      const pagination = {
+        page: parseInt(req.query.page) || 1,
+        limit: parseInt(req.query.limit) || 10,
+      };
+
       const result = await classService.getClassesByCourse(
         parseInt(courseId),
         userId,
-        userRole
+        userRole,
+        pagination
       );
 
       if (result.success) {
