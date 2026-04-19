@@ -877,7 +877,7 @@ class PresentationService {
           {
             model: User,
             as: "student",
-            attributes: ["userId", "firstName", "lastName", "email"],
+            attributes: ["userId", "firstName", "lastName", "email", "avatar"],
           },
           {
             model: Topic,
@@ -1452,7 +1452,7 @@ class PresentationService {
           {
             model: User,
             as: "student",
-            attributes: ["userId", "firstName", "lastName", "email"],
+            attributes: ["userId", "firstName", "lastName", "email", "avatar"],
           },
           {
             model: Topic,
