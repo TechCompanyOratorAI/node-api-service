@@ -87,10 +87,13 @@ class ClassService {
   }
 
   /**
-   * Get classes by course (Admin or Instructor in course)
+   * Get classes by course (Admin or Instructor in course) with pagination
    */
-  async getClassesByCourse(courseId, userId, userRole) {
+  async getClassesByCourse(courseId, userId, userRole, pagination = {}) {
     try {
+      const { page = 1, limit = 10 } = pagination;
+      const offset = (page - 1) * limit;
+
       const where = { courseId };
 
       // Student chỉ thấy lớp active và chưa hết hạn
@@ -107,14 +110,14 @@ class ClassService {
         }).then((records) => records.map((r) => r.classId));
 
         if (instructorClassIds.length === 0) {
-          return { success: true, data: [] };
+          return { success: true, data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } };
         }
 
         where.classId = { [Op.in]: instructorClassIds };
       }
       // Admin can see all classes in course
 
-      const classes = await Class.findAll({
+      const { count, rows: classes } = await Class.findAndCountAll({
         where,
         include: [
           {
@@ -139,7 +142,10 @@ class ClassService {
             attributes: ["keyId", "isActive", "expiresAt"],
           },
         ],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
         order: [["classCode", "ASC"]],
+        distinct: true,
       });
 
       return {
@@ -149,6 +155,12 @@ class ClassService {
           enrollmentCount: c.enrollments?.length || 0,
           activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
         })),
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
       };
     } catch (error) {
       console.error("Get classes error:", error);
