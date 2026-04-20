@@ -11,6 +11,11 @@
  */
 
 import { getIO } from "../websocket/index.js";
+import {
+  saveForPresentation,
+  saveForGroup,
+  saveForClass,
+} from "../services/notificationService.js";
 
 /**
  * Emit an event to the presentation room.
@@ -62,6 +67,13 @@ export const emitJobEvent = (subEvent, presentationId, payload) => {
  * @param {number} presentationId
  * @param {object} payload
  */
+const reportNotifMeta = {
+  generated:                { title: "Báo cáo AI sẵn sàng",        message: "Báo cáo đánh giá mới đã được tạo xong!" },
+  confirmed:                { title: "Báo cáo được xác nhận",       message: "Giảng viên đã xác nhận báo cáo AI của bạn!" },
+  rejected:                 { title: "Báo cáo bị từ chối",          message: "Giảng viên đã từ chối báo cáo AI của bạn." },
+  "criterion-feedback-changed": { title: "Phản hồi tiêu chí cập nhật", message: "Giảng viên đã cập nhật phản hồi cho một tiêu chí đánh giá." },
+};
+
 export const emitReportEvent = (subEvent, presentationId, payload) => {
   const event = `report:${subEvent}`;
   console.log(`[SocketEmitter] emitReportEvent("${subEvent}", presentationId=${presentationId}) → will emit "${event}"`);
@@ -70,6 +82,11 @@ export const emitReportEvent = (subEvent, presentationId, payload) => {
     ...payload,
     _ts: Date.now(),
   });
+  const meta = reportNotifMeta[subEvent];
+  if (meta) {
+    const msg = payload?.message || meta.message;
+    saveForPresentation(presentationId, `report:${subEvent}`, meta.title, msg, { presentationId, ...payload });
+  }
 };
 
 /**
@@ -90,6 +107,14 @@ export const emitUploadPermissionChanged = (classId, payload) => {
       _ts: Date.now(),
     });
     console.log(`[SocketEmitter] EMIT → room="class:${classId}" event="class:upload-permission-changed"`);
+    const enabled = payload?.isUploadEnabled;
+    saveForClass(
+      classId,
+      "class:upload-permission-changed",
+      "Quyền nộp bài thay đổi",
+      enabled ? "Giảng viên đã mở quyền nộp bài cho lớp." : "Giảng viên đã đóng quyền nộp bài.",
+      { classId, ...payload }
+    );
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitUploadPermissionChanged failed: ${err.message}`);
   }
@@ -106,19 +131,13 @@ export const emitUploadPermissionChanged = (classId, payload) => {
 export const emitGradeDistributed = (groupId, reportId, distribution) => {
   try {
     const io = getIO();
-    const payload = {
-      groupId,
-      reportId,
-      distribution,
-      _ts: Date.now(),
-    };
+    const payload = { groupId, reportId, distribution, _ts: Date.now() };
     console.log(`[SocketEmitter] EMIT → room="group:${groupId}" event="grade:distributed" payload=`, payload);
     io.to(`group:${groupId}`).emit("grade:distributed", payload);
     console.log(`[SocketEmitter] ✅ emitGradeDistributed succeeded`);
+    saveForGroup(groupId, "grade:distributed", "Điểm đã được phân chia", "Trưởng nhóm đã phân chia điểm cho các thành viên.", { groupId, reportId });
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitGradeDistributed failed: ${err.message}`);
-    console.error(`[SocketEmitter]   → Did you restart the backend after code changes?`);
-    console.error(`[SocketEmitter]   → getIO() threw because Socket.IO is not initialized`);
   }
 };
 
@@ -133,19 +152,13 @@ export const emitGradeDistributed = (groupId, reportId, distribution) => {
 export const emitGradeFinalized = (groupId, reportId, distribution) => {
   try {
     const io = getIO();
-    const payload = {
-      groupId,
-      reportId,
-      distribution,
-      _ts: Date.now(),
-    };
+    const payload = { groupId, reportId, distribution, _ts: Date.now() };
     console.log(`[SocketEmitter] EMIT → room="group:${groupId}" event="grade:finalized" payload=`, payload);
     io.to(`group:${groupId}`).emit("grade:finalized", payload);
     console.log(`[SocketEmitter] ✅ emitGradeFinalized succeeded`);
+    saveForGroup(groupId, "grade:finalized", "Điểm đã được chốt", "Điểm đã được chốt bởi giảng viên.", { groupId, reportId });
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitGradeFinalized failed: ${err.message}`);
-    console.error(`[SocketEmitter]   → Did you restart the backend after code changes?`);
-    console.error(`[SocketEmitter]   → getIO() threw because Socket.IO is not initialized`);
   }
 };
 
@@ -160,15 +173,11 @@ export const emitGradeFinalized = (groupId, reportId, distribution) => {
 export const emitGradeReopened = (groupId, reportId, distribution) => {
   try {
     const io = getIO();
-    const payload = {
-      groupId,
-      reportId,
-      distribution,
-      _ts: Date.now(),
-    };
+    const payload = { groupId, reportId, distribution, _ts: Date.now() };
     console.log(`[SocketEmitter] EMIT → room="group:${groupId}" event="grade:reopened" payload=`, payload);
     io.to(`group:${groupId}`).emit("grade:reopened", payload);
     console.log(`[SocketEmitter] ✅ emitGradeReopened succeeded`);
+    saveForGroup(groupId, "grade:reopened", "Điểm được mở lại", "Giảng viên đã mở lại việc phân chia điểm.", { groupId, reportId });
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitGradeReopened failed: ${err.message}`);
   }
@@ -185,15 +194,11 @@ export const emitGradeReopened = (groupId, reportId, distribution) => {
 export const emitGradeFeedbackUpdated = (groupId, reportId, distribution) => {
   try {
     const io = getIO();
-    const payload = {
-      groupId,
-      reportId,
-      distribution,
-      _ts: Date.now(),
-    };
+    const payload = { groupId, reportId, distribution, _ts: Date.now() };
     console.log(`[SocketEmitter] EMIT → room="group:${groupId}" event="grade:feedback-updated" payload=`, payload);
     io.to(`group:${groupId}`).emit("grade:feedback-updated", payload);
     console.log(`[SocketEmitter] ✅ emitGradeFeedbackUpdated succeeded`);
+    saveForGroup(groupId, "grade:feedback-updated", "Phản hồi điểm cập nhật", "Phản hồi về điểm số của bạn đã được cập nhật.", { groupId, reportId });
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitGradeFeedbackUpdated failed: ${err.message}`);
   }
@@ -211,15 +216,11 @@ export const emitCriterionFeedbackChanged = (presentationId, reportId, payload =
   try {
     const io = getIO();
     const room = `presentation:${presentationId}`;
-    const data = {
-      presentationId,
-      reportId,
-      ...payload,
-      _ts: Date.now(),
-    };
+    const data = { presentationId, reportId, ...payload, _ts: Date.now() };
     console.log(`[SocketEmitter] EMIT → room="${room}" event="report:criterion-feedback-changed" payload=`, data);
     io.to(room).emit("report:criterion-feedback-changed", data);
     console.log(`[SocketEmitter] ✅ emitCriterionFeedbackChanged succeeded`);
+    saveForPresentation(presentationId, "report:criterion-feedback-changed", "Phản hồi tiêu chí cập nhật", "Giảng viên đã cập nhật phản hồi cho một tiêu chí đánh giá.", { presentationId, reportId });
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitCriterionFeedbackChanged failed: ${err.message}`);
   }

@@ -37,6 +37,12 @@ initWebRoutes(app);
 
 connectDB();
 
+// Auto-create Notifications table if not exists
+const db = require("./models/index.js");
+db.Notification.sync({ alter: true }).catch((err) =>
+  console.error("[DB] Notification sync failed:", err.message)
+);
+
 let port = process.env.PORT || 8080;
 
 httpServer.listen(port, () => {
