@@ -28,6 +28,7 @@ import instructorRoutes from "./instructorRoutes.js";
 import adminDashboardController from "../controllers/adminDashboardController.js";
 import devBypassRoutes from "./devBypassRoutes.js";
 import notificationRoutes from "./notificationRoutes.js";
+import transcriptRoutes from "./transcriptRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -64,6 +65,7 @@ router.use("/rubric-criteria", rubricCriteriaRoutes);
 router.use("/ai-reports", aiReportRoutes);
 router.use("/ai-reports", aiReportFeedbackRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/transcripts", transcriptRoutes);
 
 // ─── Share routes ───────────────────────────────────────────────
 // Public view: GET /share/:token (no authentication needed)
