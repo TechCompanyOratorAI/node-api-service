@@ -8,7 +8,14 @@ const router = express.Router();
 // Tất cả routes đều cần authentication
 router.use(authenticateToken);
 router.use(requireEmailVerification);
-router.use(requireRole(['instructor', 'admin'])); // Chỉ instructor hoặc admin mới truy cập
+router.use(requireRole(['Instructor', 'Admin'])); // Chỉ instructor hoặc admin mới truy cập
+
+// GET /api/instructor/dashboard - Dashboard metrics cho instructor
+router.get(
+  '/dashboard',
+  generalRateLimit,
+  instructorController.getDashboard.bind(instructorController)
+);
 
 // GET /api/instructor/presentations/pending - Danh sách chờ duyệt
 router.get(
