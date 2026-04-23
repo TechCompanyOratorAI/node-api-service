@@ -57,7 +57,7 @@ class ClassScoreService {
           {
             model: User,
             as: "student",
-            attributes: ["userId", "username", "firstName", "lastName", "email"],
+            attributes: ["userId", "username", "firstName", "lastName", "email", "avatar"],
           },
         ],
         order: [[{ model: User, as: "student" }, "firstName", "ASC"]],
@@ -285,6 +285,7 @@ class ClassScoreService {
             firstName: student.firstName,
             lastName: student.lastName,
             email: student.email,
+            avatar: student.avatar,
           },
           // Diem trung binh AI
           overallAverageScore,
