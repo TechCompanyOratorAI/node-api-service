@@ -1,47 +1,92 @@
 import db from '../models/index.js';
 
-const { Transcript, TranscriptSegment, Speaker, Presentation, User, AudioRecord, Class, ClassInstructor } = db;
+const {
+    Transcript,
+    TranscriptSegment,
+    Speaker,
+    Presentation,
+    User,
+    AudioRecord,
+    TopicEnrollment,
+    Topic,
+    GroupStudent,
+    Group
+} = db;
 
 class TranscriptService {
     /**
      * Kiểm tra quyền truy cập transcript của presentation
-     * Student chỉ xem được transcript của mình
-     * Instructor xem được transcript trong lớp họ dạy
-     * Admin xem tất cả
+     * Đồng bộ với presentationService.checkPresentationAccess
      */
     async _checkAccess(presentationId, user) {
         const presentation = await Presentation.findByPk(presentationId, {
-            attributes: ['presentationId', 'studentId', 'classId'],
-            include: [
-                {
-                    model: Class,
-                    as: 'class',
-                    attributes: ['classId'],
-                    include: [
-                        {
-                            model: ClassInstructor,
-                            as: 'classInstructors',
-                            attributes: ['instructorId'],
-                            required: false,
-                            where: { instructorId: user.userId }
-                        }
-                    ]
-                }
-            ]
+            attributes: ['presentationId', 'studentId', 'classId', 'courseId']
         });
 
-        if (!presentation) return { allowed: false, reason: 'Presentation not found' };
+        if (!presentation) {
+            return { allowed: false, reason: 'Presentation not found' };
+        }
 
-        const roles = user.roles?.map(r => r.roleName) || [];
-        if (roles.includes('Admin')) return { allowed: true, presentation };
-
-        if (presentation.studentId === user.userId) return { allowed: true, presentation };
-
-        if (
-            roles.includes('Instructor') &&
-            presentation.class?.classInstructors?.length > 0
-        ) {
+        if (presentation.studentId === user.userId) {
             return { allowed: true, presentation };
+        }
+
+        const roleNames = [
+            ...(user.userRoles || []).map((userRole) => userRole?.role?.roleName),
+            user.role
+        ]
+            .map((roleName) => String(roleName || '').toLowerCase())
+            .filter(Boolean);
+
+        if (roleNames.some((role) => ['admin', 'teacher', 'instructor'].includes(role))) {
+            return { allowed: true, presentation };
+        }
+
+        if (presentation.classId) {
+            const ownerGroup = await GroupStudent.findOne({
+                where: { studentId: presentation.studentId },
+                include: [
+                    {
+                        model: Group,
+                        as: 'group',
+                        where: { classId: presentation.classId },
+                        attributes: ['groupId']
+                    }
+                ]
+            });
+
+            if (ownerGroup?.group?.groupId) {
+                const isMember = await GroupStudent.findOne({
+                    where: {
+                        studentId: user.userId,
+                        groupId: ownerGroup.group.groupId
+                    }
+                });
+
+                if (isMember) {
+                    return { allowed: true, presentation };
+                }
+            }
+        }
+
+        if (presentation.courseId) {
+            const enrollment = await TopicEnrollment.findOne({
+                where: {
+                    studentId: user.userId,
+                    status: 'enrolled'
+                },
+                include: [
+                    {
+                        model: Topic,
+                        as: 'topic',
+                        where: { courseId: presentation.courseId }
+                    }
+                ]
+            });
+
+            if (enrollment) {
+                return { allowed: true, presentation };
+            }
         }
 
         return { allowed: false, reason: 'Access denied' };
