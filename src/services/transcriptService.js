@@ -69,6 +69,13 @@ class TranscriptService {
                         {
                             model: Speaker,
                             as: 'speaker',
+                            include: [
+                                {
+                                    model: User,
+                                    as: 'mappedStudent',
+                                    attributes: ['userId', 'firstName', 'lastName']
+                                }
+                            ],
                             attributes: ['speakerId', 'aiSpeakerLabel', 'isMapped', 'totalDurationSeconds', 'segmentCount'],
                             required: false
                         }
@@ -119,6 +126,13 @@ class TranscriptService {
                         {
                             model: Speaker,
                             as: 'speaker',
+                            include: [
+                                {
+                                    model: User,
+                                    as: 'mappedStudent',
+                                    attributes: ['userId', 'firstName', 'lastName']
+                                }
+                            ],
                             attributes: ['speakerId', 'aiSpeakerLabel', 'isMapped', 'totalDurationSeconds', 'segmentCount'],
                             required: false
                         }
@@ -159,6 +173,13 @@ class TranscriptService {
                 {
                     model: Speaker,
                     as: 'speaker',
+                    include: [
+                        {
+                            model: User,
+                            as: 'mappedStudent',
+                            attributes: ['userId', 'firstName', 'lastName']
+                        }
+                    ],
                     attributes: ['speakerId', 'aiSpeakerLabel', 'isMapped'],
                     required: false
                 }
