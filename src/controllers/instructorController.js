@@ -347,6 +347,135 @@ class InstructorController {
     }
   }
 
+  async getPresentations(req, res) {
+    try {
+      const instructorId = req.user.userId;
+      const isAdmin = String(req.user.role || '').toLowerCase() === 'admin';
+      const {
+        search = '',
+        status,
+        classId,
+        courseId,
+        page = 1,
+        limit = 12,
+      } = req.query;
+
+      const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+      const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 12));
+      const { classIds, courseIds } = await this.getInstructorScopeIds(instructorId, isAdmin);
+
+      if (!isAdmin && classIds.length === 0 && courseIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            presentations: [],
+            total: 0,
+            page: parsedPage,
+            limit: parsedLimit,
+            totalPages: 0,
+          },
+        });
+      }
+
+      const op = db.Sequelize.Op;
+      const whereClause = {};
+
+      if (classId) {
+        whereClause.classId = parseInt(classId, 10);
+      } else if (classIds.length > 0) {
+        whereClause.classId = { [op.in]: classIds };
+      }
+
+      if (courseId) {
+        whereClause.courseId = parseInt(courseId, 10);
+      } else if (!whereClause.classId && courseIds.length > 0) {
+        whereClause.courseId = { [op.in]: courseIds };
+      }
+
+      if (status) {
+        whereClause.status = status;
+      }
+
+      const keyword = String(search || '').trim();
+      if (keyword) {
+        whereClause[op.or] = [
+          { title: { [op.like]: `%${keyword}%` } },
+          { description: { [op.like]: `%${keyword}%` } },
+          { '$student.firstName$': { [op.like]: `%${keyword}%` } },
+          { '$student.lastName$': { [op.like]: `%${keyword}%` } },
+          { '$student.email$': { [op.like]: `%${keyword}%` } },
+          { '$class.classCode$': { [op.like]: `%${keyword}%` } },
+          { '$course.courseName$': { [op.like]: `%${keyword}%` } },
+          { '$topic.topicName$': { [op.like]: `%${keyword}%` } },
+        ];
+      }
+
+      const offset = (parsedPage - 1) * parsedLimit;
+
+      const presentations = await Presentation.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: User,
+            as: 'student',
+            attributes: ['userId', 'firstName', 'lastName', 'email'],
+            required: false,
+          },
+          {
+            model: Class,
+            as: 'class',
+            attributes: ['classId', 'classCode'],
+            required: false,
+          },
+          {
+            model: Course,
+            as: 'course',
+            attributes: ['courseId', 'courseCode', 'courseName'],
+            required: false,
+          },
+          {
+            model: db.Topic,
+            as: 'topic',
+            attributes: ['topicId', 'topicName'],
+            required: false,
+          },
+          {
+            model: AIReport,
+            as: 'submission',
+            attributes: ['reportId', 'overallScore', 'gradeForInstructor', 'reportStatus'],
+            required: false,
+          },
+        ],
+        order: [
+          ['submissionDate', 'DESC'],
+          ['createdAt', 'DESC'],
+        ],
+        limit: parsedLimit,
+        offset,
+        distinct: true,
+        subQuery: false,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          presentations: presentations.rows,
+          total: presentations.count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(presentations.count / parsedLimit),
+        },
+      });
+    } catch (error) {
+      console.error('Get instructor presentations error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch instructor presentations',
+        error: error.message,
+      });
+    }
+  }
+
   // Duyệt submission cho presentation
   async approveSubmission(req, res) {
     try {

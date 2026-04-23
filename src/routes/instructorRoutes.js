@@ -17,6 +17,13 @@ router.get(
   instructorController.getDashboard.bind(instructorController)
 );
 
+// GET /api/instructor/presentations - Danh sách tất cả bài thuyết trình trong scope instructor
+router.get(
+  '/presentations',
+  generalRateLimit,
+  instructorController.getPresentations.bind(instructorController)
+);
+
 // GET /api/instructor/presentations/pending - Danh sách chờ duyệt
 router.get(
   '/presentations/pending',
