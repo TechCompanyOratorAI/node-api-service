@@ -23,6 +23,9 @@ const {
   AIReport,
   Feedback,
   Class,
+  Transcript,
+  TranscriptSegment,
+  Speaker,
 } = db;
 
 /** Generate a url-safe random token */
@@ -395,6 +398,57 @@ class ShareService {
             model: AudioRecord,
             as: 'audioRecord',
             attributes: ['audioId', 'fileName', 'filePath', 'durationSeconds', 'fileFormat'],
+          },
+          {
+            model: Transcript,
+            as: 'transcript',
+            attributes: [
+              'transcriptId',
+              'presentationId',
+              'audioId',
+              'fullTranscript',
+              'language',
+              'confidenceScore',
+              'generatedAt',
+            ],
+            include: [
+              {
+                model: TranscriptSegment,
+                as: 'segments',
+                attributes: [
+                  'segmentId',
+                  'transcriptId',
+                  'speakerId',
+                  'segmentNumber',
+                  'segmentText',
+                  'startTimestamp',
+                  'endTimestamp',
+                  'confidenceScore',
+                ],
+                include: [
+                  {
+                    model: Speaker,
+                    as: 'speaker',
+                    attributes: [
+                      'speakerId',
+                      'aiSpeakerLabel',
+                      'isMapped',
+                      'totalDurationSeconds',
+                      'segmentCount',
+                    ],
+                    required: false,
+                    include: [
+                      {
+                        model: User,
+                        as: 'mappedStudent',
+                        attributes: ['userId', 'firstName', 'lastName'],
+                        required: false,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
           },
         ],
       });
