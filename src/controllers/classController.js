@@ -66,7 +66,12 @@ class ClassController {
       const search = req.query.search;
       const courseId = req.query.courseId ? parseInt(req.query.courseId) : null;
       const userId = req.user.userId;
-      const userRole = req.userRoles?.includes("Admin") || req.userRoles?.includes("AcademicCoordinator") ? "Admin" : "Student";
+      const userRole =
+        req.userRoles?.includes("Admin") || req.userRoles?.includes("AcademicCoordinator")
+          ? "Admin"
+          : req.userRoles?.includes("Instructor")
+          ? "Instructor"
+          : "Student";
 
       const result = await classService.getAllClasses({
         page,
