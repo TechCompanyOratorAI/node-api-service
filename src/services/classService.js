@@ -5,6 +5,7 @@ const {
   Class,
   ClassInstructor,
   Course,
+  CourseAcademicBlock,
   CourseInstructor,
   User,
   Enrollment,
@@ -16,8 +17,57 @@ const { Op } = require("sequelize");
 const { emitUploadPermissionChanged } = require("../websocket/emitters");
 const auditLogService = require("./auditLogService");
 const { AUDIT_ACTIONS, AUDIT_STATUSES } = require("../constants/businessConstants");
+const academicCalendarService = require("./academicCalendarService");
 
 class ClassService {
+  async getAllowedCourseBlockIds(courseId, transaction = null) {
+    const mappings = await CourseAcademicBlock.findAll({
+      where: { courseId },
+      attributes: ["academicBlockId", "isPrimary"],
+      order: [["isPrimary", "DESC"], ["courseAcademicBlockId", "ASC"]],
+      transaction,
+    });
+    return mappings.map((mapping) => mapping.academicBlockId);
+  }
+
+  resolveClassAcademicBlockId(requestedBlockId, allowedBlockIds) {
+    const normalizedRequestedBlockId = requestedBlockId === undefined || requestedBlockId === null
+      ? requestedBlockId
+      : parseInt(requestedBlockId, 10);
+
+    if (!allowedBlockIds.length) {
+      return {
+        success: true,
+        academicBlockId: normalizedRequestedBlockId || null,
+      };
+    }
+
+    if (normalizedRequestedBlockId !== undefined && normalizedRequestedBlockId !== null) {
+      if (!allowedBlockIds.includes(normalizedRequestedBlockId)) {
+        return {
+          success: false,
+          message: "Academic block of class must belong to course academic blocks",
+        };
+      }
+      return {
+        success: true,
+        academicBlockId: normalizedRequestedBlockId,
+      };
+    }
+
+    if (allowedBlockIds.length === 1) {
+      return {
+        success: true,
+        academicBlockId: allowedBlockIds[0],
+      };
+    }
+
+    return {
+      success: false,
+      message: "Course has multiple academic blocks, class academicBlockId is required",
+    };
+  }
+
   /**
    * Create new class (Admin only)
    */
@@ -46,13 +96,33 @@ class ClassService {
         };
       }
 
+      const allowedBlockIds = await this.getAllowedCourseBlockIds(courseId, transaction);
+      const blockSelection = this.resolveClassAcademicBlockId(classData.academicBlockId, allowedBlockIds);
+      if (!blockSelection.success) {
+        await transaction.rollback();
+        return blockSelection;
+      }
+
+      const academicBlockId = blockSelection.academicBlockId;
+      const blockValidation = await academicCalendarService.validateEntityWithinBlock({
+        academicBlockId,
+        startDate,
+        endDate,
+        entityLabel: "Class",
+      });
+      if (!blockValidation.success) {
+        await transaction.rollback();
+        return blockValidation;
+      }
+
       // Create class
       const newClass = await Class.create({
         courseId,
+        academicBlockId: academicBlockId || null,
         classCode,
         status: "active",
-        startDate,
-        endDate,
+        startDate: startDate || blockValidation.academicBlock?.startDate || null,
+        endDate: endDate || blockValidation.academicBlock?.endDate || null,
         maxStudents,
         maxGroupMembers,
         createdBy: userId,
@@ -125,7 +195,13 @@ class ClassService {
           {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName"],
+            attributes: ["courseId", "courseCode", "courseName", "academicBlockId"],
+            include: [{
+              model: db.AcademicBlock,
+              as: "academicBlocks",
+              through: { attributes: ["isPrimary"] },
+              required: false,
+            }],
           },
           {
             model: User,
@@ -218,7 +294,13 @@ class ClassService {
           {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName"],
+            attributes: ["courseId", "courseCode", "courseName", "academicBlockId"],
+            include: [{
+              model: db.AcademicBlock,
+              as: "academicBlocks",
+              through: { attributes: ["isPrimary"] },
+              required: false,
+            }],
           },
           {
             model: User,
@@ -312,7 +394,14 @@ class ClassService {
               "courseName",
               "semester",
               "academicYear",
+              "academicBlockId",
             ],
+            include: [{
+              model: db.AcademicBlock,
+              as: "academicBlocks",
+              through: { attributes: ["isPrimary"] },
+              required: false,
+            }],
           },
           {
             model: User,
@@ -382,7 +471,13 @@ class ClassService {
           {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName", "semester", "academicYear"],
+            attributes: ["courseId", "courseCode", "courseName", "semester", "academicYear", "academicBlockId"],
+            include: [{
+              model: db.AcademicBlock,
+              as: "academicBlocks",
+              through: { attributes: ["isPrimary"] },
+              required: false,
+            }],
           },
           {
             model: Topic,
@@ -536,6 +631,40 @@ class ClassService {
       }
 
       // Update class info
+      const allowedBlockIds = await this.getAllowedCourseBlockIds(classData.courseId, transaction);
+      const requestedBlockId = classUpdates.academicBlockId !== undefined
+        ? classUpdates.academicBlockId
+        : classData.academicBlockId;
+      const blockSelection = this.resolveClassAcademicBlockId(requestedBlockId, allowedBlockIds);
+      if (!blockSelection.success) {
+        await transaction.rollback();
+        return blockSelection;
+      }
+
+      const nextAcademicBlockId = blockSelection.academicBlockId;
+      const nextStartDate = classUpdates.startDate || classData.startDate;
+      const nextEndDate = classUpdates.endDate || classData.endDate;
+      const blockValidation = await academicCalendarService.validateEntityWithinBlock({
+        academicBlockId: nextAcademicBlockId,
+        startDate: nextStartDate,
+        endDate: nextEndDate,
+        entityLabel: "Class",
+      });
+      if (!blockValidation.success) {
+        await transaction.rollback();
+        return blockValidation;
+      }
+
+      if (classUpdates.academicBlockId !== undefined) {
+        classUpdates.academicBlockId = nextAcademicBlockId || null;
+      }
+      if (classUpdates.startDate === undefined && classUpdates.academicBlockId !== undefined && !nextStartDate) {
+        classUpdates.startDate = blockValidation.academicBlock?.startDate || null;
+      }
+      if (classUpdates.endDate === undefined && classUpdates.academicBlockId !== undefined && !nextEndDate) {
+        classUpdates.endDate = blockValidation.academicBlock?.endDate || null;
+      }
+
       await classData.update(classUpdates, { transaction });
 
       // Update enrollment key if provided

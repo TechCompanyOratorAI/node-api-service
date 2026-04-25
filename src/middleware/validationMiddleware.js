@@ -174,6 +174,21 @@ export const validateCourse = [
     .isInt({ min: 2000, max: 2100 })
     .withMessage("Academic year must be a valid year between 2000 and 2100"),
 
+  body("academicBlockId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Academic block ID must be a positive integer"),
+
+  body("academicBlockIds")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage("Academic block IDs must be a non-empty array"),
+
+  body("academicBlockIds.*")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Each academic block ID must be a positive integer"),
+
   body("startDate")
     .optional()
     .isISO8601()
@@ -225,6 +240,21 @@ export const validateCourseUpdate = [
     .optional()
     .isInt({ min: 2000, max: 2100 })
     .withMessage("Academic year must be a valid year between 2000 and 2100"),
+
+  body("academicBlockId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Academic block ID must be a positive integer"),
+
+  body("academicBlockIds")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage("Academic block IDs must be a non-empty array"),
+
+  body("academicBlockIds.*")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Each academic block ID must be a positive integer"),
 
   body("startDate")
     .optional()
@@ -409,6 +439,11 @@ export const validateCreateClass = [
       return true;
     }),
 
+  body("academicBlockId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Academic block ID must be a positive integer"),
+
   // Enrollment key fields (required)
   body("enrollKey")
     .trim()
@@ -490,6 +525,11 @@ export const validateUpdateClass = [
       }
       return true;
     }),
+
+  body("academicBlockId")
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage("Academic block ID must be a positive integer"),
 
   body("maxStudents")
     .optional({ nullable: true })

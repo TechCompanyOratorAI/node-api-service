@@ -37,7 +37,7 @@ export const requireClassInstructor = async (req, res, next) => {
 
     try {
         // Admin bypass - Admin has full access to all classes
-        if (userRoles.includes('Admin')) {
+        if (userRoles.includes('Admin') || userRoles.includes('AcademicCoordinator')) {
             return next();
         }
 
@@ -103,7 +103,7 @@ export const requireCourseInstructor = async (req, res, next) => {
 
     try {
         // Admin bypass - Admin has full access to all courses
-        if (userRoles.includes('Admin')) {
+        if (userRoles.includes('Admin') || userRoles.includes('AcademicCoordinator')) {
             return next();
         }
 
@@ -215,7 +215,7 @@ export const requireClassInstructorOrAdmin = async (req, res, next) => {
     }
 
     // Admin bypass
-    if (userRoles.includes('Admin')) {
+    if (userRoles.includes('Admin') || userRoles.includes('AcademicCoordinator')) {
         return next();
     }
 

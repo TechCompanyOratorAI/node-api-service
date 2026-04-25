@@ -1,8 +1,129 @@
 import db from '../models/index.js';
 
-const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group } = db;
+const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group, AcademicBlock, AcademicYear, CourseAcademicBlock } = db;
 
 class CourseService {
+    normalizeAcademicBlockIds(courseData = {}) {
+        const { academicBlockIds, academicBlockId } = courseData;
+        if (Array.isArray(academicBlockIds)) {
+            return [...new Set(academicBlockIds.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))];
+        }
+        if (academicBlockId !== undefined && academicBlockId !== null) {
+            const parsed = parseInt(academicBlockId, 10);
+            return Number.isInteger(parsed) && parsed > 0 ? [parsed] : [];
+        }
+        return [];
+    }
+
+    async resolveCourseBlocks(academicBlockIds, transaction) {
+        if (!academicBlockIds.length) {
+            return { success: true, blocks: [] };
+        }
+
+        const blocks = await AcademicBlock.findAll({
+            where: {
+                academicBlockId: academicBlockIds,
+                isActive: true,
+            },
+            include: [{ model: AcademicYear, as: "academicYear" }],
+            transaction,
+        });
+
+        if (blocks.length !== academicBlockIds.length) {
+            return {
+                success: false,
+                message: "One or more academicBlockIds are invalid or inactive",
+            };
+        }
+
+        return { success: true, blocks };
+    }
+
+    validateCourseDateWithinBlocks(startDate, endDate, blocks) {
+        if (!blocks.length) {
+            return { success: true };
+        }
+
+        const minStart = blocks.reduce((acc, block) => {
+            if (!acc) return block.startDate;
+            return new Date(block.startDate) < new Date(acc) ? block.startDate : acc;
+        }, null);
+        const maxEnd = blocks.reduce((acc, block) => {
+            if (!acc) return block.endDate;
+            return new Date(block.endDate) > new Date(acc) ? block.endDate : acc;
+        }, null);
+
+        const actualStart = startDate || minStart;
+        const actualEnd = endDate || maxEnd;
+
+        if (new Date(actualStart) >= new Date(actualEnd)) {
+            return { success: false, message: "Course endDate must be after startDate" };
+        }
+        if (new Date(actualStart) < new Date(minStart) || new Date(actualEnd) > new Date(maxEnd)) {
+            return {
+                success: false,
+                message: "Course dates must be inside selected academic blocks range",
+            };
+        }
+
+        return {
+            success: true,
+            startDate: actualStart,
+            endDate: actualEnd,
+            primaryAcademicBlockId: blocks[0]?.academicBlockId || null,
+        };
+    }
+
+    async syncCourseAcademicBlocks(courseId, academicBlockIds, transaction) {
+        await CourseAcademicBlock.destroy({
+            where: { courseId },
+            transaction,
+        });
+
+        if (!academicBlockIds.length) return;
+
+        await CourseAcademicBlock.bulkCreate(
+            academicBlockIds.map((blockId, index) => ({
+                courseId,
+                academicBlockId: blockId,
+                isPrimary: index === 0,
+            })),
+            { transaction }
+        );
+    }
+
+    buildAcademicBlocksInclude(required = false, where = null) {
+        return {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            attributes: [
+                "academicBlockId",
+                "blockCode",
+                "term",
+                "half",
+                "blockType",
+                "startDate",
+                "endDate",
+                "handoverStartDate",
+                "handoverEndDate",
+                "isActive",
+            ],
+            through: { attributes: ["isPrimary"] },
+            include: [{ model: AcademicYear, as: "academicYear" }],
+            required,
+            ...(where ? { where } : {}),
+        };
+    }
+
+    formatCourseBlocks(course) {
+        const blocks = course.academicBlocks || [];
+        const primary = blocks.find((b) => b.CourseAcademicBlock?.isPrimary) || blocks[0] || null;
+        return {
+            academicBlocks: blocks,
+            primaryAcademicBlockId: primary?.academicBlockId || null,
+        };
+    }
+
     // Create new course (with multi-instructor support)
     async createCourse(courseData, createdBy) {
         const transaction = await db.sequelize.transaction();
@@ -19,6 +140,7 @@ class CourseService {
                 endDate,
                 instructorIds = [] // Array of instructor IDs
             } = courseData;
+            const academicBlockIds = this.normalizeAcademicBlockIds(courseData);
 
             // Check if course code already exists
             const existingCourse = await Course.findOne({
@@ -36,18 +158,33 @@ class CourseService {
                 };
             }
 
+            const resolvedBlocks = await this.resolveCourseBlocks(academicBlockIds, transaction);
+            if (!resolvedBlocks.success) {
+                await transaction.rollback();
+                return resolvedBlocks;
+            }
+
+            const dateValidation = this.validateCourseDateWithinBlocks(startDate, endDate, resolvedBlocks.blocks);
+            if (!dateValidation.success) {
+                await transaction.rollback();
+                return dateValidation;
+            }
+
             // Create course (no single instructorId FK)
             const course = await Course.create({
                 courseCode,
                 courseName,
                 departmentId,
                 description,
+                academicBlockId: dateValidation.primaryAcademicBlockId,
                 semester,
                 academicYear,
-                startDate,
-                endDate,
+                startDate: dateValidation.startDate || null,
+                endDate: dateValidation.endDate || null,
                 isActive: true
             }, { transaction });
+
+            await this.syncCourseAcademicBlocks(course.courseId, academicBlockIds, transaction);
 
             // Assign instructors via course_instructors M:N table
             if (instructorIds && instructorIds.length > 0) {
@@ -70,6 +207,9 @@ class CourseService {
                         as: 'instructors',
                         attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
                         through: { attributes: ['assignedAt'] }
+                    },
+                    {
+                        ...this.buildAcademicBlocksInclude(false)
                     }
                 ]
             });
@@ -97,6 +237,7 @@ class CourseService {
                 instructorId,
                 departmentId,
                 majorCode,
+                academicBlockId,
                 semester,
                 academicYear,
                 isActive,
@@ -157,7 +298,8 @@ class CourseService {
                 as: 'topics',
                 attributes: ['topicId', 'topicName', 'sequenceNumber'],
                 required: false
-            }
+            },
+            this.buildAcademicBlocksInclude(!!academicBlockId, academicBlockId ? { academicBlockId } : null)
         ],
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -189,6 +331,8 @@ class CourseService {
 
     const coursesWithStats = courses.map(course => {
         const json = course.toJSON();
+        const primary = json.academicBlocks?.find((b) => b.CourseAcademicBlock?.isPrimary) || json.academicBlocks?.[0] || null;
+        json.academicBlockId = primary?.academicBlockId || null;
         json.totalActiveClasses = activeClassCounts[course.courseId] || 0;
         return json;
     });
@@ -228,6 +372,7 @@ class CourseService {
             const {
                 semester,
                 academicYear,
+                academicBlockId,
                 isActive,
                 search
             } = filters;
@@ -276,7 +421,8 @@ class CourseService {
                         as: 'topics',
                         attributes: ['topicId', 'topicName', 'sequenceNumber'],
                         required: false
-                    }
+                    },
+                    this.buildAcademicBlocksInclude(!!academicBlockId, academicBlockId ? { academicBlockId } : null)
                 ],
                 limit: parseInt(limit),
                 offset: parseInt(offset),
@@ -293,7 +439,12 @@ class CourseService {
                     lastName: instructor.lastName,
                     email: instructor.email
                 },
-                data: courses.map(course => course.toJSON()),
+                data: courses.map(course => {
+                    const json = course.toJSON();
+                    const primary = json.academicBlocks?.find((b) => b.CourseAcademicBlock?.isPrimary) || json.academicBlocks?.[0] || null;
+                    json.academicBlockId = primary?.academicBlockId || null;
+                    return json;
+                }),
                 pagination: {
                     total: count,
                     page: parseInt(page),
@@ -326,6 +477,9 @@ class CourseService {
                     as: 'topics',
                     attributes: ['topicId', 'topicName', 'description', 'sequenceNumber', 'dueDate', 'maxDurationMinutes'],
                     order: [['sequenceNumber', 'ASC']]
+                },
+                {
+                    ...this.buildAcademicBlocksInclude(false)
                 }
             ];
 
@@ -362,6 +516,7 @@ class CourseService {
                 };
             }
 
+            const { academicBlocks, primaryAcademicBlockId } = this.formatCourseBlocks(course);
             const courseData = {
                 courseId: course.courseId,
                 courseCode: course.courseCode,
@@ -369,6 +524,8 @@ class CourseService {
                 description: course.description,
                 semester: course.semester,
                 academicYear: course.academicYear,
+                academicBlockId: primaryAcademicBlockId,
+                academicBlocks,
                 startDate: course.startDate,
                 endDate: course.endDate,
                 isActive: course.isActive,
@@ -435,6 +592,8 @@ class CourseService {
                 courseCode,
                 courseName,
                 description,
+                academicBlockId,
+                academicBlockIds,
                 semester,
                 academicYear,
                 startDate,
@@ -443,6 +602,7 @@ class CourseService {
                 departmentId,
                 instructorIds // Array of instructor IDs to update
             } = courseData;
+            const hasAcademicBlocksInPayload = Array.isArray(academicBlockIds) || academicBlockId !== undefined;
 
             // If updating course code, check for duplicates
             if (courseCode && courseCode !== course.courseCode) {
@@ -464,18 +624,46 @@ class CourseService {
                 }
             }
 
-            // Update course basic info
+            const existingMappings = await CourseAcademicBlock.findAll({
+                where: { courseId },
+                attributes: ["academicBlockId", "isPrimary"],
+                order: [["isPrimary", "DESC"], ["courseAcademicBlockId", "ASC"]],
+                transaction,
+            });
+
+            const nextAcademicBlockIds = hasAcademicBlocksInPayload
+                ? this.normalizeAcademicBlockIds({ academicBlockIds, academicBlockId })
+                : existingMappings.map((mapping) => mapping.academicBlockId);
+            const resolvedBlocks = await this.resolveCourseBlocks(nextAcademicBlockIds, transaction);
+            if (!resolvedBlocks.success) {
+                await transaction.rollback();
+                return resolvedBlocks;
+            }
+
+            const nextStartDate = startDate || course.startDate;
+            const nextEndDate = endDate || course.endDate;
+            const dateValidation = this.validateCourseDateWithinBlocks(nextStartDate, nextEndDate, resolvedBlocks.blocks);
+            if (!dateValidation.success) {
+                await transaction.rollback();
+                return dateValidation;
+            }
+
             await course.update({
                 courseCode: courseCode || course.courseCode,
                 courseName: courseName || course.courseName,
                 description: description !== undefined ? description : course.description,
+                academicBlockId: dateValidation.primaryAcademicBlockId,
                 semester: semester || course.semester,
                 academicYear: academicYear || course.academicYear,
-                startDate: startDate || course.startDate,
-                endDate: endDate || course.endDate,
+                startDate: dateValidation.startDate || null,
+                endDate: dateValidation.endDate || null,
                 isActive: isActive !== undefined ? isActive : course.isActive,
                 departmentId: departmentId !== undefined ? departmentId : course.departmentId
             }, { transaction });
+
+            if (hasAcademicBlocksInPayload) {
+                await this.syncCourseAcademicBlocks(courseId, nextAcademicBlockIds, transaction);
+            }
 
             // Update instructors if instructorIds provided
             if (instructorIds !== undefined && Array.isArray(instructorIds)) {
@@ -516,6 +704,9 @@ class CourseService {
                         as: 'instructors',
                         attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
                         through: { attributes: ['assignedAt'] }
+                    },
+                    {
+                        ...this.buildAcademicBlocksInclude(false)
                     }
                 ]
             });
