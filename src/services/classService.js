@@ -139,7 +139,7 @@ class ClassService {
           {
             model: EnrollKey,
             as: "enrollKeys",
-            attributes: ["keyId", "isActive", "expiresAt"],
+            attributes: ["keyId", "keyValue", "isActive", "expiresAt"],
           },
         ],
         limit: parseInt(limit),
@@ -148,28 +148,31 @@ class ClassService {
         distinct: true,
       });
 
-      return {
-        success: true,
-        data: classes.map((c) => ({
-          ...c.toJSON(),
-          enrollmentCount: c.enrollments?.length || 0,
-          activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
-        })),
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit),
-        },
-      };
-    } catch (error) {
-      console.error("Get classes error:", error);
-      return {
-        success: false,
-        message: "Không thể lấy danh sách lớp học",
-        error: error.message,
-      };
+     return {
+  success: true,
+  data: classes.map((c) => {
+    const classData = {
+      ...c.toJSON(),
+      enrollmentCount: c.enrollments?.length || 0,
+      activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
+    };
+
+    // Admin / Instructor mới thấy enroll key
+    if (userRole === "Admin" || userRole === "Instructor") {
+      const activeKey = c.enrollKeys?.find((k) => k.isActive);
+      classData.enrollkey = activeKey?.keyValue || null;
     }
+
+    return classData;
+  }),
+
+  pagination: {
+    total: count,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    totalPages: Math.ceil(count / limit),
+  },
+};
   }
 
   /**
@@ -238,8 +241,8 @@ class ClassService {
             activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
           };
 
-          // Only include enrollkey for Admin users
-          if (userRole === "Admin") {
+          // Include enrollkey for Admin or Instructor
+          if (userRole === "Admin" || userRole === "Instructor") {
             const activeKey = c.enrollKeys?.find((k) => k.isActive);
             classData.enrollkey = activeKey?.keyValue || null;
           }
