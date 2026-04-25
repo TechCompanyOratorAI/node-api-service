@@ -1,6 +1,7 @@
 "use strict";
 
 const { validationResult } = require("express-validator");
+const db = require("../models");
 const classService = require("../services/classService");
 
 class ClassController {
@@ -26,17 +27,72 @@ class ClassController {
         });
       }
 
-      const classData = { ...req.body, courseId: parseInt(courseId) };
-      const result = await classService.createClass(
-        classData,
-        req.user.userId,
-        req.userRoles || []
-      );
+      const { Course, Class, ClassInstructor } = db;
+      const transaction = await db.sequelize.transaction();
 
-      if (result.success) {
-        return res.status(201).json(result);
-      } else {
-        return res.status(400).json(result);
+      try {
+        const classData = { ...req.body, courseId: parseInt(courseId) };
+        const { classCode, startDate, endDate, maxStudents, maxGroupMembers } =
+          classData;
+
+        const course = await Course.findByPk(classData.courseId, { transaction });
+        if (!course) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Không tìm thấy khóa học",
+          });
+        }
+
+        const existing = await Class.findOne({
+          where: { courseId: classData.courseId, classCode },
+          transaction,
+        });
+        if (existing) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Mã lớp đã tồn tại trong khóa học này",
+          });
+        }
+
+        const newClass = await Class.create(
+          {
+            courseId: classData.courseId,
+            classCode,
+            status: "active",
+            startDate,
+            endDate,
+            maxStudents,
+            maxGroupMembers,
+            createdBy: req.user.userId,
+          },
+          { transaction }
+        );
+
+        const isAdmin = (req.userRoles || []).includes("Admin");
+        const isInstructor = (req.userRoles || []).includes("Instructor");
+        if (isInstructor && !isAdmin) {
+          await ClassInstructor.create(
+            {
+              classId: newClass.classId,
+              instructorId: req.user.userId,
+              assignedBy: req.user.userId,
+            },
+            { transaction }
+          );
+        }
+
+        await transaction.commit();
+
+        return res.status(201).json({
+          success: true,
+          message: "Tạo lớp học thành công",
+          class: newClass,
+        });
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
       }
     } catch (error) {
       console.error("Create class controller error:", error);
@@ -137,13 +193,19 @@ class ClassController {
       const userRole = req.userRoles?.includes("Admin")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
-        ? "Instructor"
-        : "Student";
+          ? "Instructor"
+          : "Student";
+
+      const pagination = {
+        page: parseInt(req.query.page) || 1,
+        limit: parseInt(req.query.limit) || 10,
+      };
 
       const result = await classService.getClassesByCourse(
         parseInt(courseId),
         userId,
-        userRole
+        userRole,
+        pagination
       );
 
       if (result.success) {
@@ -177,8 +239,8 @@ class ClassController {
       const userRole = req.userRoles?.includes("Admin")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
-        ? "Instructor"
-        : "Student";
+          ? "Instructor"
+          : "Student";
 
       const result = await classService.getClassById(
         parseInt(classId),
@@ -230,12 +292,32 @@ class ClassController {
       const userRole = req.userRoles?.includes("Admin")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
-        ? "Instructor"
-        : "Student";
+          ? "Instructor"
+          : "Student";
+
+      const normalizedUpdates = { ...req.body };
+      if (
+        normalizedUpdates.expiresAt !== undefined &&
+        normalizedUpdates.keyExpiresAt === undefined
+      ) {
+        normalizedUpdates.keyExpiresAt = normalizedUpdates.expiresAt;
+      }
+      if (
+        normalizedUpdates.maxUses !== undefined &&
+        normalizedUpdates.keyMaxUses === undefined
+      ) {
+        normalizedUpdates.keyMaxUses = normalizedUpdates.maxUses;
+      }
+
+      Object.keys(normalizedUpdates).forEach((key) => {
+        if (normalizedUpdates[key] === null || normalizedUpdates[key] === undefined) {
+          delete normalizedUpdates[key];
+        }
+      });
 
       const result = await classService.updateClass(
         parseInt(classId),
-        req.body,
+        normalizedUpdates,
         userId,
         userRole
       );
@@ -501,6 +583,81 @@ class ClassController {
     } catch (error) {
       console.error("Delete topic error:", error);
       return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  // ============================================================
+  // UPLOAD PERMISSION HANDLERS
+  // ============================================================
+
+  // POST /api/classes/:classId/upload-permission - Bật/tắt cho phép upload
+  async setUploadPermission(req, res) {
+    try {
+      const { classId } = req.params;
+      const { isUploadEnabled, uploadStartDate, uploadEndDate } = req.body;
+
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const instructorId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin")
+        ? "Admin"
+        : req.userRoles?.includes("Instructor")
+          ? "Instructor"
+          : null;
+
+      if (!userRole) {
+        return res.status(403).json({
+          success: false,
+          message: "Chỉ giảng viên hoặc admin mới có quyền thực hiện",
+        });
+      }
+
+      const result = await classService.setUploadPermission(
+        parseInt(classId),
+        {
+          isUploadEnabled: isUploadEnabled ?? true,
+          uploadStartDate: uploadStartDate || null,
+          uploadEndDate: uploadEndDate || null,
+        },
+        instructorId,
+        userRole
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Set upload permission error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  // GET /api/classes/:classId/upload-permission - Lấy trạng thái upload
+  async getUploadPermission(req, res) {
+    try {
+      const { classId } = req.params;
+
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const result = await classService.getUploadPermission(parseInt(classId));
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Get upload permission error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
     }
   }
 }

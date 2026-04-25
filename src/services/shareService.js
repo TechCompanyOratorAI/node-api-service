@@ -23,12 +23,44 @@ const {
   AIReport,
   Feedback,
   Class,
+  Transcript,
+  TranscriptSegment,
+  Speaker,
 } = db;
 
 /** Generate a url-safe random token */
 const generateToken = () => crypto.randomBytes(48).toString('base64url');
 
 class ShareService {
+  async _getAuthorizedPresentation(presentationId, actor) {
+    const actorId = typeof actor === 'object' ? actor?.userId : actor;
+    const roleNames = typeof actor === 'object'
+      ? [
+          ...(actor?.userRoles || []).map((userRole) => userRole?.role?.roleName),
+          actor?.role,
+        ]
+          .map((roleName) => String(roleName || '').toLowerCase())
+          .filter(Boolean)
+      : [];
+
+    if (!actorId) return null;
+
+    const presentation = await Presentation.findByPk(presentationId, {
+      include: [{ model: User, as: 'student', attributes: ['userId', 'firstName', 'lastName'] }],
+    });
+
+    if (!presentation) return null;
+
+    if (
+      presentation.studentId === actorId ||
+      roleNames.some((role) => ['admin', 'teacher', 'instructor'].includes(role))
+    ) {
+      return presentation;
+    }
+
+    return null;
+  }
+
   // ─────────────────────────────────────────────────
   // SHARE: Create public link
   // ─────────────────────────────────────────────────
@@ -38,14 +70,13 @@ class ShareService {
    * Một bài chỉ có TỐI ĐA 1 public share record
    *
    * @param {number} presentationId
-   * @param {number} ownerId - userId của người share (phải là owner)
+   * @param {object|number} actor - user hiện tại
    * @param {object} options - { expiresAt }
    */
-  async createPublicShare(presentationId, ownerId, options = {}) {
+  async createPublicShare(presentationId, actor, options = {}) {
     try {
-      const presentation = await Presentation.findOne({
-        where: { presentationId, studentId: ownerId },
-      });
+      const actorId = typeof actor === 'object' ? actor?.userId : actor;
+      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
 
       if (!presentation) {
         return { success: false, message: 'Presentation not found or access denied' };
@@ -62,7 +93,7 @@ class ShareService {
           accessLevel: 'view',
           shareType: 'public',
           shareToken: generateToken(),
-          grantedBy: ownerId,
+          grantedBy: actorId,
           grantedAt: new Date(),
           expiresAt: expiresAt || null,
         },
@@ -93,16 +124,14 @@ class ShareService {
    * Mời người dùng cụ thể bằng email xem presentation
    *
    * @param {number} presentationId
-   * @param {number} ownerId
+   * @param {object|number} actor
    * @param {string[]} emails - Danh sách email cần mời
    * @param {object} options - { expiresAt }
    */
-  async inviteByEmails(presentationId, ownerId, emails, options = {}) {
+  async inviteByEmails(presentationId, actor, emails, options = {}) {
     try {
-      const presentation = await Presentation.findOne({
-        where: { presentationId, studentId: ownerId },
-        include: [{ model: User, as: 'student', attributes: ['userId', 'firstName', 'lastName'] }],
-      });
+      const actorId = typeof actor === 'object' ? actor?.userId : actor;
+      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
 
       if (!presentation) {
         return { success: false, message: 'Presentation not found or access denied' };
@@ -130,7 +159,7 @@ class ShareService {
         }
 
         // Không tự share cho chính mình
-        if (user.userId === ownerId) {
+        if (user.userId === actorId) {
           results.push({
             email: normalizedEmail,
             success: false,
@@ -148,7 +177,7 @@ class ShareService {
             accessLevel: 'view',
             shareType: 'private',
             shareToken: generateToken(),
-            grantedBy: ownerId,
+            grantedBy: actorId,
             grantedAt: new Date(),
             expiresAt: expiresAt || null,
           },
@@ -156,7 +185,7 @@ class ShareService {
 
         if (!created && !accessRecord.shareToken) {
           // Bổ sung token nếu cũ chưa có
-          await accessRecord.update({ shareToken: generateToken(), grantedBy: ownerId, expiresAt: expiresAt || null });
+          await accessRecord.update({ shareToken: generateToken(), grantedBy: actorId, expiresAt: expiresAt || null });
         }
 
         await accessRecord.reload();
@@ -212,11 +241,9 @@ class ShareService {
   /**
    * Thu hồi public share link
    */
-  async revokePublicShare(presentationId, ownerId) {
+  async revokePublicShare(presentationId, actor) {
     try {
-      const presentation = await Presentation.findOne({
-        where: { presentationId, studentId: ownerId },
-      });
+      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
       if (!presentation) {
         return { success: false, message: 'Presentation not found or access denied' };
       }
@@ -239,11 +266,9 @@ class ShareService {
   /**
    * Thu hồi quyền truy cập theo accessId
    */
-  async revokePrivateShare(presentationId, ownerId, accessId) {
+  async revokePrivateShare(presentationId, actor, accessId) {
     try {
-      const presentation = await Presentation.findOne({
-        where: { presentationId, studentId: ownerId },
-      });
+      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
       if (!presentation) {
         return { success: false, message: 'Presentation not found or access denied' };
       }
@@ -270,11 +295,9 @@ class ShareService {
   /**
    * Lấy danh sách tất cả người đang được share
    */
-  async getShareList(presentationId, ownerId) {
+  async getShareList(presentationId, actor) {
     try {
-      const presentation = await Presentation.findOne({
-        where: { presentationId, studentId: ownerId },
-      });
+      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
       if (!presentation) {
         return { success: false, message: 'Presentation not found or access denied' };
       }
@@ -395,6 +418,57 @@ class ShareService {
             model: AudioRecord,
             as: 'audioRecord',
             attributes: ['audioId', 'fileName', 'filePath', 'durationSeconds', 'fileFormat'],
+          },
+          {
+            model: Transcript,
+            as: 'transcript',
+            attributes: [
+              'transcriptId',
+              'presentationId',
+              'audioId',
+              'fullTranscript',
+              'language',
+              'confidenceScore',
+              'generatedAt',
+            ],
+            include: [
+              {
+                model: TranscriptSegment,
+                as: 'segments',
+                attributes: [
+                  'segmentId',
+                  'transcriptId',
+                  'speakerId',
+                  'segmentNumber',
+                  'segmentText',
+                  'startTimestamp',
+                  'endTimestamp',
+                  'confidenceScore',
+                ],
+                include: [
+                  {
+                    model: Speaker,
+                    as: 'speaker',
+                    attributes: [
+                      'speakerId',
+                      'aiSpeakerLabel',
+                      'isMapped',
+                      'totalDurationSeconds',
+                      'segmentCount',
+                    ],
+                    required: false,
+                    include: [
+                      {
+                        model: User,
+                        as: 'mappedStudent',
+                        attributes: ['userId', 'firstName', 'lastName'],
+                        required: false,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
           },
         ],
       });

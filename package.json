@@ -28,7 +28,8 @@
     "multer": "^2.0.2",
     "mysql2": "^2.2.5",
     "nodemailer": "^7.0.12",
-    "sequelize": "^6.6.2"
+    "sequelize": "^6.6.2",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@babel/core": "^7.12.10",

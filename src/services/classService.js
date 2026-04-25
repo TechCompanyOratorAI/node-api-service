@@ -13,13 +13,14 @@ const {
   Topic,
 } = db;
 const { Op } = require("sequelize");
+const { emitUploadPermissionChanged } = require("../websocket/emitters");
 
 class ClassService {
   /**
-   * Create new class with enrollment key (Admin only)
+   * Create new class (Admin only)
    */
   async createClass(classData, userId, userRoles = []) {
-    const { courseId, classCode, startDate, endDate, maxStudents, maxGroupMembers, enrollKey, keyExpiresAt, keyMaxUses } = classData;
+    const { courseId, classCode, startDate, endDate, maxStudents, maxGroupMembers } = classData;
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -55,17 +56,6 @@ class ClassService {
         createdBy: userId,
       }, { transaction });
 
-      // Create enrollment key for the new class
-      const enrollmentKey = await EnrollKey.create({
-        classId: newClass.classId,
-        keyValue: enrollKey,
-        expiresAt: keyExpiresAt ? new Date(keyExpiresAt) : null,
-        maxUses: keyMaxUses || null,
-        usedCount: 0,
-        isActive: true,
-        createdBy: userId,
-      }, { transaction });
-
       const isAdmin = userRoles.includes("Admin");
       const isInstructor = userRoles.includes("Instructor");
 
@@ -82,15 +72,8 @@ class ClassService {
 
       return {
         success: true,
-        message: "Tạo lớp học và mã đăng ký thành công",
+        message: "Tạo lớp học thành công",
         class: newClass,
-        enrollmentKey: {
-          keyId: enrollmentKey.keyId,
-          keyValue: enrollmentKey.keyValue,
-          expiresAt: enrollmentKey.expiresAt,
-          maxUses: enrollmentKey.maxUses,
-          isActive: enrollmentKey.isActive
-        }
       };
     } catch (error) {
       await transaction.rollback();
@@ -104,10 +87,13 @@ class ClassService {
   }
 
   /**
-   * Get classes by course (Admin or Instructor in course)
+   * Get classes by course (Admin or Instructor in course) with pagination
    */
-  async getClassesByCourse(courseId, userId, userRole) {
+  async getClassesByCourse(courseId, userId, userRole, pagination = {}) {
     try {
+      const { page = 1, limit = 10 } = pagination;
+      const offset = (page - 1) * limit;
+
       const where = { courseId };
 
       // Student chỉ thấy lớp active và chưa hết hạn
@@ -124,14 +110,14 @@ class ClassService {
         }).then((records) => records.map((r) => r.classId));
 
         if (instructorClassIds.length === 0) {
-          return { success: true, data: [] };
+          return { success: true, data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } };
         }
 
         where.classId = { [Op.in]: instructorClassIds };
       }
       // Admin can see all classes in course
 
-      const classes = await Class.findAll({
+      const { count, rows: classes } = await Class.findAndCountAll({
         where,
         include: [
           {
@@ -156,35 +142,37 @@ class ClassService {
             attributes: ["keyId", "keyValue", "isActive", "expiresAt"],
           },
         ],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
         order: [["classCode", "ASC"]],
+        distinct: true,
       });
 
-      return {
-        success: true,
-        data: classes.map((c) => {
-          const classData = {
-            ...c.toJSON(),
-            enrollmentCount: c.enrollments?.length || 0,
-            activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
-          };
+     return {
+  success: true,
+  data: classes.map((c) => {
+    const classData = {
+      ...c.toJSON(),
+      enrollmentCount: c.enrollments?.length || 0,
+      activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
+    };
 
-          // Include enrollkey for Admin or Instructor
-          if (userRole === "Admin" || userRole === "Instructor") {
-            const activeKey = c.enrollKeys?.find((k) => k.isActive);
-            classData.enrollkey = activeKey?.keyValue || null;
-          }
-
-          return classData;
-        }),
-      };
-    } catch (error) {
-      console.error("Get classes error:", error);
-      return {
-        success: false,
-        message: "Không thể lấy danh sách lớp học",
-        error: error.message,
-      };
+    // Admin / Instructor mới thấy enroll key
+    if (userRole === "Admin" || userRole === "Instructor") {
+      const activeKey = c.enrollKeys?.find((k) => k.isActive);
+      classData.enrollkey = activeKey?.keyValue || null;
     }
+
+    return classData;
+  }),
+
+  pagination: {
+    total: count,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    totalPages: Math.ceil(count / limit),
+  },
+};
   }
 
   /**
@@ -526,7 +514,15 @@ class ClassService {
       }
 
       // Extract enrollment key fields from updates
-      const { enrollKey, keyExpiresAt, keyMaxUses, ...classUpdates } = updates;
+      const { enrollKey, keyExpiresAt, keyMaxUses, ...rawClassUpdates } = updates;
+      let classUpdates = rawClassUpdates;
+
+      if (userRole === "Instructor") {
+        classUpdates = {};
+        if (rawClassUpdates.maxGroupMembers !== undefined) {
+          classUpdates.maxGroupMembers = rawClassUpdates.maxGroupMembers;
+        }
+      }
 
       // Update class info
       await classData.update(classUpdates, { transaction });
@@ -872,6 +868,112 @@ class ClassService {
     } catch (error) {
       console.error("Delete topic error:", error);
       return { success: false, message: "Không thể xóa topic", error: error.message };
+    }
+  }
+
+  // ============================================================
+  // UPLOAD PERMISSION METHODS
+  // ============================================================
+
+  /**
+   * Set upload permission for a class
+   */
+  async setUploadPermission(classId, data, instructorId, userRole) {
+    try {
+      const { Class, ClassInstructor } = require("../models");
+
+      // Find the class
+      const classRecord = await Class.findByPk(classId);
+      if (!classRecord) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Check permission: Admin hoặc Instructor phụ trách lớp này
+      let hasPermission = false;
+
+      if (userRole === "Admin") {
+        hasPermission = true;
+      } else if (userRole === "Instructor") {
+        // Kiểm tra instructor có phụ trách lớp này không qua bảng ClassInstructor
+        const classInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId },
+        });
+        hasPermission = !!classInstructor;
+      }
+
+      if (!hasPermission) {
+        return {
+          success: false,
+          message: "Bạn không có quyền thay đổi cài đặt của lớp học này",
+        };
+      }
+
+      // Update class
+      await classRecord.update({
+        isUploadEnabled: data.isUploadEnabled,
+        uploadStartDate: data.uploadStartDate || null,
+        uploadEndDate: data.uploadEndDate || null,
+      });
+
+      emitUploadPermissionChanged(classId, {
+        isUploadEnabled: classRecord.isUploadEnabled,
+        uploadStartDate: classRecord.uploadStartDate,
+        uploadEndDate: classRecord.uploadEndDate,
+      });
+
+      return {
+        success: true,
+        message: data.isUploadEnabled
+          ? "Đã mở cho phép upload bài thuyết trình"
+          : "Đã đóng không cho phép upload bài thuyết trình",
+        data: {
+          classId,
+          isUploadEnabled: classRecord.isUploadEnabled,
+          uploadStartDate: classRecord.uploadStartDate,
+          uploadEndDate: classRecord.uploadEndDate,
+        },
+      };
+    } catch (error) {
+      console.error("Set upload permission error:", error);
+      return {
+        success: false,
+        message: "Không thể cập nhật cài đặt upload",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get upload permission for a class
+   */
+  async getUploadPermission(classId) {
+    try {
+      const { Class } = require("../models");
+
+      const classRecord = await Class.findByPk(classId, {
+        attributes: ["classId", "isUploadEnabled", "uploadStartDate", "uploadEndDate"],
+      });
+
+      if (!classRecord) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      return {
+        success: true,
+        data: {
+          classId: classRecord.classId,
+          isUploadEnabled: classRecord.isUploadEnabled,
+          uploadStartDate: classRecord.uploadStartDate,
+          uploadEndDate: classRecord.uploadEndDate,
+        },
+      };
+    } catch (error) {
+      console.error("Get upload permission error:", error);
+      return {
+        success: false,
+        message: "Không thể lấy cài đặt upload",
+        error: error.message,
+      };
     }
   }
 }

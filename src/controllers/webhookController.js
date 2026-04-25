@@ -14,6 +14,7 @@ import speakerService from "../services/speakerService.js";
 import reportService from "../services/reportService.js";
 import aiReportService from "../services/aiReportService.js";
 import db from "../models/index.js";
+import { emitJobEvent, emitReportEvent } from "../websocket/emitters.js";
 
 const {
   Transcript,
@@ -155,6 +156,15 @@ const asrComplete = async (req, res) => {
       await transaction.commit();
       transactionCommitted = true;
 
+      // Emit WebSocket: ASR failed → presentation may be failed
+      emitJobEvent("failed", presentationId, {
+        jobType: "asr",
+        jobId,
+        error: error || "ASR processing failed",
+        status: "failed",
+        message: "Xử lý ASR thất bại",
+      });
+
       return res.json({
         success: true,
         message: "ASR failure recorded",
@@ -248,6 +258,22 @@ const asrComplete = async (req, res) => {
       await transaction.commit();
       transactionCommitted = true;
       console.log(`✅ Transcript transaction committed`);
+
+      // Emit WebSocket: ASR completed successfully
+      emitJobEvent("progress", presentationId, {
+        jobType: "asr",
+        jobId,
+        progress: 33,
+        status: "completed",
+        message: "Đã ghi âm xong, đang phân tích nội dung...",
+      });
+
+      // Emit WebSocket: ASR job completed
+      emitJobEvent("completed", presentationId, {
+        jobType: "asr",
+        jobId,
+        message: "Xử lý ASR hoàn tất",
+      });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -362,11 +388,20 @@ const asrComplete = async (req, res) => {
       }
     }
 
-    // Try to dispatch semantic job (gated: both ASR done AND all slides done)
+      // Try to dispatch semantic job (gated: both ASR done AND all slides done)
     try {
       const semanticDispatch = await jobService.checkAndDispatchSemanticIfReady(presentationId);
       if (semanticDispatch.dispatched) {
         console.log(`⏭️ Semantic job ${semanticDispatch.jobId} dispatched after ASR completed for presentation ${presentationId}`);
+
+        // Emit WebSocket: semantic analysis started
+        emitJobEvent("progress", presentationId, {
+          jobType: "semantic",
+          jobId: semanticDispatch.jobId,
+          progress: 50,
+          status: "running",
+          message: "Đang phân tích nội dung...",
+        });
       } else {
         console.log(`⏳ Semantic not yet ready after ASR: ${semanticDispatch.reason}`);
       }
@@ -465,10 +500,6 @@ const analysisComplete = async (req, res) => {
     console.log(
       `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
     );
-    
-    console.log(
-      `📥 Webhook: Analysis complete for job ${jobId}, presentation ${presentationId}, status: ${status}`,
-    );
 
     // Check for idempotency key to prevent duplicate processing
     if (idempotencyKey && processedRequests.has(idempotencyKey)) {
@@ -541,6 +572,15 @@ const analysisComplete = async (req, res) => {
       await jobService.markJobFailed(jobId, error || "Analysis failed", true);
       await transaction.commit();
 
+      // Emit WebSocket: semantic analysis failed
+      emitJobEvent("failed", presentationId, {
+        jobType: "semantic",
+        jobId,
+        error: error || "Semantic analysis failed",
+        status: "failed",
+        message: "Phân tích nội dung thất bại",
+      });
+
       return res.json({
         success: true,
         message: "Analysis failure recorded",
@@ -572,6 +612,22 @@ const analysisComplete = async (req, res) => {
     await jobService.markJobCompleted(jobId, {
       analysisCreated: true,
       segmentAnalysisCount: analysis?.segmentAnalyses?.length || 0,
+    });
+
+    // Emit WebSocket: semantic analysis completed, report is being generated
+    emitJobEvent("progress", presentationId, {
+      jobType: "semantic",
+      jobId,
+      progress: 75,
+      status: "completed",
+      message: "Đang tạo báo cáo AI...",
+    });
+
+    // Emit WebSocket: semantic job completed
+    emitJobEvent("completed", presentationId, {
+      jobType: "semantic",
+      jobId,
+      message: "Phân tích ngữ nghĩa hoàn tất",
     });
 
     console.log(`✅ Analysis webhook processed successfully for job ${jobId}`);
@@ -855,6 +911,14 @@ const reportComplete = async (req, res) => {
 
       await transaction.commit();
 
+      // Emit WebSocket: report generation failed
+      emitReportEvent("failed", presentationId, {
+        reportId,
+        jobId,
+        error: error || "Report generation failed",
+        message: "Tạo báo cáo thất bại",
+      });
+
       return res.json({
         success: true,
         message: "Report failure recorded",
@@ -987,6 +1051,22 @@ const reportComplete = async (req, res) => {
     console.log(`✅ Report stored and Job ${jobId} marked COMPLETED`);
     console.log(`✅ Report webhook processed successfully for job ${jobId}`);
 
+    // Emit WebSocket: report generation completed
+    emitReportEvent("generated", presentationId, {
+      reportId,
+      jobId,
+      overallScore: overallScores?.weightedOverallScore ?? null,
+      message: "Báo cáo AI đã sẵn sàng!",
+    });
+
+    // Emit WebSocket: report job completed
+    emitJobEvent("completed", presentationId, {
+      jobType: "report",
+      jobId,
+      reportId,
+      message: "Báo cáo AI hoàn tất",
+    });
+
     return res.json({
       success: true,
       message: "Report saved successfully",
@@ -1101,6 +1181,16 @@ const slidesComplete = async (req, res) => {
       );
       await transaction.commit();
 
+      // Emit WebSocket: slides processing failed
+      emitJobEvent("failed", presentationId, {
+        jobType: "slides",
+        jobId,
+        slideId,
+        error: error || "Slides processing failed",
+        status: "failed",
+        message: "Xử lý slide thất bại",
+      });
+
       return res.json({
         success: true,
         message: "Slides processing failure recorded",
@@ -1134,28 +1224,36 @@ const slidesComplete = async (req, res) => {
       }
 
       await slide.update(updateData, { transaction });
-
       console.log(`✅ Updated slide ${slideId} with OCR results`);
 
-      // Note: Embedding storage can be added later if needed
-      // For now, we'll just log that we received it
+      // Bug 5 fix: Slide model has no embedding column yet.
+      // Persist embedding vector in job metadata so it is not lost.
+      // When a dedicated Slides.embedding column is added via migration,
+      // move this into updateData above.
       if (result.embedding && result.embedding.length > 0) {
         console.log(
-          `📊 Received embedding vector of length ${result.embedding.length} for slide ${slideId}`,
+          `📊 Received embedding vector of length ${result.embedding.length} for slide ${slideId} — storing in job metadata`,
         );
-        // TODO: Store embedding in a dedicated table or add metadata field to Slides table
       }
     }
 
-    // Mark job as completed
+    // Bug 4 fix: Commit transaction BEFORE markJobCompleted.
+    // markJobCompleted → checkAndDispatchSemanticIfReady reads all slide job
+    // statuses from DB. If we commit after, this slide appears still
+    // pending and semantic dispatch is incorrectly blocked.
+    await transaction.commit();
+
+    // Mark job as completed (outside transaction so semantic gate sees committed data)
     await jobService.markJobCompleted(jobId, {
       slideProcessed: true,
       slideId,
-      extractedText: result?.extractedText ? result.extractedText.length : 0,
+      extractedTextLength: result?.extractedText ? result.extractedText.length : 0,
       hasEmbedding: !!(result?.embedding && result.embedding.length > 0),
+      // Persist embedding in metadata until dedicated DB column is added
+      embedding: (result?.embedding && result.embedding.length > 0)
+        ? result.embedding
+        : undefined,
     });
-
-    await transaction.commit();
 
     // Try to dispatch semantic job now that this slide job is done.
     // checkAndDispatchSemanticIfReady will only proceed if:
@@ -1179,6 +1277,13 @@ const slidesComplete = async (req, res) => {
 
     console.log(`✅ Slides webhook processed successfully for job ${jobId}`);
 
+    // Emit WebSocket: slide job completed
+    emitJobEvent("completed", presentationId, {
+      jobType: "slides",
+      jobId,
+      slideId,
+      message: "Xử lý slide hoàn tất",
+    });
 
     return res.json({
       success: true,
@@ -1190,7 +1295,14 @@ const slidesComplete = async (req, res) => {
       },
     });
   } catch (error) {
-    await transaction.rollback();
+    // Only rollback if transaction has not been committed yet
+    if (transaction && !transaction.finished) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error("❌ Transaction rollback failed:", rollbackError);
+      }
+    }
     console.error("❌ Slides webhook error:", error);
 
     try {

@@ -203,7 +203,7 @@ export const requireClassEnrollment = async (req, res, next) => {
  * @param {Function} next - Express next middleware function
  */
 export const requireClassInstructorOrAdmin = async (req, res, next) => {
-    const { classId } = req.params;
+    const classId = req.params?.classId || req.body?.classId;
     const userId = req.user?.userId;
     const userRoles = req.userRoles || [];
 

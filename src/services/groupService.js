@@ -1,7 +1,7 @@
 "use strict";
 
 const db = require("../models");
-const { Group, GroupStudent, Class, User, Enrollment, TopicEnrollment, Topic, Course, Presentation } = db;
+const { Group, GroupStudent, Class, User, Enrollment, TopicEnrollment, Topic, Course, Presentation, GroupGradeDistribution } = db;
 
 class GroupService {
   async createGroup(classId, groupName, description, userId) {
@@ -142,6 +142,35 @@ class GroupService {
         };
       }
 
+      // Vấn đề 2: Chặn join nếu nhóm đã có bài thuyết trình
+      // Kiểm tra presentation nào đã được nộp (submitted/processing/done/failed)
+      // Nếu chỉ là draft thì vẫn cho join
+      const existingPresentation = await Presentation.findOne({
+        where: {
+          groupCode: groupId.toString(),
+          status: { [db.Sequelize.Op.notIn]: ["draft"] },
+        },
+      });
+
+      if (existingPresentation) {
+        return {
+          success: false,
+          message: "Không thể tham gia nhóm vì nhóm đã có bài thuyết trình được nộp trên hệ thống.",
+        };
+      }
+
+      // Vấn đề 1 (bổ sung): Chặn join nếu điểm đã được chốt
+      const finalizedDistribution = await GroupGradeDistribution.findOne({
+        where: { groupId, status: "finalized" },
+      });
+
+      if (finalizedDistribution) {
+        return {
+          success: false,
+          message: "Không thể tham gia nhóm vì điểm đã được chốt bởi giảng viên.",
+        };
+      }
+
       await GroupStudent.create({
         groupId: group.groupId,
         studentId: userId,
@@ -184,6 +213,43 @@ class GroupService {
             "Bạn là trưởng nhóm. Vui lòng chuyển quyền trưởng nhóm hoặc giải thể nhóm trước khi rời đi",
         };
       }
+
+      // Vấn đề 1: Chặn rời nhóm nếu điểm đã được chốt
+      const finalizedDistribution = await GroupGradeDistribution.findOne({
+        where: { groupId, status: "finalized" },
+      });
+
+      if (finalizedDistribution) {
+        const finalizedDate = finalizedDistribution.finalizedAt
+          ? new Date(finalizedDistribution.finalizedAt).toLocaleDateString("vi-VN", {
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            })
+          : "trước đó";
+        return {
+          success: false,
+          message: `Không thể rời nhóm vì điểm đã được chốt vào ngày ${finalizedDate}. Vui lòng liên hệ giảng viên nếu cần hỗ trợ.`,
+        };
+      }
+
+      // Cũng chặn nếu nhóm đang có distribution đang xử lý (submitted/reopened)
+      // để tránh rời nhóm giữa chừng
+      const activeDistribution = await GroupGradeDistribution.findOne({
+        where: {
+          groupId,
+          status: { [db.Sequelize.Op.in]: ["submitted", "reopened"] },
+        },
+      });
+
+      if (activeDistribution) {
+        return {
+          success: false,
+          message:
+            "Không thể rời nhóm vì đang có phân chia điểm đang xử lý. Vui lòng chờ hoàn tất.",
+        };
+      }
+
       await membership.destroy();
 
       return { success: true, message: "Rời nhóm thành công" };

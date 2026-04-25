@@ -15,9 +15,16 @@ import Sequelize from 'sequelize';
 
 const { Op } = Sequelize;
 
-const { Speaker, TranscriptSegment, User, Presentation } = db;
+const { Speaker, TranscriptSegment, User, Presentation, GroupStudent, Group } = db;
 
 class SpeakerService {
+    _speakerLabelSortValue(label) {
+        if (!label) return Number.MAX_SAFE_INTEGER;
+
+        const match = String(label).match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER;
+    }
+
     /**
      * Tạo speakers từ diarization results
      * @param {number} presentationId 
@@ -297,10 +304,17 @@ class SpeakerService {
             const speakers = await Speaker.findAll({
                 where,
                 include,
-                order: [['totalDurationSeconds', 'DESC']]
+                order: [['aiSpeakerLabel', 'ASC']]
             });
 
-            return speakers;
+            return speakers.sort((a, b) => {
+                const labelDiff =
+                    this._speakerLabelSortValue(a.aiSpeakerLabel) -
+                    this._speakerLabelSortValue(b.aiSpeakerLabel);
+
+                if (labelDiff !== 0) return labelDiff;
+                return String(a.aiSpeakerLabel || '').localeCompare(String(b.aiSpeakerLabel || ''));
+            });
         } catch (error) {
             console.error('❌ Error getting speakers by presentation:', error);
             throw error;
@@ -383,7 +397,16 @@ class SpeakerService {
             const totalDuration = speakers.reduce((sum, s) => sum + s.totalDurationSeconds, 0);
             const totalSegments = speakers.reduce((sum, s) => sum + s.segmentCount, 0);
 
-            const speakerBreakdown = speakers.map(speaker => ({
+            const speakerBreakdown = [...speakers]
+                .sort((a, b) => {
+                    const labelDiff =
+                        this._speakerLabelSortValue(a.aiSpeakerLabel) -
+                        this._speakerLabelSortValue(b.aiSpeakerLabel);
+
+                    if (labelDiff !== 0) return labelDiff;
+                    return String(a.aiSpeakerLabel || '').localeCompare(String(b.aiSpeakerLabel || ''));
+                })
+                .map(speaker => ({
                 speakerId: speaker.speakerId,
                 aiSpeakerLabel: speaker.aiSpeakerLabel,
                 studentName: speaker.mappedStudent ? `${speaker.mappedStudent.firstName} ${speaker.mappedStudent.lastName}` : 'Unmapped',
@@ -543,71 +566,148 @@ class SpeakerService {
     }
 
     /**
-     * Auto-suggest student mappings based on enrollment
-     * Returns suggested mappings for unmapped speakers
-     * @param {number} presentationId 
+     * Get group members for a presentation (via groupCode)
+     * @param {number} presentationId
+     * @returns {Promise<Array>} - [{userId, firstName, lastName, email, role}]
+     */
+    async _resolveGroupId(presentation) {
+        if (!presentation || !presentation.groupCode || !presentation.classId) return null;
+
+        const group = await Group.findOne({
+            where: {
+                classId: presentation.classId,
+                groupName: presentation.groupCode
+            },
+            attributes: ['groupId']
+        });
+
+        return group ? group.groupId : null;
+    }
+
+    async getGroupMembersForPresentation(presentationId) {
+        try {
+            const presentation = await Presentation.findByPk(presentationId);
+            const groupId = await this._resolveGroupId(presentation);
+            if (!groupId) return [];
+
+            const groupStudents = await GroupStudent.findAll({
+                where: { groupId },
+                include: [{
+                    model: User,
+                    as: 'student',
+                    attributes: ['userId', 'firstName', 'lastName', 'email']
+                }],
+                order: [
+                    [Sequelize.literal("CASE WHEN role = 'leader' THEN 0 ELSE 1 END"), 'ASC'],
+                    ['joinedAt', 'ASC']
+                ]
+            });
+
+            return groupStudents
+                .filter(gs => gs.student)
+                .map(gs => ({
+                    userId: gs.student.userId,
+                    firstName: gs.student.firstName,
+                    lastName: gs.student.lastName,
+                    email: gs.student.email,
+                    role: gs.role
+                }));
+        } catch (error) {
+            console.error('❌ Error getting group members for presentation:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Suggest student mappings based on speaking order and group membership
+     * @param {number} presentationId
      * @returns {Promise<Array>}
      */
     async suggestStudentMappings(presentationId) {
         try {
-            // Get presentation details
-            const presentation = await Presentation.findByPk(presentationId, {
+            const presentation = await Presentation.findByPk(presentationId);
+            const groupId = await this._resolveGroupId(presentation);
+            if (!groupId) return [];
+
+            // Group members: leader first, then by joinedAt ASC
+            const groupStudents = await GroupStudent.findAll({
+                where: { groupId },
                 include: [{
-                    model: require('../models').Course,
-                    as: 'course',
-                    include: [{
-                        model: require('../models').Enrollment,
-                        as: 'enrollments',
-                        include: [{
-                            model: User,
-                            as: 'student',
-                            attributes: ['userId', 'firstName', 'lastName', 'email']
-                        }]
-                    }]
-                }]
+                    model: User,
+                    as: 'student',
+                    attributes: ['userId', 'firstName', 'lastName', 'email']
+                }],
+                order: [
+                    [Sequelize.literal("CASE WHEN role = 'leader' THEN 0 ELSE 1 END"), 'ASC'],
+                    ['joinedAt', 'ASC']
+                ]
             });
 
-            if (!presentation || !presentation.course) {
-                return [];
+            const allMembers = groupStudents
+                .filter(gs => gs.student)
+                .map(gs => ({
+                    userId: gs.student.userId,
+                    firstName: gs.student.firstName,
+                    lastName: gs.student.lastName,
+                    email: gs.student.email,
+                    role: gs.role
+                }));
+
+            if (allMembers.length === 0) return [];
+
+            // All speakers for this presentation
+            const allSpeakers = await Speaker.findAll({
+                where: { presentationId },
+                attributes: ['speakerId', 'aiSpeakerLabel', 'isMapped', 'studentId']
+            });
+
+            // First appearance time per speaker from TranscriptSegments
+            const speakerIds = allSpeakers.map(s => s.speakerId).filter(Boolean);
+            let firstSeenMap = {};
+
+            if (speakerIds.length > 0) {
+                const firstAppearances = await TranscriptSegment.findAll({
+                    attributes: [
+                        'speakerId',
+                        [Sequelize.fn('MIN', Sequelize.col('startTimestamp')), 'firstSeen']
+                    ],
+                    where: { speakerId: { [Op.in]: speakerIds } },
+                    group: ['speakerId'],
+                    raw: true
+                });
+                firstAppearances.forEach(row => {
+                    firstSeenMap[row.speakerId] = Number(row.firstSeen);
+                });
             }
 
-            // Get unmapped speakers
-            const unmappedSpeakers = await this.getUnmappedSpeakers(presentationId);
-
-            // Get enrolled students
-            const enrolledStudents = presentation.course.enrollments
-                .filter(e => e.student)
-                .map(e => e.student);
-
-            // Get already mapped students
-            const mappedSpeakers = await Speaker.findAll({
-                where: {
-                    presentationId,
-                    isMapped: true
-                },
-                attributes: ['studentId']
+            // Sort speakers by first appearance, fallback to label alphabetically
+            const sortedSpeakers = [...allSpeakers].sort((a, b) => {
+                const aTime = firstSeenMap[a.speakerId] ?? Infinity;
+                const bTime = firstSeenMap[b.speakerId] ?? Infinity;
+                if (aTime !== bTime) return aTime - bTime;
+                return a.aiSpeakerLabel.localeCompare(b.aiSpeakerLabel);
             });
-            const mappedStudentIds = new Set(mappedSpeakers.map(s => s.studentId));
 
-            // Filter available students (not yet mapped)
-            const availableStudents = enrolledStudents.filter(
-                student => !mappedStudentIds.has(student.userId)
+            const mappedStudentIds = new Set(
+                allSpeakers.filter(s => s.isMapped && s.studentId).map(s => s.studentId)
             );
 
-            // Simple suggestion: pair unmapped speakers with available students
+            const unmappedSpeakers = sortedSpeakers.filter(s => !s.isMapped);
+            const availableMembers = allMembers.filter(m => !mappedStudentIds.has(m.userId));
+
             const suggestions = [];
-            for (let i = 0; i < Math.min(unmappedSpeakers.length, availableStudents.length); i++) {
+            for (let i = 0; i < Math.min(unmappedSpeakers.length, availableMembers.length); i++) {
                 suggestions.push({
                     speakerId: unmappedSpeakers[i].speakerId,
                     aiSpeakerLabel: unmappedSpeakers[i].aiSpeakerLabel,
                     suggestedStudent: {
-                        userId: availableStudents[i].userId,
-                        firstName: availableStudents[i].firstName,
-                        lastName: availableStudents[i].lastName,
-                        email: availableStudents[i].email
+                        userId: availableMembers[i].userId,
+                        firstName: availableMembers[i].firstName,
+                        lastName: availableMembers[i].lastName,
+                        email: availableMembers[i].email
                     },
-                    confidence: 'low', // Simple matching, low confidence
-                    reason: 'Enrolled in course'
+                    confidence: 'medium',
+                    reason: 'Speaking order matching'
                 });
             }
 
@@ -615,6 +715,30 @@ class SpeakerService {
             return suggestions;
         } catch (error) {
             console.error('❌ Error suggesting student mappings:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Auto-map speakers to students based on speaking order
+     * @param {number} presentationId
+     * @returns {Promise<{mapped: number, failed: number, suggestions: Array}>}
+     */
+    async autoMapSpeakers(presentationId) {
+        try {
+            const suggestions = await this.suggestStudentMappings(presentationId);
+            if (suggestions.length === 0) return { mapped: 0, failed: 0, suggestions: [] };
+
+            const mappings = suggestions.map(s => ({
+                speakerId: s.speakerId,
+                studentId: s.suggestedStudent.userId
+            }));
+
+            const results = await this.batchMapSpeakers(mappings);
+            console.log(`✅ Auto-mapped ${results.success.length} speakers for presentation ${presentationId}`);
+            return { mapped: results.success.length, failed: results.failed.length, suggestions };
+        } catch (error) {
+            console.error('❌ Error auto-mapping speakers:', error);
             throw error;
         }
     }

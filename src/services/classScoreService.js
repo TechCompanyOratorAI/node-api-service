@@ -1,7 +1,20 @@
 "use strict";
 
 const db = require("../models");
-const { Enrollment, Class, ClassInstructor, Presentation, AIReport, CriterionFeedback, ClassRubricCriteria, User } = db;
+const {
+  Enrollment,
+  Class,
+  ClassInstructor,
+  Presentation,
+  AIReport,
+  CriterionFeedback,
+  ClassRubricCriteria,
+  User,
+  GroupGradeDistribution,
+  GroupGradeMember,
+  GroupStudent,
+  TopicEnrollment,
+} = db;
 
 class ClassScoreService {
   /**
@@ -44,7 +57,7 @@ class ClassScoreService {
           {
             model: User,
             as: "student",
-            attributes: ["userId", "username", "firstName", "lastName", "email"],
+            attributes: ["userId", "username", "firstName", "lastName", "email", "avatar"],
           },
         ],
         order: [[{ model: User, as: "student" }, "firstName", "ASC"]],
@@ -117,6 +130,37 @@ class ClassScoreService {
         });
       }
 
+      // Get group grade distributions for confirmed reports in this class
+      let groupGradeMembersMap = new Map(); // studentId -> Map(reportId -> receivedGrade)
+      if (reportIds.length > 0) {
+        const gradeDistributions = await GroupGradeDistribution.findAll({
+          where: { reportId: reportIds },
+          attributes: ["id", "reportId"],
+        });
+        const distributionIds = gradeDistributions.map((d) => d.id);
+        const distReportMap = new Map(gradeDistributions.map((d) => [d.id, d.reportId]));
+
+        if (distributionIds.length > 0) {
+          const gradeMembers = await GroupGradeMember.findAll({
+            where: { distributionId: distributionIds },
+            attributes: ["id", "distributionId", "studentId", "percentage", "receivedGrade"],
+          });
+
+          gradeMembers.forEach((gm) => {
+            const reportId = distReportMap.get(gm.distributionId);
+            if (reportId) {
+              if (!groupGradeMembersMap.has(gm.studentId)) {
+                groupGradeMembersMap.set(gm.studentId, new Map());
+              }
+              groupGradeMembersMap.get(gm.studentId).set(reportId, {
+                receivedGrade: parseFloat(gm.receivedGrade),
+                percentage: parseFloat(gm.percentage),
+              });
+            }
+          });
+        }
+      }
+
       // Get rubric criteria for this class (active only)
       const classCriteria = await ClassRubricCriteria.findAll({
         where: { classId, isActive: 1 },
@@ -164,18 +208,21 @@ class ClassScoreService {
           );
           overallAverageScore = parseFloat((totalScore / studentConfirmedReports.length).toFixed(2));
 
-          // Diem trung binh GV (gradeForInstructor)
-          const reportsWithInstructorGrade = studentConfirmedReports.filter(
-            (r) => r.gradeForInstructor !== null && r.gradeForInstructor !== undefined
-          );
-          if (reportsWithInstructorGrade.length > 0) {
-            const totalInstructorScore = reportsWithInstructorGrade.reduce(
-              (sum, r) => sum + parseFloat(r.gradeForInstructor),
-              0
-            );
-            instructorAverageScore = parseFloat(
-              (totalInstructorScore / reportsWithInstructorGrade.length).toFixed(2)
-            );
+          // Diem trung binh GV: uu tien receivedGrade (da chia boi leader),
+          // neu chua chia thi dung gradeForInstructor
+          const gradeEntries = studentConfirmedReports
+            .filter((r) => r.gradeForInstructor !== null && r.gradeForInstructor !== undefined)
+            .map((r) => {
+              const distributed = groupGradeMembersMap.get(student.userId)?.get(r.reportId);
+              if (distributed) {
+                return distributed.receivedGrade;
+              }
+              return parseFloat(r.gradeForInstructor);
+            });
+
+          if (gradeEntries.length > 0) {
+            const totalInstructorScore = gradeEntries.reduce((sum, g) => sum + g, 0);
+            instructorAverageScore = parseFloat((totalInstructorScore / gradeEntries.length).toFixed(2));
           }
         }
 
@@ -207,6 +254,9 @@ class ClassScoreService {
         // Presentations summary
         const presentationsSummary = studentPresentations.map((p) => {
           const report = reportMap.get(p.presentationId);
+          const distributed = report
+            ? groupGradeMembersMap.get(student.userId)?.get(report.reportId)
+            : null;
           return {
             presentationId: p.presentationId,
             title: p.title,
@@ -217,6 +267,9 @@ class ClassScoreService {
             gradeForInstructor: report && report.gradeForInstructor !== null
               ? parseFloat(report.gradeForInstructor)
               : null,
+            // Diem da phan chia boi leader (neu co)
+            receivedGrade: distributed ? distributed.receivedGrade : null,
+            percentage: distributed ? distributed.percentage : null,
             reportStatus: report ? report.reportStatus : null,
             confirmedAt: report ? report.confirmedAt : null,
           };
@@ -232,6 +285,7 @@ class ClassScoreService {
             firstName: student.firstName,
             lastName: student.lastName,
             email: student.email,
+            avatar: student.avatar,
           },
           // Diem trung binh AI
           overallAverageScore,

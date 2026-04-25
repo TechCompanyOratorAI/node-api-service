@@ -3,6 +3,7 @@ import classController from "../controllers/classController.js";
 import classScoreController from "../controllers/classScoreController.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import enrollKeyController from "../controllers/enrollKeyController.js";
+import groupGradeDistributionController from "../controllers/groupGradeDistributionController.js";
 import {
   authenticateToken,
   requireEmailVerification,
@@ -42,7 +43,7 @@ router.get(
 router.put(
   "/:classId",
   requireRole(["Admin", "Instructor"]),
-  requireClassInstructor, // Check instructor is assigned to class
+  requireClassInstructorOrAdmin,
   validateUpdateClass,
   classController.updateClass
 );
@@ -76,6 +77,14 @@ router.get(
   requireRole(["Admin", "Instructor"]),
   requireClassInstructorOrAdmin,
   classScoreController.getClassScores
+);
+
+// Group grade distributions - get all grade distributions for all groups in a class (Instructor)
+router.get(
+  "/:classId/group-grade-distributions",
+  requireRole(["Admin", "Instructor"]),
+  requireClassInstructorOrAdmin,
+  groupGradeDistributionController.getGradeDistributionsByClass
 );
 
 // Enrollment key management
@@ -138,6 +147,25 @@ router.delete(
   "/topics/:topicId",
   requireRole(["Admin", "Instructor"]),
   classController.deleteTopic
+);
+
+// ============================================================
+// UPLOAD PERMISSION ROUTES
+// ============================================================
+// GET  /api/classes/:classId/upload-permission - Lấy trạng thái upload
+router.get(
+  "/:classId/upload-permission",
+  authenticateToken,
+  requireEmailVerification,
+  classController.getUploadPermission
+);
+
+// POST /api/classes/:classId/upload-permission - Bật/tắt upload
+router.post(
+  "/:classId/upload-permission",
+  requireRole(["Admin", "Instructor"]),
+  requireClassInstructorOrAdmin,
+  classController.setUploadPermission
 );
 
 export default router;

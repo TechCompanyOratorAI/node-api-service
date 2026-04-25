@@ -21,7 +21,7 @@ class ShareController {
 
       const { expiresAt } = req.body;
 
-      const result = await shareService.createPublicShare(parsedId, req.user.userId, { expiresAt });
+      const result = await shareService.createPublicShare(parsedId, req.user, { expiresAt });
 
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -43,7 +43,7 @@ class ShareController {
         return res.status(400).json({ success: false, message: 'presentationId must be a number' });
       }
 
-      const result = await shareService.revokePublicShare(parsedId, req.user.userId);
+      const result = await shareService.revokePublicShare(parsedId, req.user);
 
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -72,7 +72,7 @@ class ShareController {
 
       const { emails, expiresAt } = req.body;
 
-      const result = await shareService.inviteByEmails(parsedId, req.user.userId, emails, { expiresAt });
+      const result = await shareService.inviteByEmails(parsedId, req.user, emails, { expiresAt });
 
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -95,7 +95,7 @@ class ShareController {
         return res.status(400).json({ success: false, message: 'Invalid IDs provided' });
       }
 
-      const result = await shareService.revokePrivateShare(parsedId, req.user.userId, parsedAccessId);
+      const result = await shareService.revokePrivateShare(parsedId, req.user, parsedAccessId);
 
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -117,7 +117,7 @@ class ShareController {
         return res.status(400).json({ success: false, message: 'presentationId must be a number' });
       }
 
-      const result = await shareService.getShareList(parsedId, req.user.userId);
+      const result = await shareService.getShareList(parsedId, req.user);
 
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {

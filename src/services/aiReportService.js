@@ -6,13 +6,13 @@ import {
   ClassRubricCriteria,
   Presentation,
   Class,
-  User
+  User,
 } from "../models";
 import { Op } from "sequelize";
 import db from "../models";
 import queueService from "../services/queueService";
-import classGradeSyncService from "./classGradeSyncService";
 import jobService from "./jobService.js";
+import { emitReportEvent } from "../websocket/emitters.js";
 
 const VALID_REPORT_STATUSES = [
   "waiting",
@@ -85,8 +85,8 @@ class AIReportService {
         where: { presentationId: presentationId },
       });
 
-      const initialStatus = aiSettings.requireInstructorConfirmation 
-        ? "pending_review" 
+      const initialStatus = aiSettings.requireInstructorConfirmation
+        ? "pending_review"
         : "confirmed";
 
       const rubricData = classCriteria.map((c) => ({
@@ -207,17 +207,17 @@ class AIReportService {
           reportStatus: "generating",
           classAiSettingId: aiSettings.classAiSettingId,
         });
-        
+
         console.log(`[AIReportService] Triggering report regeneration for presentation ${presentationId}`);
-        
+
         // Create a new dedicated report job
         const reportJob = await jobService.createJob(presentationId, "report", {
           reportId: existingReport.reportId,
           triggeredBy: jobId,
         });
-        
+
         await this._sendToReportQueue(presentationId, existingReport.reportId, classId, reportJob.jobId, classCriteria, aiSettings);
-        
+
         return {
           success: true,
           reportId: existingReport.reportId,
@@ -242,7 +242,7 @@ class AIReportService {
 
       console.log(`[AIReportService] Created report ${report.reportId} for presentation ${presentationId}`);
       await report.update({ reportStatus: "generating" });
-      
+
       // Create a new dedicated report job
       const reportJob = await jobService.createJob(presentationId, "report", {
         reportId: report.reportId,
@@ -415,20 +415,22 @@ class AIReportService {
         gradeForInstructor: gradeForInstructor,
       });
 
-      // Dong bo finalGrade vao Enrollment sau khi confirm
-      // studentId nam trong Presentation, khong nam trong AIReport
-      const presentation = await Presentation.findByPk(report.presentationId, {
-        attributes: ["studentId"],
+      // Emit WebSocket: report confirmed by instructor
+      emitReportEvent("confirmed", report.presentationId, {
+        reportId,
+        instructorId,
+        overallScore: report.overallScore,
+        message: "Giảng viên đã xác nhận báo cáo",
       });
-      await classGradeSyncService.syncEnrollmentFinalGrade(
-        report.classId,
-        presentation ? presentation.studentId : null
-      );
+
+      // Không sync điểm vào Enrollment ở đây nữa
+      // Leader sẽ là người chia điểm cho các thành viên nhóm sau khi confirm
+      // thông qua API: POST /api/ai-reports/:reportId/distribute-grade
 
       return {
         success: true,
         data: report,
-        message: "Đã xác nhận AI report",
+        message: "Đã xác nhận AI report. Trưởng nhóm sẽ phân chia điểm cho các thành viên.",
       };
     } catch (error) {
       console.error("Confirm AI report error:", error);
@@ -528,6 +530,13 @@ class AIReportService {
         reportStatus: "rejected",
         confirmedByInstructorId: instructorId,
         confirmedAt: new Date(),
+      });
+
+      // Emit WebSocket: report rejected by instructor
+      emitReportEvent("rejected", report.presentationId, {
+        reportId,
+        instructorId,
+        message: "Giảng viên đã từ chối báo cáo",
       });
 
       return {
