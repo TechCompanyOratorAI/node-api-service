@@ -1,6 +1,8 @@
 import db from "../models/index.js";
+import businessConstants from "../constants/businessConstants.js";
 
 const { Role, UserRole, User } = db;
+const { ROLES } = businessConstants;
 
 class RoleService {
   // Get all roles
@@ -223,15 +225,20 @@ class RoleService {
     try {
       const defaultRoles = [
         {
-          roleName: "Admin",
+          roleName: ROLES.ADMIN,
           description: "System administrator with full access",
         },
         {
-          roleName: "Instructor",
+          roleName: ROLES.ACADEMIC_COORDINATOR,
+          description:
+            "Academic coordinator who manages curriculum, rosters, and instructor eligibility",
+        },
+        {
+          roleName: ROLES.INSTRUCTOR,
           description: "Course instructor who can create and manage courses",
         },
         {
-          roleName: "Student",
+          roleName: ROLES.STUDENT,
           description:
             "Student who can enroll in courses and create presentations",
         },

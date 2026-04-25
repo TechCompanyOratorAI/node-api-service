@@ -1,5 +1,9 @@
 import { validationResult } from 'express-validator';
 import roleService from '../services/roleService.js';
+import auditLogService from '../services/auditLogService.js';
+import businessConstants from '../constants/businessConstants.js';
+
+const { AUDIT_ACTIONS, AUDIT_STATUSES } = businessConstants;
 
 class RoleController {
   // Get all roles
@@ -101,8 +105,25 @@ class RoleController {
       const result = await roleService.assignRoleToUser(parseInt(userId), roleName);
       
       if (result.success) {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_ASSIGNED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.SUCCESS,
+          metadata: { roleName },
+        });
         return res.status(200).json(result);
       } else {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_ASSIGNED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.FAILURE,
+          reason: result.message || result.error,
+          metadata: { roleName },
+        });
         return res.status(400).json(result);
       }
     } catch (error) {
@@ -131,8 +152,25 @@ class RoleController {
       const result = await roleService.removeRoleFromUser(parseInt(userId), roleName);
       
       if (result.success) {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_REMOVED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.SUCCESS,
+          metadata: { roleName },
+        });
         return res.status(200).json(result);
       } else {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_REMOVED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.FAILURE,
+          reason: result.message || result.error,
+          metadata: { roleName },
+        });
         return res.status(400).json(result);
       }
     } catch (error) {
@@ -186,8 +224,25 @@ class RoleController {
       const result = await roleService.updateUserRole(parseInt(userId), oldRoleName, newRoleName);
       
       if (result.success) {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_UPDATED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.SUCCESS,
+          metadata: { oldRoleName, newRoleName },
+        });
         return res.status(200).json(result);
       } else {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_UPDATED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.FAILURE,
+          reason: result.message || result.error,
+          metadata: { oldRoleName, newRoleName },
+        });
         return res.status(400).json(result);
       }
     } catch (error) {
