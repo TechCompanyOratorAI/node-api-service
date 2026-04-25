@@ -52,6 +52,10 @@ const validateCreateClassWithoutKey = [
         .optional()
         .isInt({ min: 1 })
         .withMessage('maxGroupMembers must be a positive integer'),
+    body('academicBlockId')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('academicBlockId must be a positive integer'),
     body('status')
         .optional()
         .isIn(['active', 'closed', 'archived'])
@@ -64,7 +68,7 @@ router.use(requireEmailVerification);
 
 
 router.post('/',
-    requireRole(['Admin']),
+    requireRole(['Admin', 'AcademicCoordinator']),
     generalRateLimit,
     validateCourse,
     courseController.createCourse
@@ -83,19 +87,19 @@ router.get('/:courseId',
 );
 
 router.patch('/:courseId',
-    requireRole(['Admin']),
+    requireRole(['Admin', 'AcademicCoordinator']),
     validateCourseUpdate,
     courseController.updateCourse
 );
 
 router.delete('/:courseId',
-    requireRole(['Admin']),
+    requireRole(['Admin', 'AcademicCoordinator']),
     courseController.deleteCourse
 );
 
 // Class management routes for course
 router.post('/:courseId/classes',
-    requireRole(['Admin']),
+    requireRole(['Admin', 'AcademicCoordinator']),
     validateCreateClassWithoutKey,
     classController.createClass
 );

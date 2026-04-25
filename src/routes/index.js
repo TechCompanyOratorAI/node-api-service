@@ -30,6 +30,7 @@ import devBypassRoutes from "./devBypassRoutes.js";
 import notificationRoutes from "./notificationRoutes.js";
 import transcriptRoutes from "./transcriptRoutes.js";
 import auditLogRoutes from "./auditLogRoutes.js";
+import academicCalendarRoutes from "./academicCalendarRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -68,6 +69,7 @@ router.use("/ai-reports", aiReportFeedbackRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/transcripts", transcriptRoutes);
 router.use("/audit-logs", auditLogRoutes);
+router.use("/academic-calendar", academicCalendarRoutes);
 
 // ─── Share routes ───────────────────────────────────────────────
 // Public view: GET /share/:token (no authentication needed)

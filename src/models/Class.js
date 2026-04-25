@@ -14,6 +14,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
+      academicBlockId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
       classCode: {
         type: DataTypes.STRING(50),
         allowNull: false,
@@ -71,6 +75,10 @@ module.exports = (sequelize, DataTypes) => {
     Class.belongsTo(models.Course, {
       foreignKey: "courseId",
       as: "course",
+    });
+    Class.belongsTo(models.AcademicBlock, {
+      foreignKey: "academicBlockId",
+      as: "academicBlock",
     });
     Class.belongsTo(models.User, {
       foreignKey: "createdBy",

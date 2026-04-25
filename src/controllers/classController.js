@@ -1,7 +1,6 @@
 "use strict";
 
 const { validationResult } = require("express-validator");
-const db = require("../models");
 const classService = require("../services/classService");
 
 class ClassController {
@@ -27,73 +26,14 @@ class ClassController {
         });
       }
 
-      const { Course, Class, ClassInstructor } = db;
-      const transaction = await db.sequelize.transaction();
+      const result = await classService.createClass(
+        { ...req.body, courseId: parseInt(courseId) },
+        req.user.userId,
+        req.userRoles || []
+      );
 
-      try {
-        const classData = { ...req.body, courseId: parseInt(courseId) };
-        const { classCode, startDate, endDate, maxStudents, maxGroupMembers } =
-          classData;
+      return res.status(result.success ? 201 : 400).json(result);
 
-        const course = await Course.findByPk(classData.courseId, { transaction });
-        if (!course) {
-          await transaction.rollback();
-          return res.status(400).json({
-            success: false,
-            message: "Không tìm thấy khóa học",
-          });
-        }
-
-        const existing = await Class.findOne({
-          where: { courseId: classData.courseId, classCode },
-          transaction,
-        });
-        if (existing) {
-          await transaction.rollback();
-          return res.status(400).json({
-            success: false,
-            message: "Mã lớp đã tồn tại trong khóa học này",
-          });
-        }
-
-        const newClass = await Class.create(
-          {
-            courseId: classData.courseId,
-            classCode,
-            status: "active",
-            startDate,
-            endDate,
-            maxStudents,
-            maxGroupMembers,
-            createdBy: req.user.userId,
-          },
-          { transaction }
-        );
-
-        const isAdmin = (req.userRoles || []).includes("Admin");
-        const isInstructor = (req.userRoles || []).includes("Instructor");
-        if (isInstructor && !isAdmin) {
-          await ClassInstructor.create(
-            {
-              classId: newClass.classId,
-              instructorId: req.user.userId,
-              assignedBy: req.user.userId,
-            },
-            { transaction }
-          );
-        }
-
-        await transaction.commit();
-
-        return res.status(201).json({
-          success: true,
-          message: "Tạo lớp học thành công",
-          class: newClass,
-        });
-      } catch (error) {
-        await transaction.rollback();
-        throw error;
-      }
     } catch (error) {
       console.error("Create class controller error:", error);
       return res.status(500).json({
@@ -126,7 +66,7 @@ class ClassController {
       const search = req.query.search;
       const courseId = req.query.courseId ? parseInt(req.query.courseId) : null;
       const userId = req.user.userId;
-      const userRole = req.userRoles?.includes("Admin") ? "Admin" : "Student";
+      const userRole = req.userRoles?.includes("Admin") || req.userRoles?.includes("AcademicCoordinator") ? "Admin" : "Student";
 
       const result = await classService.getAllClasses({
         page,
@@ -187,6 +127,7 @@ class ClassController {
       const userId = req.user.userId;
       // Get primary role from req.userRoles (set by requireRole middleware)
       const userRole = req.userRoles?.includes("Admin")
+        || req.userRoles?.includes("AcademicCoordinator")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
           ? "Instructor"
@@ -233,6 +174,7 @@ class ClassController {
 
       const userId = req.user.userId;
       const userRole = req.userRoles?.includes("Admin")
+        || req.userRoles?.includes("AcademicCoordinator")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
           ? "Instructor"
@@ -286,6 +228,7 @@ class ClassController {
 
       const userId = req.user.userId;
       const userRole = req.userRoles?.includes("Admin")
+        || req.userRoles?.includes("AcademicCoordinator")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
           ? "Instructor"

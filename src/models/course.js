@@ -29,6 +29,21 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'department'
             });
 
+            Course.belongsTo(models.AcademicBlock, {
+                foreignKey: 'academicBlockId',
+                as: 'academicBlock'
+            });
+            Course.belongsToMany(models.AcademicBlock, {
+                through: models.CourseAcademicBlock,
+                foreignKey: 'courseId',
+                otherKey: 'academicBlockId',
+                as: 'academicBlocks'
+            });
+            Course.hasMany(models.CourseAcademicBlock, {
+                foreignKey: 'courseId',
+                as: 'courseAcademicBlocks'
+            });
+
             // Keep existing associations
             // Enrollment removed - now belongs to Class, not Course
             Course.hasMany(models.Topic, { foreignKey: 'courseId', as: 'topics' });
@@ -46,6 +61,7 @@ module.exports = (sequelize, DataTypes) => {
             description: { type: DataTypes.TEXT },
             semester: { type: DataTypes.STRING(30) },
             academicYear: { type: DataTypes.INTEGER },
+            academicBlockId: { type: DataTypes.INTEGER, allowNull: true },
             startDate: { type: DataTypes.DATEONLY },
             endDate: { type: DataTypes.DATEONLY },
             isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },

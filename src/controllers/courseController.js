@@ -38,6 +38,7 @@ class CourseController {
                 instructorId: req.query.instructorId,
                 departmentId: req.query.departmentId,
                 majorCode: req.query.majorCode,
+                academicBlockId: req.query.academicBlockId,
                 semester: req.query.semester,
                 academicYear: req.query.academicYear,
                 isActive: req.query.isActive,
@@ -75,6 +76,7 @@ class CourseController {
             const filters = {
                 semester: req.query.semester,
                 academicYear: req.query.academicYear,
+                academicBlockId: req.query.academicBlockId,
                 isActive: req.query.isActive,
                 search: req.query.search
             };
@@ -149,7 +151,7 @@ class CourseController {
 
             const { courseId } = req.params;
             // Get user role (Admin has priority)
-            const userRole = req.userRoles && req.userRoles.includes('Admin') ? 'Admin' : 'Instructor';
+            const userRole = req.userRoles && (req.userRoles.includes('Admin') || req.userRoles.includes('AcademicCoordinator')) ? 'Admin' : 'Instructor';
             const result = await courseService.updateCourse(courseId, req.body, req.user.userId, userRole);
 
             if (result.success) {
@@ -171,7 +173,7 @@ class CourseController {
         try {
             const { courseId } = req.params;
             // Get user role (Admin has priority)
-            const userRole = req.userRoles && req.userRoles.includes('Admin') ? 'Admin' : 'Instructor';
+            const userRole = req.userRoles && (req.userRoles.includes('Admin') || req.userRoles.includes('AcademicCoordinator')) ? 'Admin' : 'Instructor';
             const result = await courseService.deleteCourse(courseId, req.user.userId, userRole);
 
             if (result.success) {

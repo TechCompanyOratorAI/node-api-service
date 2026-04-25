@@ -30,25 +30,25 @@ router.use(requireEmailVerification);
 // Get all classes (Admin and Student)
 router.get(
   "/",
-  requireRole(["Admin", "Student"]),
+  requireRole(["Admin", "AcademicCoordinator", "Student"]),
   classController.getAllClasses
 );
 
 router.get(
   "/:classId",
-  requireRole(["Admin", "Instructor", "Student"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor", "Student"]),
   classController.getClassById
 );
 
 router.put(
   "/:classId",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   requireClassInstructorOrAdmin,
   validateUpdateClass,
   classController.updateClass
 );
 
-router.delete("/:classId", requireRole(["Admin"]), classController.deleteClass);
+router.delete("/:classId", requireRole(["Admin", "AcademicCoordinator"]), classController.deleteClass);
 
 router.post(
   "/:classId/instructors",
@@ -67,14 +67,14 @@ router.get("/:classId/instructors", classController.getClassInstructors);
 
 router.get(
   "/:classId/students",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   enrollmentController.getClassStudents
 );
 
 // Class scores - get all students and their scores (Instructor/Admin)
 router.get(
   "/:classId/scores",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   requireClassInstructorOrAdmin,
   classScoreController.getClassScores
 );
