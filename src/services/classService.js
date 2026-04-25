@@ -153,7 +153,7 @@ class ClassService {
           {
             model: EnrollKey,
             as: "enrollKeys",
-            attributes: ["keyId", "isActive", "expiresAt"],
+            attributes: ["keyId", "keyValue", "isActive", "expiresAt"],
           },
         ],
         order: [["classCode", "ASC"]],
@@ -161,11 +161,21 @@ class ClassService {
 
       return {
         success: true,
-        data: classes.map((c) => ({
-          ...c.toJSON(),
-          enrollmentCount: c.enrollments?.length || 0,
-          activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
-        })),
+        data: classes.map((c) => {
+          const classData = {
+            ...c.toJSON(),
+            enrollmentCount: c.enrollments?.length || 0,
+            activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
+          };
+
+          // Include enrollkey for Admin or Instructor
+          if (userRole === "Admin" || userRole === "Instructor") {
+            const activeKey = c.enrollKeys?.find((k) => k.isActive);
+            classData.enrollkey = activeKey?.keyValue || null;
+          }
+
+          return classData;
+        }),
       };
     } catch (error) {
       console.error("Get classes error:", error);
@@ -243,8 +253,8 @@ class ClassService {
             activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
           };
 
-          // Only include enrollkey for Admin users
-          if (userRole === "Admin") {
+          // Include enrollkey for Admin or Instructor
+          if (userRole === "Admin" || userRole === "Instructor") {
             const activeKey = c.enrollKeys?.find((k) => k.isActive);
             classData.enrollkey = activeKey?.keyValue || null;
           }
