@@ -173,7 +173,16 @@ class ClassService {
     totalPages: Math.ceil(count / limit),
   },
 };
+    } catch (error) {
+      console.error("Get classes by course error:", error);
+      return {
+        success: false,
+        message: "Không thể lấy danh sách lớp học",
+        error: error.message,
+      };
+    }
   }
+
 
   /**
    * Get all classes (Admin and Student) with pagination and filters
