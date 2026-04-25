@@ -469,7 +469,8 @@ class ClassController {
 
       const result = await classService.removeInstructor(
         parseInt(classId),
-        parseInt(instructorId)
+        parseInt(instructorId),
+        req.user.userId
       );
 
       if (result.success) {

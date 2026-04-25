@@ -5,8 +5,10 @@ import {
   requireRole,
 } from "../middleware/authMiddleware.js";
 import { body } from "express-validator";
+import businessConstants from "../constants/businessConstants.js";
 
 const router = express.Router();
+const { ROLE_VALUES } = businessConstants;
 
 // Public routes (authenticated users)
 router.get("/all", authenticateToken, roleController.getAllRoles);
@@ -20,8 +22,8 @@ router.post(
   [
     body("userId").isInt().withMessage("User ID must be a valid integer"),
     body("roleName")
-      .isIn(["Admin", "Instructor", "Student"])
-      .withMessage("Role must be Admin, Instructor, or Student"),
+      .isIn(ROLE_VALUES)
+      .withMessage(`Role must be one of: ${ROLE_VALUES.join(", ")}`),
   ],
   roleController.assignRole
 );
@@ -33,8 +35,8 @@ router.post(
   [
     body("userId").isInt().withMessage("User ID must be a valid integer"),
     body("roleName")
-      .isIn(["Admin", "Instructor", "Student"])
-      .withMessage("Role must be Admin, Instructor, or Student"),
+      .isIn(ROLE_VALUES)
+      .withMessage(`Role must be one of: ${ROLE_VALUES.join(", ")}`),
   ],
   roleController.removeRole
 );
@@ -46,11 +48,11 @@ router.put(
   [
     body("userId").isInt().withMessage("User ID must be a valid integer"),
     body("oldRoleName")
-      .isIn(["Admin", "Instructor", "Student"])
-      .withMessage("Old role must be Admin, Instructor, or Student"),
+      .isIn(ROLE_VALUES)
+      .withMessage(`Old role must be one of: ${ROLE_VALUES.join(", ")}`),
     body("newRoleName")
-      .isIn(["Admin", "Instructor", "Student"])
-      .withMessage("New role must be Admin, Instructor, or Student"),
+      .isIn(ROLE_VALUES)
+      .withMessage(`New role must be one of: ${ROLE_VALUES.join(", ")}`),
   ],
   roleController.updateUserRole
 );

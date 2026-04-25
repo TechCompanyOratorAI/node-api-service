@@ -14,6 +14,8 @@ const {
 } = db;
 const { Op } = require("sequelize");
 const { emitUploadPermissionChanged } = require("../websocket/emitters");
+const auditLogService = require("./auditLogService");
+const { AUDIT_ACTIONS, AUDIT_STATUSES } = require("../constants/businessConstants");
 
 class ClassService {
   /**
@@ -671,6 +673,15 @@ class ClassService {
         assignedBy,
       });
 
+      await auditLogService.log({
+        actorUserId: assignedBy,
+        action: AUDIT_ACTIONS.CLASS_INSTRUCTOR_ASSIGNED,
+        entityType: "ClassInstructor",
+        entityId: classId,
+        status: AUDIT_STATUSES.SUCCESS,
+        metadata: { classId, instructorId },
+      });
+
       return { success: true, message: "Phân công giảng viên thành công" };
     } catch (error) {
       console.error("Assign instructor error:", error);
@@ -685,7 +696,7 @@ class ClassService {
   /**
    * Remove instructor from class
    */
-  async removeInstructor(classId, instructorId) {
+  async removeInstructor(classId, instructorId, removedBy = null) {
     try {
       const assignment = await ClassInstructor.findOne({
         where: { classId, instructorId },
@@ -699,6 +710,15 @@ class ClassService {
       }
 
       await assignment.destroy();
+
+      await auditLogService.log({
+        actorUserId: removedBy,
+        action: AUDIT_ACTIONS.CLASS_INSTRUCTOR_REMOVED,
+        entityType: "ClassInstructor",
+        entityId: classId,
+        status: AUDIT_STATUSES.SUCCESS,
+        metadata: { classId, instructorId },
+      });
 
       return { success: true, message: "Gỡ bỏ giảng viên thành công" };
     } catch (error) {
