@@ -42,7 +42,7 @@ class RubricCriteriaService {
         rubricTemplateId: templateId,
       });
 
-      const finalWeight = currentWeight + newWeight;
+      const finalWeight = await this.getTotalWeight(templateId);
       if (finalWeight === 100) {
         await template.update({ isActive: true });
         return {
@@ -53,6 +53,7 @@ class RubricCriteriaService {
         };
       }
 
+      await template.update({ isActive: false });
       return {
         success: true,
         data: criteria,
@@ -178,9 +179,24 @@ class RubricCriteriaService {
       // Soft delete
       await criteria.update({ isActive: false });
 
+      // Cập nhật trạng thái template
+      const finalWeight = await this.getTotalWeight(criteria.rubricTemplateId);
+      const template = await RubricTemplate.findByPk(criteria.rubricTemplateId);
+      
+      if (template) {
+        if (finalWeight === 100) {
+          await template.update({ isActive: true });
+        } else {
+          await template.update({ isActive: false });
+        }
+      }
+
       return {
         success: true,
-        message: "Xóa criteria thành công",
+        message: finalWeight === 100 
+          ? "Xóa criteria thành công. Template vẫn hoạt động (100%)" 
+          : "Xóa criteria thành công. Template đã bị hủy kích hoạt (do tổng weight < 100%)",
+        finalWeight
       };
     } catch (error) {
       console.error("Delete rubric criteria error:", error);
