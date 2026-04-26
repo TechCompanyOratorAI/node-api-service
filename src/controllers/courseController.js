@@ -37,7 +37,7 @@ class CourseController {
             const filters = {
                 instructorId: req.query.instructorId,
                 departmentId: req.query.departmentId,
-                majorCode: req.query.majorCode,
+                subjectAreaId: req.query.subjectAreaId,
                 academicBlockId: req.query.academicBlockId,
                 semester: req.query.semester,
                 academicYear: req.query.academicYear,

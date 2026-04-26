@@ -133,6 +133,7 @@ class CourseService {
                 courseCode,
                 courseName,
                 departmentId,
+                subjectAreaId,
                 description,
                 semester,
                 academicYear,
@@ -175,6 +176,7 @@ class CourseService {
                 courseCode,
                 courseName,
                 departmentId,
+                subjectAreaId: subjectAreaId || null,
                 description,
                 academicBlockId: dateValidation.primaryAcademicBlockId,
                 semester,
@@ -236,7 +238,7 @@ class CourseService {
             const {
                 instructorId,
                 departmentId,
-                majorCode,
+                subjectAreaId,
                 academicBlockId,
                 semester,
                 academicYear,
@@ -258,7 +260,7 @@ class CourseService {
     if (semester) where.semester = semester;
     if (academicYear) where.academicYear = academicYear;
     if (departmentId) where.departmentId = departmentId;
-    if (majorCode) where.majorCode = majorCode;
+    if (subjectAreaId) where.subjectAreaId = subjectAreaId;
     // Default to active courses only if not specified (for student access)
     if (isActive !== undefined) {
         where.isActive = isActive;
@@ -600,6 +602,7 @@ class CourseService {
                 endDate,
                 isActive,
                 departmentId,
+                subjectAreaId,
                 instructorIds // Array of instructor IDs to update
             } = courseData;
             const hasAcademicBlocksInPayload = Array.isArray(academicBlockIds) || academicBlockId !== undefined;
@@ -658,7 +661,8 @@ class CourseService {
                 startDate: dateValidation.startDate || null,
                 endDate: dateValidation.endDate || null,
                 isActive: isActive !== undefined ? isActive : course.isActive,
-                departmentId: departmentId !== undefined ? departmentId : course.departmentId
+                departmentId: departmentId !== undefined ? departmentId : course.departmentId,
+                subjectAreaId: subjectAreaId !== undefined ? subjectAreaId : course.subjectAreaId,
             }, { transaction });
 
             if (hasAcademicBlocksInPayload) {
@@ -1316,7 +1320,7 @@ class CourseService {
     }
 
     /**
-     * Get available instructors for a course (same major)
+     * Get available instructors for a course (same department)
      * @param {number} courseId - Course ID
      * @param {object} filters - Filter options { search }
      * @returns {Promise<object>} - Result with instructors list
@@ -1340,13 +1344,8 @@ class CourseService {
             };
 
             // Filter by course department if exists
-            // If course has departmentId, only show instructors with same departmentId
             if (course.departmentId) {
                 where.departmentId = course.departmentId;
-            }
-            // If course has no departmentId but has majorCode, fallback to majorCode matching
-            else if (course.majorCode) {
-                where.studyMajor = { [db.Sequelize.Op.like]: `%${course.majorCode}%` };
             }
 
             // Search filter
@@ -1401,7 +1400,6 @@ class CourseService {
                 data: instructorsList,
                 count: instructorsList.length,
                 departmentId: course.departmentId,
-                majorCode: course.majorCode,
                 totalInstructors: instructors.length,
                 alreadyAssigned: assignedIds.length
             };

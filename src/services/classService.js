@@ -16,6 +16,7 @@ const {
 const { Op } = require("sequelize");
 const { emitUploadPermissionChanged } = require("../websocket/emitters");
 const auditLogService = require("./auditLogService");
+const competencyService = require("./competencyService");
 const { AUDIT_ACTIONS, AUDIT_STATUSES } = require("../constants/businessConstants");
 const academicCalendarService = require("./academicCalendarService");
 
@@ -776,7 +777,7 @@ class ClassService {
   /**
    * Assign instructor to class
    */
-  async assignInstructor(classId, instructorId, assignedBy) {
+  async assignInstructor(classId, instructorId, assignedBy, options = {}) {
     try {
       const classData = await Class.findByPk(classId);
       if (!classData) {
@@ -807,23 +808,77 @@ class ClassService {
         };
       }
 
+      const actorRoles = Array.isArray(options.actorRoles) ? options.actorRoles : [];
+      const canOverride =
+        actorRoles.includes("Admin") || actorRoles.includes("AcademicCoordinator");
+      const overrideReason =
+        typeof options.overrideReason === "string" ? options.overrideReason.trim() : "";
+
+      const eligibility = await competencyService.evaluateInstructorEligibilityForCourse(
+        classData.courseId,
+        instructorId,
+        {
+          classContext: {
+            classId,
+            startDate: classData.startDate,
+            endDate: classData.endDate,
+          },
+        }
+      );
+
+      if (!eligibility.success) {
+        return {
+          success: false,
+          message: eligibility.message || "Unable to evaluate instructor eligibility",
+          error: eligibility.error,
+        };
+      }
+
+      if (!eligibility.eligible && !(canOverride && overrideReason)) {
+        return {
+          success: false,
+          message: "Instructor is not eligible by competency/workload/schedule",
+          eligibility,
+        };
+      }
+
+      const isOverrideAssignment = !eligibility.eligible;
+
       // Assign
       await ClassInstructor.create({
         classId,
         instructorId,
         assignedBy,
+        assignmentStatus: isOverrideAssignment ? "override" : "eligible",
+        overrideReason: isOverrideAssignment ? overrideReason : null,
+        overrideBy: isOverrideAssignment ? assignedBy : null,
+        overrideAt: isOverrideAssignment ? new Date() : null,
       });
 
       await auditLogService.log({
         actorUserId: assignedBy,
-        action: AUDIT_ACTIONS.CLASS_INSTRUCTOR_ASSIGNED,
+        action: isOverrideAssignment
+          ? AUDIT_ACTIONS.CLASS_INSTRUCTOR_OVERRIDDEN
+          : AUDIT_ACTIONS.CLASS_INSTRUCTOR_ASSIGNED,
         entityType: "ClassInstructor",
         entityId: classId,
         status: AUDIT_STATUSES.SUCCESS,
-        metadata: { classId, instructorId },
+        reason: isOverrideAssignment ? overrideReason : null,
+        metadata: {
+          classId,
+          instructorId,
+          assignmentStatus: isOverrideAssignment ? "override" : "eligible",
+          eligibility,
+        },
       });
 
-      return { success: true, message: "Phân công giảng viên thành công" };
+      return {
+        success: true,
+        message: isOverrideAssignment
+          ? "Instructor assigned with override"
+          : "Instructor assigned successfully",
+        assignmentStatus: isOverrideAssignment ? "override" : "eligible",
+      };
     } catch (error) {
       console.error("Assign instructor error:", error);
       return {

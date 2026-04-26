@@ -28,6 +28,10 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'departmentId',
                 as: 'department'
             });
+            Course.belongsTo(models.SubjectArea, {
+                foreignKey: 'subjectAreaId',
+                as: 'subjectArea'
+            });
 
             Course.belongsTo(models.AcademicBlock, {
                 foreignKey: 'academicBlockId',
@@ -42,6 +46,16 @@ module.exports = (sequelize, DataTypes) => {
             Course.hasMany(models.CourseAcademicBlock, {
                 foreignKey: 'courseId',
                 as: 'courseAcademicBlocks'
+            });
+            Course.hasMany(models.CourseCompetencyRequirement, {
+                foreignKey: 'courseId',
+                as: 'competencyRequirements'
+            });
+            Course.belongsToMany(models.CompetencyCatalog, {
+                through: models.CourseCompetencyRequirement,
+                foreignKey: 'courseId',
+                otherKey: 'competencyId',
+                as: 'requiredCompetencies'
             });
 
             // Keep existing associations
@@ -58,6 +72,8 @@ module.exports = (sequelize, DataTypes) => {
             courseName: { type: DataTypes.STRING(200), allowNull: false },
             majorCode: { type: DataTypes.STRING(20), allowNull: true, comment: 'Major code (e.g., SE, CS, IT)' },
             departmentId: { type: DataTypes.INTEGER, allowNull: true, comment: 'Department ID' },
+            majorId: { type: DataTypes.INTEGER, allowNull: true },
+            subjectAreaId: { type: DataTypes.INTEGER, allowNull: true },
             description: { type: DataTypes.TEXT },
             semester: { type: DataTypes.STRING(30) },
             academicYear: { type: DataTypes.INTEGER },

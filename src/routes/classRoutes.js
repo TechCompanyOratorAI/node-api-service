@@ -52,14 +52,14 @@ router.delete("/:classId", requireRole(["Admin", "AcademicCoordinator"]), classC
 
 router.post(
   "/:classId/instructors",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   validateAssignInstructor,
   classController.assignInstructor
 );
 
 router.delete(
   "/:classId/instructors/:instructorId",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   classController.removeInstructor
 );
 

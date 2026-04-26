@@ -337,7 +337,7 @@ class ClassController {
         });
       }
 
-      const { instructorId, instructorIds } = req.body;
+      const { instructorId, instructorIds, overrideReason } = req.body;
       const assignedBy = req.user.userId;
 
       // Handle single instructor
@@ -345,7 +345,11 @@ class ClassController {
         const result = await classService.assignInstructor(
           parseInt(classId),
           parseInt(instructorId),
-          assignedBy
+          assignedBy,
+          {
+            overrideReason,
+            actorRoles: req.userRoles || [],
+          }
         );
 
         if (result.success) {
@@ -367,7 +371,11 @@ class ClassController {
           const result = await classService.assignInstructor(
             parseInt(classId),
             parseInt(id),
-            assignedBy
+            assignedBy,
+            {
+              overrideReason,
+              actorRoles: req.userRoles || [],
+            }
           );
 
           if (result.success) {
