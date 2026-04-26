@@ -659,11 +659,6 @@ export const validateRubricCriteria = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("displayOrder phải lớn hơn hoặc bằng 1"),
-
-  body("evaluationGuide")
-    .optional()
-    .isLength({ max: 5000 })
-    .withMessage("Hướng dẫn đánh giá không được quá 5000 ký tự"),
 ];
 
 // ClassAISettings validation
@@ -753,11 +748,6 @@ export const validateClassRubricCriteria = [
     .isInt({ min: 1 })
     .withMessage("displayOrder phải lớn hơn hoặc bằng 1"),
 
-  body("evaluationGuide")
-    .optional()
-    .isLength({ max: 5000 })
-    .withMessage("Hướng dẫn đánh giá không được quá 5000 ký tự"),
-
   body("isActive")
     .optional()
     .isInt({ min: 0, max: 1 })
@@ -792,11 +782,6 @@ export const validateClassRubricCustomCriteria = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("displayOrder phải lớn hơn hoặc bằng 1"),
-
-  body("evaluationGuide")
-    .optional()
-    .isLength({ max: 5000 })
-    .withMessage("Hướng dẫn đánh giá không được quá 5000 ký tự"),
 
   body("rubricTemplateId")
     .optional()

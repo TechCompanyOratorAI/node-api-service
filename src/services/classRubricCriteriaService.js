@@ -55,7 +55,6 @@ class ClassRubricCriteriaService {
         weight: criteria.weight,
         maxScore: criteria.maxScore,
         displayOrder: criteria.displayOrder,
-        evaluationGuide: criteria.evaluationGuide,
         isActive: 1,
         createdBy: userId,
         updatedBy: userId,
@@ -233,8 +232,9 @@ class ClassRubricCriteriaService {
         }
       }
 
+      const { evaluationGuide, ...createData } = data;
       const criterion = await ClassRubricCriteria.create({
-        ...data,
+        ...createData,
         classId: classId,
         sourceCriteriaId: null, // Custom criteria has no source
         createdBy: userId,
@@ -297,7 +297,8 @@ class ClassRubricCriteriaService {
         }
       }
 
-      await criterion.update(data);
+      const { evaluationGuide, ...updateData } = data;
+      await criterion.update(updateData);
 
       return {
         success: true,
@@ -593,6 +594,86 @@ class ClassRubricCriteriaService {
       return {
         success: false,
         message: "Lỗi khi lấy danh sách criteria",
+        error: error.message,
+      };
+    }
+  }
+  /**
+   * Bulk update/create criteria for a class
+   */
+  async bulkUpdateCriteria(classId, criteriaData, userId) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      const classExists = await Class.findByPk(classId);
+      if (!classExists) {
+        await transaction.rollback();
+        return { success: false, message: "Lớp học không tìm thấy" };
+      }
+
+      const results = { updated: 0, created: 0 };
+
+      for (const criteria of criteriaData) {
+        // Luôn bỏ evaluationGuide nếu có gửi lên
+        const { classRubricCriteriaId, evaluationGuide, ...data } = criteria;
+
+        if (classRubricCriteriaId) {
+          // Update existing criterion
+          await ClassRubricCriteria.update(
+            { ...data, updatedBy: userId },
+            {
+              where: { classRubricCriteriaId, classId },
+              transaction,
+            }
+          );
+          results.updated++;
+        } else {
+          // Create new custom criterion
+          await ClassRubricCriteria.create(
+            {
+              ...data,
+              classId,
+              sourceCriteriaId: null,
+              createdBy: userId,
+              updatedBy: userId,
+            },
+            { transaction }
+          );
+          results.created++;
+        }
+      }
+
+      // Check total weight after updates
+      const allCriteria = await ClassRubricCriteria.findAll({
+        where: { classId, isActive: 1 },
+        transaction,
+      });
+
+      const totalWeight = allCriteria.reduce(
+        (sum, c) => sum + (parseFloat(c.weight) || 0),
+        0
+      );
+
+      if (totalWeight > 100) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: `Tổng trọng số hiện tại là ${totalWeight}%, vượt quá 100%. Vui lòng điều chỉnh lại.`,
+          code: "WEIGHT_EXCEEDS_100",
+        };
+      }
+
+      await transaction.commit();
+      return {
+        success: true,
+        message: `Cập nhật thành công (${results.updated} cập nhật, ${results.created} tạo mới). Tổng weight: ${totalWeight}%`,
+        data: results,
+      };
+    } catch (error) {
+      if (transaction) await transaction.rollback();
+      console.error("Bulk update class criteria error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi cập nhật danh sách criteria",
         error: error.message,
       };
     }

@@ -45,9 +45,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 1,
       },
-      evaluationGuide: {
-        type: DataTypes.TEXT,
-      },
       isActive: {
         type: DataTypes.TINYINT(1),
         allowNull: false,

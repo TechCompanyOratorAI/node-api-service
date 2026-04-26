@@ -258,7 +258,6 @@ class RubricTemplateService {
               weight: criteria.weight,
               maxScore: criteria.maxScore,
               displayOrder: criteria.displayOrder,
-              evaluationGuide: criteria.evaluationGuide,
               isActive: criteria.isActive !== false,
             },
             {
@@ -275,7 +274,6 @@ class RubricTemplateService {
               weight: criteria.weight,
               maxScore: criteria.maxScore || 100,
               displayOrder: criteria.displayOrder || 0,
-              evaluationGuide: criteria.evaluationGuide,
               isActive: criteria.isActive !== false ? true : false,
             },
             { transaction }

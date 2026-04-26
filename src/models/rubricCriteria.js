@@ -37,9 +37,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0,
       },
-      evaluationGuide: {
-        type: DataTypes.TEXT,
-      },
       isActive: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
