@@ -303,40 +303,56 @@ class GroupService {
 
   async promoteMember(groupId, studentId, userId) {
     try {
-      const currentLeader = await GroupStudent.findOne({
-        where: { groupId, studentId: userId },
+      // Find the existing leader of the group
+      const existingLeader = await GroupStudent.findOne({
+        where: { groupId, role: "leader" },
       });
 
-      if (!currentLeader || currentLeader.role !== "leader") {
-        return {
-          success: false,
-          message: "Chỉ trưởng nhóm mới có quyền chuyển quyền",
-        };
-      }
-
-      const member = await GroupStudent.findOne({
+      // Find the member to be promoted
+      const memberToPromote = await GroupStudent.findOne({
         where: { groupId, studentId },
       });
 
-      if (!member) {
+      if (!memberToPromote) {
         return {
           success: false,
-          message: "Thành viên không tồn tại trong nhóm",
+          message: "Thành viên này không tồn tại trong nhóm",
         };
       }
-      await currentLeader.update({ role: "member" });
-      await member.update({ role: "leader" });
 
-      return {
-        success: true,
-        message: "Đã chuyển quyền trưởng nhóm",
-        newLeaderId: studentId,
-      };
+      if (memberToPromote.role === "leader") {
+        return {
+          success: false,
+          message: "Thành viên này đã là trưởng nhóm rồi",
+        };
+      }
+
+      const transaction = await db.sequelize.transaction();
+      try {
+        // 1. Demote existing leader if exists
+        if (existingLeader) {
+          await existingLeader.update({ role: "member" }, { transaction });
+        }
+
+        // 2. Promote new leader
+        await memberToPromote.update({ role: "leader" }, { transaction });
+
+        await transaction.commit();
+
+        return {
+          success: true,
+          message: `Đã chuyển quyền trưởng nhóm sang cho sinh viên ID ${studentId}`,
+          newLeaderId: studentId,
+        };
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
+      }
     } catch (error) {
       console.error("Promote member error:", error);
       return {
         success: false,
-        message: "Không thể chuyển quyền",
+        message: "Không thể chuyển quyền trưởng nhóm",
         error: error.message,
       };
     }
