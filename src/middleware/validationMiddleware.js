@@ -157,11 +157,31 @@ export const validateCourse = [
     .trim()
     .toUpperCase(),
 
+  body("majorId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("majorId must be a positive integer"),
+
+  body("subjectAreaId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("subjectAreaId must be a positive integer"),
+
   body("description")
     .optional()
     .isLength({ max: 5000 })
     .withMessage("Description must be less than 5000 characters")
     .trim(),
+
+  body("majorId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("majorId must be a positive integer"),
+
+  body("subjectAreaId")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("subjectAreaId must be a positive integer"),
 
   body("semester")
     .optional()
@@ -640,6 +660,10 @@ export const validateAssignInstructor = [
     }
     return true;
   }),
+  body("overrideReason")
+    .optional()
+    .isLength({ min: 5, max: 2000 })
+    .withMessage("overrideReason must be between 5 and 2000 characters"),
 ];
 
 // ============================================================

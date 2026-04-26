@@ -31,6 +31,8 @@ import notificationRoutes from "./notificationRoutes.js";
 import transcriptRoutes from "./transcriptRoutes.js";
 import auditLogRoutes from "./auditLogRoutes.js";
 import academicCalendarRoutes from "./academicCalendarRoutes.js";
+import competencyRoutes from "./competencyRoutes.js";
+import subjectAreaRoutes from "./subjectAreaRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -70,6 +72,8 @@ router.use("/notifications", notificationRoutes);
 router.use("/transcripts", transcriptRoutes);
 router.use("/audit-logs", auditLogRoutes);
 router.use("/academic-calendar", academicCalendarRoutes);
+router.use("/", competencyRoutes);
+router.use("/subject-areas", subjectAreaRoutes);
 
 // ─── Share routes ───────────────────────────────────────────────
 // Public view: GET /share/:token (no authentication needed)

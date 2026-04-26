@@ -44,6 +44,7 @@ const AUDIT_ACTIONS = Object.freeze({
   ROLE_REMOVED: "role.removed",
   ROLE_UPDATED: "role.updated",
   CLASS_INSTRUCTOR_ASSIGNED: "class.instructor_assigned",
+  CLASS_INSTRUCTOR_OVERRIDDEN: "class.instructor_overridden",
   CLASS_INSTRUCTOR_REMOVED: "class.instructor_removed",
   ENROLL_KEY_CREATED: "enroll_key.created",
   ENROLL_KEY_ROTATED: "enroll_key.rotated",
@@ -51,6 +52,10 @@ const AUDIT_ACTIONS = Object.freeze({
   CLASS_JOINED: "class.joined",
   GROUP_LEADER_CHANGED: "group.leader_changed",
   DEADLINE_UPDATED: "deadline.updated",
+  COMPETENCY_CREATED: "competency.created",
+  COURSE_COMPETENCY_REQUIREMENT_UPDATED: "course.competency_requirement_updated",
+  INSTRUCTOR_COMPETENCY_SUBMITTED: "instructor.competency_submitted",
+  INSTRUCTOR_COMPETENCY_REVIEWED: "instructor.competency_reviewed",
 });
 
 const AUDIT_STATUSES = Object.freeze({
