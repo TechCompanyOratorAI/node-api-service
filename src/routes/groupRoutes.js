@@ -3,6 +3,7 @@ const router = express.Router();
 const groupController = require('../controllers/groupController');
 const groupGradeDistributionController = require('../controllers/groupGradeDistributionController');
 const { authenticateToken, requireEmailVerification } = require('../middleware/authMiddleware');
+const { requireRole } = require('../middleware/authMiddleware');
 
 // Tất cả routes cần xác thực
 router.use(authenticateToken);
@@ -22,8 +23,8 @@ router.patch('/:groupId', groupController.updateGroup);
 router.delete('/:groupId', groupController.deleteGroup);
 // [POST] /api/groups/:groupId/members/:studentId/remove - Xóa thành viên (chỉ leader)
 router.post('/:groupId/members/:studentId/remove', groupController.removeMember);
-// [POST] /api/groups/:groupId/members/:studentId/promote - Chuyển quyền leader (chỉ leader)
-router.post('/:groupId/members/:studentId/promote', groupController.promoteMember);
+// [POST] /api/groups/:groupId/members/:studentId/promote - Chuyển quyền leader (chỉ Admin/Instructor)
+router.post('/:groupId/members/:studentId/promote', requireRole(["Admin", "Instructor"]), groupController.promoteMember);
 
 // ============================================================
 // TOPIC SELECTION ROUTES
