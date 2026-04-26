@@ -83,27 +83,41 @@ class ClassRubricCriteriaController {
     }
   }
 
-  /**
-   * PUT /class-rubric-criteria/:classRubricCriteriaId
-   * Update a class rubric criterion
-   */
+
   async updateCriterion(req, res) {
     try {
+      const { classRubricCriteriaId } = req.params;
+
+      if (!classRubricCriteriaId || isNaN(parseInt(classRubricCriteriaId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID không hợp lệ",
+        });
+      }
+
+      // Check if bulk update (array)
+      if (Array.isArray(req.body)) {
+        const userId = req.user?.userId;
+        const result = await classRubricCriteriaService.bulkUpdateCriteria(
+          parseInt(classRubricCriteriaId),
+          req.body,
+          userId
+        );
+
+        if (result.success) {
+          return res.status(200).json(result);
+        } else {
+          return res.status(400).json(result);
+        }
+      }
+
+      // Single update logic
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
           message: "Dữ liệu không hợp lệ",
           errors: errors.array(),
-        });
-      }
-
-      const { classRubricCriteriaId } = req.params;
-
-      if (!classRubricCriteriaId || isNaN(parseInt(classRubricCriteriaId))) {
-        return res.status(400).json({
-          success: false,
-          message: "ID criteria không hợp lệ",
         });
       }
 
