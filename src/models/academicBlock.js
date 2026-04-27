@@ -67,14 +67,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATEONLY,
         allowNull: false,
       },
-      handoverStartDate: {
-        type: DataTypes.DATEONLY,
-        allowNull: true,
-      },
-      handoverEndDate: {
-        type: DataTypes.DATEONLY,
-        allowNull: true,
-      },
       isActive: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

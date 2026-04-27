@@ -18,8 +18,18 @@ class AcademicCalendarController {
     return res.status(result.success ? 200 : 400).json(result);
   }
 
+  async deleteAcademicYear(req, res) {
+    const result = await academicCalendarService.deleteAcademicYear(parseInt(req.params.academicYearId));
+    return res.status(result.success ? 200 : 400).json(result);
+  }
+
   async createAcademicBlock(req, res) {
     const result = await academicCalendarService.createAcademicBlock(req.body);
+    return res.status(result.success ? 201 : 400).json(result);
+  }
+
+  async createAcademicBlocksBulk(req, res) {
+    const result = await academicCalendarService.createAcademicBlocksBulk(req.body);
     return res.status(result.success ? 201 : 400).json(result);
   }
 
@@ -35,6 +45,11 @@ class AcademicCalendarController {
 
   async updateAcademicBlock(req, res) {
     const result = await academicCalendarService.updateAcademicBlock(parseInt(req.params.academicBlockId), req.body);
+    return res.status(result.success ? 200 : 400).json(result);
+  }
+
+  async deleteAcademicBlock(req, res) {
+    const result = await academicCalendarService.deleteAcademicBlock(parseInt(req.params.academicBlockId));
     return res.status(result.success ? 200 : 400).json(result);
   }
 }
