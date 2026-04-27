@@ -586,12 +586,6 @@ export const validateUpdateClass = [
 
 // Enrollment key creation validation
 export const validateCreateKey = [
-  body("customKey")
-    .optional()
-    .isString()
-    .isLength({ min: 6, max: 50 })
-    .withMessage("Mã tham gia tùy chỉnh phải có từ 6-50 ký tự"),
-
   body("expiresAt")
     .optional()
     .isISO8601()
@@ -611,17 +605,12 @@ export const validateCreateKey = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("Số lần sử dụng tối đa phải là số nguyên dương"),
-
-  body("description")
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage("Mô tả không được vượt quá 500 ký tự")
-    .trim(),
 ];
 
 // Student join class validation
 export const validateJoinClass = [
   body("classId")
+    .optional()
     .isInt({ min: 1 })
     .withMessage("classId phải là số nguyên dương"),
 

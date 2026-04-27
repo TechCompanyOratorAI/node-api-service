@@ -977,7 +977,164 @@ class GroupService {
       };
     }
   }
+  /**
+   * Tự động phân nhóm sinh viên đã enroll vào lớp (Instructor/Admin only)
+   * @param {number} classId
+   * @param {object} options
+   *   strategy: 'groupCount' | 'membersPerGroup'
+   *   value: number — số nhóm hoặc số thành viên/nhóm
+   *   namePrefix: string — tiền tố tên nhóm, VD "Nhóm" → Nhóm 1, Nhóm 2...
+   *   resetExisting: boolean — xoá tất cả nhóm cũ trước khi phân; false = chỉ phân sv chưa có nhóm
+   * @param {number} userId
+   * @param {string} userRole
+   */
+  async autoAssignGroups(classId, options, userId, userRole) {
+    const { strategy, value, namePrefix = "Nhóm", resetExisting = false } = options;
+
+    if (!["groupCount", "membersPerGroup"].includes(strategy)) {
+      return { success: false, message: "Chiến lược không hợp lệ. Dùng 'groupCount' hoặc 'membersPerGroup'" };
+    }
+    if (!value || value < 1 || value > 200) {
+      return { success: false, message: "Giá trị không hợp lệ (1-200)" };
+    }
+
+    const transaction = await db.sequelize.transaction();
+    try {
+      // 1. Verify class exists
+      const classData = await Class.findByPk(classId, { transaction });
+      if (!classData) {
+        await transaction.rollback();
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // 2. Get all enrolled students
+      const enrollments = await Enrollment.findAll({
+        where: { classId, status: "enrolled" },
+        attributes: ["studentId"],
+        transaction,
+      });
+
+      if (enrollments.length === 0) {
+        await transaction.rollback();
+        return { success: false, message: "Lớp học chưa có sinh viên đăng ký" };
+      }
+
+      const allStudentIds = enrollments.map((e) => e.studentId);
+
+      // 3. Handle existing groups
+      if (resetExisting) {
+        // Delete all existing groups in this class (cascade deletes GroupStudents)
+        await Group.destroy({ where: { classId }, transaction });
+      }
+
+      // 4. Find students already in a group (after possible reset)
+      const existingMemberships = await GroupStudent.findAll({
+        include: [{ model: Group, as: "group", where: { classId }, attributes: ["groupId"] }],
+        attributes: ["studentId"],
+        transaction,
+      });
+      const alreadyGroupedIds = new Set(existingMemberships.map((m) => m.studentId));
+
+      const unassignedIds = allStudentIds.filter((id) => !alreadyGroupedIds.has(id));
+
+      if (unassignedIds.length === 0) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: resetExisting
+            ? "Không có sinh viên nào để phân nhóm"
+            : "Tất cả sinh viên đã được phân nhóm rồi. Bật 'Đặt lại tất cả' để phân lại.",
+        };
+      }
+
+      // 5. Shuffle randomly (Fisher-Yates)
+      const students = [...unassignedIds];
+      for (let i = students.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [students[i], students[j]] = [students[j], students[i]];
+      }
+
+      // 6. Determine group count
+      let groupCount;
+      if (strategy === "groupCount") {
+        groupCount = Math.min(value, students.length);
+      } else {
+        // membersPerGroup
+        groupCount = Math.ceil(students.length / value);
+      }
+
+      // 7. Determine name offset (to avoid conflicts with existing group names)
+      const existingGroups = await Group.findAll({
+        where: { classId },
+        attributes: ["groupName"],
+        transaction,
+      });
+      // Find highest existing group number using namePrefix
+      let nameOffset = 0;
+      for (const g of existingGroups) {
+        const match = g.groupName.match(new RegExp(`^${namePrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(\\d+)$`));
+        if (match) {
+          nameOffset = Math.max(nameOffset, parseInt(match[1], 10));
+        }
+      }
+
+      // 8. Distribute students round-robin into groups
+      const groupBuckets = Array.from({ length: groupCount }, () => []);
+      for (let i = 0; i < students.length; i++) {
+        groupBuckets[i % groupCount].push(students[i]);
+      }
+
+      // 9. Create groups and assign students
+      const createdGroups = [];
+      for (let i = 0; i < groupCount; i++) {
+        const bucket = groupBuckets[i];
+        if (bucket.length === 0) continue;
+
+        const groupName = `${namePrefix} ${nameOffset + i + 1}`;
+
+        const group = await Group.create(
+          { classId, groupName, description: null },
+          { transaction }
+        );
+
+        const memberRecords = bucket.map((studentId, idx) => ({
+          groupId: group.groupId,
+          studentId,
+          role: idx === 0 ? "leader" : "member",
+          joinedAt: new Date(),
+        }));
+
+        await GroupStudent.bulkCreate(memberRecords, { transaction });
+
+        createdGroups.push({
+          groupId: group.groupId,
+          groupName,
+          memberCount: bucket.length,
+          leaderId: bucket[0],
+        });
+      }
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: `Đã phân ${students.length} sinh viên vào ${createdGroups.length} nhóm thành công`,
+        data: {
+          totalAssigned: students.length,
+          groupsCreated: createdGroups.length,
+          groups: createdGroups,
+        },
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Auto-assign groups error:", error);
+      return {
+        success: false,
+        message: "Không thể phân nhóm tự động",
+        error: error.message,
+      };
+    }
+  }
 }
 
 module.exports = new GroupService();
-
