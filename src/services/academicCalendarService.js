@@ -121,8 +121,6 @@ class AcademicCalendarService {
         blockType = ACADEMIC_BLOCK_TYPES.NORMAL,
         startDate,
         endDate,
-        handoverStartDate,
-        handoverEndDate,
         isActive = true,
       } = data;
 
@@ -133,8 +131,6 @@ class AcademicCalendarService {
         blockType,
         startDate,
         endDate,
-        handoverStartDate,
-        handoverEndDate,
       });
       if (!validation.success) return validation;
 
@@ -151,8 +147,6 @@ class AcademicCalendarService {
         blockType,
         startDate,
         endDate,
-        handoverStartDate: handoverStartDate || null,
-        handoverEndDate: handoverEndDate || null,
         isActive,
       });
 
@@ -163,8 +157,8 @@ class AcademicCalendarService {
     }
   }
 
-  async validateBlockPayload(data, currentBlockId = null) {
-    const { academicYearId, term, half, blockType, startDate, endDate, handoverStartDate, handoverEndDate } = data;
+  async validateBlockPayload(data, currentBlockId = null, transaction = null) {
+    const { academicYearId, term, half, blockType, startDate, endDate } = data;
 
     if (!academicYearId) return { success: false, message: "academicYearId is required" };
     if (!ACADEMIC_TERM_VALUES.includes(term)) return { success: false, message: "Invalid academic term" };
@@ -176,12 +170,7 @@ class AcademicCalendarService {
     const rangeError = this.validateDateRange(startDate, endDate, "Academic block");
     if (rangeError) return { success: false, message: rangeError };
 
-    if (handoverStartDate || handoverEndDate) {
-      const handoverError = this.validateDateRange(handoverStartDate, handoverEndDate, "Handover period");
-      if (handoverError) return { success: false, message: handoverError };
-    }
-
-    const academicYear = await AcademicYear.findByPk(academicYearId);
+    const academicYear = await AcademicYear.findByPk(academicYearId, { transaction });
     if (!academicYear) return { success: false, message: "Academic year not found" };
 
     if (new Date(startDate) < new Date(academicYear.startDate) || new Date(endDate) > new Date(academicYear.endDate)) {
@@ -196,7 +185,7 @@ class AcademicCalendarService {
     };
     if (currentBlockId) overlapWhere.academicBlockId = { [Op.ne]: currentBlockId };
 
-    const overlappingBlock = await AcademicBlock.findOne({ where: overlapWhere });
+    const overlappingBlock = await AcademicBlock.findOne({ where: overlapWhere, transaction });
     if (overlappingBlock) {
       return {
         success: false,
@@ -205,6 +194,112 @@ class AcademicCalendarService {
     }
 
     return { success: true, academicYear };
+  }
+
+  async deleteAcademicYear(academicYearId) {
+    try {
+      const academicYear = await AcademicYear.findByPk(academicYearId);
+      if (!academicYear) return { success: false, message: "Academic year not found" };
+
+      const blockCount = await AcademicBlock.count({
+        where: { academicYearId },
+      });
+      if (blockCount > 0) {
+        return {
+          success: false,
+          message: "Cannot delete academic year while blocks still exist",
+        };
+      }
+
+      await academicYear.destroy();
+      return { success: true, message: "Academic year deleted successfully" };
+    } catch (error) {
+      console.error("Delete academic year error:", error);
+      return { success: false, message: "Failed to delete academic year", error: error.message };
+    }
+  }
+
+  async createAcademicBlocksBulk(data) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      const { academicYearId, term, blocks } = data;
+
+      if (!academicYearId) {
+        await transaction.rollback();
+        return { success: false, message: "academicYearId is required" };
+      }
+      if (!ACADEMIC_TERM_VALUES.includes(term)) {
+        await transaction.rollback();
+        return { success: false, message: "Invalid academic term" };
+      }
+      if (!Array.isArray(blocks) || blocks.length === 0) {
+        await transaction.rollback();
+        return { success: false, message: "blocks must be a non-empty array" };
+      }
+
+      const createdBlocks = [];
+
+      for (const block of blocks) {
+        const payload = {
+          academicYearId,
+          term,
+          half: block.half,
+          blockType: block.blockType || ACADEMIC_BLOCK_TYPES.NORMAL,
+          startDate: block.startDate,
+          endDate: block.endDate,
+        };
+
+        const validation = await this.validateBlockPayload(payload, null, transaction);
+        if (!validation.success) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: `Invalid block payload (${block.blockType || "NORMAL"}-${block.half || "NA"}): ${validation.message}`,
+          };
+        }
+
+        const academicYear = validation.academicYear;
+        const blockCode =
+          block.blockCode ||
+          this.buildBlockCode(academicYear.year, term, payload.half, payload.blockType);
+
+        const existingCode = await AcademicBlock.findOne({
+          where: { blockCode },
+          transaction,
+        });
+        if (existingCode) {
+          await transaction.rollback();
+          return { success: false, message: `Academic block code already exists: ${blockCode}` };
+        }
+
+        const academicBlock = await AcademicBlock.create(
+          {
+            academicYearId,
+            blockCode,
+            term,
+            half: payload.blockType === ACADEMIC_BLOCK_TYPES.BLOCK3 ? null : payload.half,
+            blockType: payload.blockType,
+            startDate: payload.startDate,
+            endDate: payload.endDate,
+            isActive: block.isActive !== undefined ? block.isActive : true,
+          },
+          { transaction }
+        );
+
+        createdBlocks.push(academicBlock);
+      }
+
+      await transaction.commit();
+      return {
+        success: true,
+        message: "Academic blocks created successfully",
+        data: createdBlocks,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Create academic blocks bulk error:", error);
+      return { success: false, message: "Failed to create academic blocks", error: error.message };
+    }
   }
 
   async listAcademicBlocks(filters = {}) {
@@ -261,8 +356,6 @@ class AcademicCalendarService {
         blockType: data.blockType || academicBlock.blockType,
         startDate: data.startDate || academicBlock.startDate,
         endDate: data.endDate || academicBlock.endDate,
-        handoverStartDate: data.handoverStartDate !== undefined ? data.handoverStartDate : academicBlock.handoverStartDate,
-        handoverEndDate: data.handoverEndDate !== undefined ? data.handoverEndDate : academicBlock.handoverEndDate,
       };
 
       const validation = await this.validateBlockPayload(nextData, academicBlockId);
@@ -288,6 +381,19 @@ class AcademicCalendarService {
     } catch (error) {
       console.error("Update academic block error:", error);
       return { success: false, message: "Failed to update academic block", error: error.message };
+    }
+  }
+
+  async deleteAcademicBlock(academicBlockId) {
+    try {
+      const academicBlock = await AcademicBlock.findByPk(academicBlockId);
+      if (!academicBlock) return { success: false, message: "Academic block not found" };
+
+      await academicBlock.destroy();
+      return { success: true, message: "Academic block deleted successfully" };
+    } catch (error) {
+      console.error("Delete academic block error:", error);
+      return { success: false, message: "Failed to delete academic block", error: error.message };
     }
   }
 

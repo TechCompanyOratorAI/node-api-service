@@ -104,8 +104,6 @@ class CourseService {
                 "blockType",
                 "startDate",
                 "endDate",
-                "handoverStartDate",
-                "handoverEndDate",
                 "isActive",
             ],
             through: { attributes: ["isPrimary"] },
