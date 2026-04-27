@@ -114,6 +114,10 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "classId",
       as: "topics",
     });
+    Class.hasMany(models.ClassEmailWhitelist, {
+      foreignKey: "classId",
+      as: "emailWhitelists",
+    });
   };
 
   return Class;
