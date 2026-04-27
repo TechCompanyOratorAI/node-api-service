@@ -2,31 +2,25 @@
 
 const db = require("../models");
 const crypto = require("crypto");
-const { EnrollKey, Class, ClassInstructor, CourseInstructor, Enrollment } = db;
+const { EnrollKey, Class, ClassInstructor, CourseInstructor, Enrollment, Course, User } = db;
 
 class EnrollKeyService {
   /**
-   * Generate random enrollment key
+   * Generate enrollment key in format: ORA-XXXX-XXXX-XXXX
+   * Uses 12 hex chars (6 random bytes) → ~281 trillion unique combinations
    */
-  generateKey(length = 16) {
-    return crypto
-      .randomBytes(length)
-      .toString("base64url")
-      .substring(0, length)
-      .toUpperCase();
+  generateKey() {
+    const hex = crypto.randomBytes(6).toString("hex").toUpperCase();
+    return `ORA-${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}`;
   }
 
   /**
    * Create enrollment key for class
    * Authorization: Admin OR instructor assigned to both course AND class
+   * Key is globally unique across ALL classes
    */
   async createKey(classId, keyData, userId, userRole) {
-    const { expiresAt, maxUses, customKey } = keyData;
-
-    console.log("Service createKey - keyData:", keyData);
-    console.log("Service createKey - customKey:", customKey);
-    console.log("Service createKey - expiresAt:", expiresAt);
-    console.log("Service createKey - maxUses:", maxUses);
+    const { expiresAt, maxUses } = keyData;
 
     try {
       const classData = await Class.findByPk(classId);
@@ -94,18 +88,18 @@ class EnrollKeyService {
         }
       }
 
-      // Generate or use custom key
-      const keyValue = customKey || this.generateKey();
+      // Generate unique key — globally unique across ALL classes
+      let keyValue;
+      let attempts = 0;
+      do {
+        keyValue = this.generateKey();
+        const existing = await EnrollKey.findOne({ where: { keyValue } });
+        if (!existing) break;
+        attempts++;
+      } while (attempts < 10);
 
-      // Check key unique within this class only (allow same key for different classes)
-      const existingInClass = await EnrollKey.findOne({
-        where: {
-          classId,
-          keyValue,
-        },
-      });
-      if (existingInClass) {
-        return { success: false, message: "Lớp học này đã sử dụng mã này rồi" };
+      if (attempts >= 10) {
+        return { success: false, message: "Không thể tạo mã đăng ký duy nhất. Vui lòng thử lại." };
       }
 
       // Create key
@@ -161,8 +155,16 @@ class EnrollKeyService {
       // Deactivate old key
       await oldKey.update({ isActive: false });
 
-      // Create new key with same settings
-      const newKeyValue = this.generateKey();
+      // Generate new globally unique key
+      let newKeyValue;
+      let attempts = 0;
+      do {
+        newKeyValue = this.generateKey();
+        const existing = await EnrollKey.findOne({ where: { keyValue: newKeyValue } });
+        if (!existing) break;
+        attempts++;
+      } while (attempts < 10);
+
       const newKey = await EnrollKey.create({
         classId: oldKey.classId,
         keyValue: newKeyValue,
@@ -316,7 +318,8 @@ class EnrollKeyService {
   }
 
   /**
-   * Validate key (for student join)
+   * Validate key and return class info (for student quick-join preview)
+   * Does NOT require classId — finds key globally
    */
   async validateKey(keyValue) {
     try {
@@ -326,7 +329,20 @@ class EnrollKeyService {
           {
             model: Class,
             as: "class",
-            include: [{ model: Course, as: "course" }],
+            include: [
+              {
+                model: Course,
+                as: "course",
+                attributes: ["courseId", "courseCode", "courseName", "semester", "academicYear"],
+              },
+              {
+                model: User,
+                as: "instructors",
+                through: { attributes: [] },
+                attributes: ["userId", "firstName", "lastName", "username"],
+                required: false,
+              },
+            ],
           },
         ],
       });
@@ -343,12 +359,22 @@ class EnrollKeyService {
         };
       }
 
+      const classData = key.class?.toJSON ? key.class.toJSON() : key.class;
+
       return {
         success: true,
         key: {
           keyId: key.keyId,
           classId: key.classId,
-          class: key.class,
+          class: {
+            classId: classData?.classId,
+            classCode: classData?.classCode,
+            className: classData?.className,
+            status: classData?.status,
+            maxStudents: classData?.maxStudents,
+            course: classData?.course,
+            instructors: classData?.instructors || [],
+          },
         },
       };
     } catch (error) {

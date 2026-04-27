@@ -13,6 +13,10 @@ router.get('/classes/:classId', groupController.getGroupsByClass);
 router.get('/classes/:classId/my-group', groupController.getMyGroupInClass);
 router.get('/my', groupController.getMyGroups);
 router.post('/', groupController.createGroup);
+
+// [POST] /api/groups/classes/:classId/auto-assign - Phân nhóm tự động (Instructor/Admin only)
+router.post('/classes/:classId/auto-assign', requireRole(['Admin', 'Instructor']), groupController.autoAssignGroups);
+
 router.get('/:groupId', groupController.getGroupById);
 router.post('/:groupId/join', groupController.joinGroup);
 router.post('/:groupId/leave', groupController.leaveGroup);
