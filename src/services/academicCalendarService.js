@@ -13,7 +13,23 @@ const { Op } = db.Sequelize;
 
 const toDateOnly = (value) => {
   if (!value) return null;
-  return String(value).slice(0, 10);
+
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return value.trim();
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeDateOnlyOrNull = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  return toDateOnly(value);
 };
 
 class AcademicCalendarService {
@@ -37,7 +53,12 @@ class AcademicCalendarService {
 
   async createAcademicYear(data) {
     try {
-      const { year, name, startDate, endDate, isActive = true } = data;
+      const { year, name, isActive = true } = data;
+      const startDate = normalizeDateOnlyOrNull(data.startDate);
+      const endDate = normalizeDateOnlyOrNull(data.endDate);
+      if (!startDate || !endDate) {
+        return { success: false, message: "Academic year startDate/endDate must be YYYY-MM-DD" };
+      }
       const rangeError = this.validateDateRange(startDate, endDate, "Academic year");
       if (rangeError) return { success: false, message: rangeError };
 
@@ -92,8 +113,16 @@ class AcademicCalendarService {
       const academicYear = await AcademicYear.findByPk(academicYearId);
       if (!academicYear) return { success: false, message: "Academic year not found" };
 
-      const startDate = data.startDate || academicYear.startDate;
-      const endDate = data.endDate || academicYear.endDate;
+      const normalizedStart = data.startDate !== undefined ? normalizeDateOnlyOrNull(data.startDate) : null;
+      const normalizedEnd = data.endDate !== undefined ? normalizeDateOnlyOrNull(data.endDate) : null;
+      if (data.startDate !== undefined && !normalizedStart) {
+        return { success: false, message: "Academic year startDate must be YYYY-MM-DD" };
+      }
+      if (data.endDate !== undefined && !normalizedEnd) {
+        return { success: false, message: "Academic year endDate must be YYYY-MM-DD" };
+      }
+      const startDate = normalizedStart || academicYear.startDate;
+      const endDate = normalizedEnd || academicYear.endDate;
       const rangeError = this.validateDateRange(startDate, endDate, "Academic year");
       if (rangeError) return { success: false, message: rangeError };
 
@@ -119,10 +148,15 @@ class AcademicCalendarService {
         term,
         half,
         blockType = ACADEMIC_BLOCK_TYPES.NORMAL,
-        startDate,
-        endDate,
+        startDate: rawStartDate,
+        endDate: rawEndDate,
         isActive = true,
       } = data;
+      const startDate = normalizeDateOnlyOrNull(rawStartDate);
+      const endDate = normalizeDateOnlyOrNull(rawEndDate);
+      if (!startDate || !endDate) {
+        return { success: false, message: "Academic block startDate/endDate must be YYYY-MM-DD" };
+      }
 
       const validation = await this.validateBlockPayload({
         academicYearId,
@@ -245,9 +279,16 @@ class AcademicCalendarService {
           term,
           half: block.half,
           blockType: block.blockType || ACADEMIC_BLOCK_TYPES.NORMAL,
-          startDate: block.startDate,
-          endDate: block.endDate,
+          startDate: normalizeDateOnlyOrNull(block.startDate),
+          endDate: normalizeDateOnlyOrNull(block.endDate),
         };
+        if (!payload.startDate || !payload.endDate) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: `Invalid block payload (${block.blockType || "NORMAL"}-${block.half || "NA"}): startDate/endDate must be YYYY-MM-DD`,
+          };
+        }
 
         const validation = await this.validateBlockPayload(payload, null, transaction);
         if (!validation.success) {
@@ -327,6 +368,9 @@ class AcademicCalendarService {
   async getCurrentAcademicBlock(referenceDate = new Date()) {
     try {
       const date = toDateOnly(referenceDate);
+      if (!date) {
+        return { success: false, message: "Invalid date format. Use YYYY-MM-DD or a valid date string." };
+      }
       const academicBlock = await AcademicBlock.findOne({
         where: {
           isActive: true,
@@ -349,13 +393,22 @@ class AcademicCalendarService {
       const academicBlock = await AcademicBlock.findByPk(academicBlockId);
       if (!academicBlock) return { success: false, message: "Academic block not found" };
 
+      const normalizedStart = data.startDate !== undefined ? normalizeDateOnlyOrNull(data.startDate) : null;
+      const normalizedEnd = data.endDate !== undefined ? normalizeDateOnlyOrNull(data.endDate) : null;
+      if (data.startDate !== undefined && !normalizedStart) {
+        return { success: false, message: "Academic block startDate must be YYYY-MM-DD" };
+      }
+      if (data.endDate !== undefined && !normalizedEnd) {
+        return { success: false, message: "Academic block endDate must be YYYY-MM-DD" };
+      }
+
       const nextData = {
         academicYearId: data.academicYearId || academicBlock.academicYearId,
         term: data.term || academicBlock.term,
         half: data.half !== undefined ? data.half : academicBlock.half,
         blockType: data.blockType || academicBlock.blockType,
-        startDate: data.startDate || academicBlock.startDate,
-        endDate: data.endDate || academicBlock.endDate,
+        startDate: normalizedStart || academicBlock.startDate,
+        endDate: normalizedEnd || academicBlock.endDate,
       };
 
       const validation = await this.validateBlockPayload(nextData, academicBlockId);
