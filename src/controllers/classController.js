@@ -3,6 +3,28 @@
 const { validationResult } = require("express-validator");
 const db = require("../models");
 const classService = require("../services/classService");
+const multer = require("multer");
+const XLSX = require("xlsx");
+
+// Multer in-memory storage for Excel uploads
+const excelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ];
+    if (
+      allowed.includes(file.mimetype) ||
+      file.originalname.match(/\.(xlsx|xls)$/i)
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Chỉ chấp nhận file Excel (.xlsx, .xls)"));
+    }
+  },
+}).single("file");
 
 class ClassController {
   async createClass(req, res) {
@@ -655,6 +677,182 @@ class ClassController {
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error("Get upload permission error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  // ============================================================
+  // EMAIL WHITELIST HANDLERS
+  // ============================================================
+
+  /**
+   * POST /api/classes/:classId/email-whitelist
+   * Upload Excel file và lưu danh sách email (replace toàn bộ)
+   */
+  uploadClassEmailWhitelist(req, res) {
+    excelUpload(req, res, async (uploadErr) => {
+      if (uploadErr) {
+        return res.status(400).json({
+          success: false,
+          message: uploadErr.message || "Lỗi khi upload file",
+        });
+      }
+
+      try {
+        const { classId } = req.params;
+        if (!classId || isNaN(parseInt(classId))) {
+          return res.status(400).json({
+            success: false,
+            message: "ID lớp học không hợp lệ",
+          });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({
+            success: false,
+            message: "Vui lòng chọn file Excel",
+          });
+        }
+
+        // Parse Excel file from buffer
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        // Extract emails: look for header row with "email" then collect values
+        // Also support: first row might already be emails (no header)
+        let emails = [];
+        let emailColIndex = -1;
+
+        // Find email column (case-insensitive header)
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          if (!Array.isArray(row)) continue;
+          for (let j = 0; j < row.length; j++) {
+            if (
+              row[j] &&
+              String(row[j]).toLowerCase().trim() === "email"
+            ) {
+              emailColIndex = j;
+              // Collect emails from rows below header
+              for (let k = i + 1; k < rows.length; k++) {
+                const val = rows[k] && rows[k][emailColIndex];
+                if (val && String(val).trim()) {
+                  emails.push(String(val).trim().toLowerCase());
+                }
+              }
+              break;
+            }
+          }
+          if (emailColIndex !== -1) break;
+        }
+
+        // Fallback: no header found — try first column of all rows
+        if (emailColIndex === -1) {
+          for (const row of rows) {
+            if (!Array.isArray(row)) continue;
+            const val = row[0];
+            if (val && String(val).trim()) {
+              emails.push(String(val).trim().toLowerCase());
+            }
+          }
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        emails = [...new Set(emails)].filter((e) => emailRegex.test(e));
+
+        if (emails.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Không tìm thấy email hợp lệ trong file. Đảm bảo file có cột 'email' hoặc cột đầu tiên chứa địa chỉ email.",
+          });
+        }
+
+        const userId = req.user.userId;
+        const userRole = req.userRoles?.includes("Admin")
+          ? "Admin"
+          : req.userRoles?.includes("Instructor")
+          ? "Instructor"
+          : null;
+
+        const result = await classService.setEmailWhitelist(
+          parseInt(classId),
+          emails,
+          userId,
+          userRole
+        );
+
+        return res.status(result.success ? 200 : 400).json(result);
+      } catch (error) {
+        console.error("Upload email whitelist error:", error);
+        return res.status(500).json({
+          success: false,
+          message: "Lỗi server nội bộ",
+        });
+      }
+    });
+  }
+
+  /**
+   * GET /api/classes/:classId/email-whitelist
+   * Lấy danh sách email whitelist của lớp
+   */
+  async getClassEmailWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const result = await classService.getEmailWhitelist(parseInt(classId));
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Get email whitelist error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * DELETE /api/classes/:classId/email-whitelist
+   * Xóa toàn bộ whitelist (tắt tính năng lọc email)
+   */
+  async deleteClassEmailWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin")
+        ? "Admin"
+        : req.userRoles?.includes("Instructor")
+        ? "Instructor"
+        : null;
+
+      const result = await classService.deleteEmailWhitelist(
+        parseInt(classId),
+        userId,
+        userRole
+      );
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Delete email whitelist error:", error);
       return res.status(500).json({
         success: false,
         message: "Lỗi server nội bộ",

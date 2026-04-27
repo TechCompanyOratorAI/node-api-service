@@ -168,4 +168,28 @@ router.post(
   classController.setUploadPermission
 );
 
+// ============================================================
+// EMAIL WHITELIST ROUTES
+// ============================================================
+// GET  /api/classes/:classId/email-whitelist - Lấy danh sách email
+router.get(
+  "/:classId/email-whitelist",
+  requireRole(["Admin", "Instructor"]),
+  classController.getClassEmailWhitelist
+);
+
+// POST /api/classes/:classId/email-whitelist - Upload Excel, replace whitelist
+router.post(
+  "/:classId/email-whitelist",
+  requireRole(["Admin", "Instructor"]),
+  classController.uploadClassEmailWhitelist
+);
+
+// DELETE /api/classes/:classId/email-whitelist - Xóa toàn bộ whitelist
+router.delete(
+  "/:classId/email-whitelist",
+  requireRole(["Admin", "Instructor"]),
+  classController.deleteClassEmailWhitelist
+);
+
 export default router;

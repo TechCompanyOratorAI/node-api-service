@@ -1005,6 +1005,138 @@ class ClassService {
       };
     }
   }
+
+  // ============================================================
+  // EMAIL WHITELIST MANAGEMENT
+  // ============================================================
+
+  /**
+   * Replace email whitelist for a class (Admin/Instructor only)
+   */
+  async setEmailWhitelist(classId, emails, userId, userRole) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      const classData = await Class.findByPk(classId, { transaction });
+      if (!classData) {
+        await transaction.rollback();
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") {
+          await transaction.rollback();
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId: userId },
+          transaction,
+        });
+        if (!isInstructor) {
+          await transaction.rollback();
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+      }
+
+      const { ClassEmailWhitelist } = db;
+
+      // Replace: xóa cũ rồi insert mới
+      await ClassEmailWhitelist.destroy({ where: { classId }, transaction });
+
+      const records = emails.map((email) => ({ classId, email }));
+      await ClassEmailWhitelist.bulkCreate(records, {
+        ignoreDuplicates: true,
+        transaction,
+      });
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: `Đã cập nhật danh sách ${emails.length} email sinh viên cho lớp học`,
+        total: emails.length,
+        emails,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Set email whitelist error:", error);
+      return {
+        success: false,
+        message: "Không thể cập nhật danh sách email",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get email whitelist for a class
+   */
+  async getEmailWhitelist(classId) {
+    try {
+      const { ClassEmailWhitelist } = db;
+      const records = await ClassEmailWhitelist.findAll({
+        where: { classId },
+        attributes: ["id", "email", "createdAt"],
+        order: [["email", "ASC"]],
+      });
+
+      return {
+        success: true,
+        classId,
+        total: records.length,
+        hasWhitelist: records.length > 0,
+        emails: records.map((r) => r.email),
+      };
+    } catch (error) {
+      console.error("Get email whitelist error:", error);
+      return {
+        success: false,
+        message: "Không thể lấy danh sách email",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Delete all whitelist entries for a class (Admin/Instructor only)
+   */
+  async deleteEmailWhitelist(classId, userId, userRole) {
+    try {
+      const classData = await Class.findByPk(classId);
+      if (!classData) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") {
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId: userId },
+        });
+        if (!isInstructor) {
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+      }
+
+      const { ClassEmailWhitelist } = db;
+      const deleted = await ClassEmailWhitelist.destroy({ where: { classId } });
+
+      return {
+        success: true,
+        message: `Đã xóa danh sách email whitelist (${deleted} email). Lớp học sẽ cho phép tất cả sinh viên tham gia.`,
+        deleted,
+      };
+    } catch (error) {
+      console.error("Delete email whitelist error:", error);
+      return {
+        success: false,
+        message: "Không thể xóa danh sách email",
+        error: error.message,
+      };
+    }
+  }
 }
 
 module.exports = new ClassService();

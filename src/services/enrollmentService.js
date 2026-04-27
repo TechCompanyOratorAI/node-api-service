@@ -79,6 +79,41 @@ class EnrollmentService {
         }
       }
 
+      // Step 4.5: Check email whitelist (nếu lớp có cài whitelist)
+      const { ClassEmailWhitelist } = db;
+      const whitelistCount = await ClassEmailWhitelist.count({
+        where: { classId: key.classId },
+        transaction,
+      });
+      if (whitelistCount > 0) {
+        const student = await User.findByPk(studentId, {
+          attributes: ["email"],
+          transaction,
+        });
+        if (!student || !student.email) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Không thể xác thực email tài khoản của bạn",
+          };
+        }
+        const inWhitelist = await ClassEmailWhitelist.findOne({
+          where: {
+            classId: key.classId,
+            email: student.email.toLowerCase().trim(),
+          },
+          transaction,
+        });
+        if (!inWhitelist) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message:
+              "Email của bạn không có trong danh sách sinh viên được phép tham gia lớp học này. Vui lòng liên hệ giảng viên.",
+          };
+        }
+      }
+
       // Step 5: Create enrollment
       const enrollment = await Enrollment.create(
         {
