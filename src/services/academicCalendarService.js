@@ -198,7 +198,7 @@ class AcademicCalendarService {
     if (!ACADEMIC_TERM_VALUES.includes(term)) return { success: false, message: "Học kỳ không hợp lệ" };
     if (!ACADEMIC_BLOCK_TYPE_VALUES.includes(blockType)) return { success: false, message: "Loại học kỳ không hợp lệ" };
     if (blockType === ACADEMIC_BLOCK_TYPES.NORMAL && !ACADEMIC_HALF_VALUES.includes(half)) {
-      return { success: false, message: "Có lỗi xảy ra" };
+      return { success: false, message: "Half không hợp lệ cho block type NORMAL" };
     }
 
     const rangeError = this.validateDateRange(startDate, endDate, "Academic block");
@@ -208,7 +208,7 @@ class AcademicCalendarService {
     if (!academicYear) return { success: false, message: "Không tìm thấy năm học" };
 
     if (new Date(startDate) < new Date(academicYear.startDate) || new Date(endDate) > new Date(academicYear.endDate)) {
-      return { success: false, message: "Có lỗi xảy ra" };
+      return { success: false, message: "Thời gian học kỳ phải nằm trong khoảng thời gian của năm học" };
     }
 
     const overlapWhere = {
@@ -223,7 +223,7 @@ class AcademicCalendarService {
     if (overlappingBlock) {
       return {
         success: false,
-        message: `Có lỗi xảy ra`,
+        message: `Thời gian học kỳ bị trùng với học kỳ hiện có`,
       };
     }
 
@@ -268,7 +268,7 @@ class AcademicCalendarService {
       }
       if (!Array.isArray(blocks) || blocks.length === 0) {
         await transaction.rollback();
-        return { success: false, message: "Có lỗi xảy ra" };
+        return { success: false, message: "Danh sách blocks không hợp lệ hoặc đang rỗng" };
       }
 
       const createdBlocks = [];
@@ -464,7 +464,7 @@ class AcademicCalendarService {
     if (rangeError) return { success: false, message: rangeError };
 
     if (new Date(actualStart) < new Date(academicBlock.startDate) || new Date(actualEnd) > new Date(academicBlock.endDate)) {
-      return { success: false, message: `Có lỗi xảy ra` };
+      return { success: false, message: `Thời gian phải nằm trong phạm vi của học kỳ hiện tại` };
     }
 
     return { success: true, academicBlock };

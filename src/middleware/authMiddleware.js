@@ -48,7 +48,7 @@ export const authenticateToken = async (req, res, next) => {
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Có lỗi xảy ra'
+        message: 'Tài khoản đã bị vô hiệu hóa'
       });
     }
 
@@ -178,7 +178,7 @@ export const requireRole = (roles) => {
       if (!hasRequiredRole) {
         return res.status(403).json({
           success: false,
-          message: 'Có lỗi xảy ra'
+          message: 'Bạn không có quyền truy cập tài nguyên này'
         });
       }
 

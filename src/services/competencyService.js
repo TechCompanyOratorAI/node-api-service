@@ -102,7 +102,7 @@ class CompetencyService {
       if (department && subjectArea && subjectArea.departmentId && subjectArea.departmentId !== department.departmentId) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Subject area không thuộc department đã chọn",
         };
       }
 
@@ -303,7 +303,7 @@ class CompetencyService {
       if (payload.level !== undefined && payload.level !== null) {
         const normalizedLevel = this.normalizeLevel(payload.level);
         if (!normalizedLevel) {
-          return { success: false, message: "Có lỗi xảy ra" };
+          return { success: false, message: "Mức độ năng lực không hợp lệ" };
         }
         await record.update({ level: normalizedLevel });
       }

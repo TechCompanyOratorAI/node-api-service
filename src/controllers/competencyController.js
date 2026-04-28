@@ -35,7 +35,7 @@ class CompetencyController {
     if (!canManageOthers && actorId !== instructorId) {
       return res.status(403).json({
         success: false,
-        message: "Có lỗi xảy ra",
+        message: "Bạn không có quyền khai báo năng lực cho giảng viên này",
       });
     }
 
@@ -51,7 +51,7 @@ class CompetencyController {
     if (!canManageOthers && actorId !== instructorId) {
       return res.status(403).json({
         success: false,
-        message: "Có lỗi xảy ra",
+        message: "Bạn không có quyền xem năng lực của giảng viên này",
       });
     }
 

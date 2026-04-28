@@ -362,7 +362,7 @@ class EmailService {
       return {
         success: false,
         message:
-          "Có lỗi xảy ra",
+          "Email service chưa được cấu hình",
       };
     }
 

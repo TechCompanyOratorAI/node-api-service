@@ -158,7 +158,7 @@ class QueueService {
     const queueUrl = QUEUE_URLS[queueType];
 
     if (!queueUrl) {
-      throw new Error(`Có lỗi xảy ra`);
+      throw new Error(`Không tìm thấy queue URL tương ứng với queue type: ${queueType}`);
     }
 
     try {
@@ -197,7 +197,7 @@ class QueueService {
     const queueUrl = QUEUE_URLS[queueType];
 
     if (!queueUrl) {
-      throw new Error(`Có lỗi xảy ra`);
+      throw new Error(`Không tìm thấy queue URL tương ứng với queue type: ${queueType}`);
     }
 
     try {

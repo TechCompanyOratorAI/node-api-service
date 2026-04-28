@@ -34,7 +34,7 @@ class StorageService {
    */
   async uploadBuffer({ key, body, contentType }) {
     if (!bucketName) {
-      throw new Error('Có lỗi xảy ra');
+      throw new Error('Thiếu cấu hình STORAGE_BUCKET_NAME');
     }
 
     const command = new PutObjectCommand({
@@ -63,7 +63,7 @@ class StorageService {
    */
   async getPresignedUploadUrl({ key, contentType, expiresIn = 3600 }) {
     if (!bucketName) {
-      throw new Error('Có lỗi xảy ra');
+      throw new Error('Thiếu cấu hình STORAGE_BUCKET_NAME');
     }
 
     const command = new PutObjectCommand({
@@ -90,7 +90,7 @@ class StorageService {
    */
   async getPresignedDownloadUrl(key, expiresIn = 3600, filename = null) {
     if (!bucketName) {
-      throw new Error('Có lỗi xảy ra');
+      throw new Error('Thiếu cấu hình STORAGE_BUCKET_NAME');
     }
 
     const params = {
@@ -116,7 +116,7 @@ class StorageService {
    */
   async deleteFile(key) {
     if (!bucketName) {
-      throw new Error('Có lỗi xảy ra');
+      throw new Error('Thiếu cấu hình STORAGE_BUCKET_NAME');
     }
 
     const command = new DeleteObjectCommand({
@@ -139,7 +139,7 @@ class StorageService {
    */
   async deleteMultipleFiles(keys) {
     if (!bucketName) {
-      throw new Error('Có lỗi xảy ra');
+      throw new Error('Thiếu cấu hình STORAGE_BUCKET_NAME');
     }
 
     const results = {
@@ -196,7 +196,7 @@ class StorageService {
    */
   async fileExists(key) {
     if (!bucketName) {
-      throw new Error('Có lỗi xảy ra');
+      throw new Error('Thiếu cấu hình STORAGE_BUCKET_NAME');
     }
 
     try {

@@ -115,7 +115,7 @@ class SpeakerController {
 
             return res.json({
                 success: true,
-                message: 'Thao tác thành công',
+                message: 'Đã ánh xạ speaker với sinh viên thành công',
                 speaker
             });
         } catch (error) {
@@ -170,7 +170,7 @@ class SpeakerController {
             if (!Array.isArray(mappings) || mappings.length === 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Có lỗi xảy ra'
+                    message: 'Danh sách mappings không hợp lệ hoặc đang rỗng'
                 });
             }
 

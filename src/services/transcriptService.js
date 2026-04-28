@@ -136,7 +136,7 @@ class TranscriptService {
 
         return {
             success: true,
-            message: 'Thao tác thành công',
+            message: 'Lấy transcript thành công',
             data: transcript,
             statusCode: 200
         };
@@ -189,7 +189,7 @@ class TranscriptService {
 
         return {
             success: true,
-            message: 'Thao tác thành công',
+            message: 'Lấy transcript chi tiết thành công',
             data: fullTranscript,
             statusCode: 200
         };
@@ -236,7 +236,7 @@ class TranscriptService {
 
         return {
             success: true,
-            message: 'Thao tác thành công',
+            message: 'Lấy transcript segments thành công',
             data: {
                 transcriptId: transcript.transcriptId,
                 presentationId: transcript.presentationId,

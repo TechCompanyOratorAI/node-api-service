@@ -382,7 +382,7 @@ class EnrollmentService {
       if (!classEnrollment) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Bạn chưa đăng ký lớp học của chủ đề này",
         };
       }
 
@@ -392,7 +392,7 @@ class EnrollmentService {
 
       if (existing) {
         if (existing.status === "enrolled") {
-          return { success: false, message: "Có lỗi xảy ra" };
+          return { success: false, message: "Bạn đã đăng ký chủ đề này rồi" };
         }
 
         await TopicEnrollment.update(
@@ -437,7 +437,7 @@ class EnrollmentService {
       if (!existing || existing.status !== "enrolled") {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Bạn chưa đăng ký chủ đề này hoặc đã hủy trước đó",
         };
       }
 
