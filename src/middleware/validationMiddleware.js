@@ -510,21 +510,6 @@ export const validateCreateClass = [
 
 // Class update validation
 export const validateUpdateClass = [
-  body().custom((value) => {
-    const requiredFields = ["classCode", "startDate", "endDate", "maxStudents"];
-
-    for (const field of requiredFields) {
-      if (!Object.prototype.hasOwnProperty.call(value, field)) {
-        throw new Error(`Thiếu trường bắt buộc: ${field}`);
-      }
-    }
-
-    if (value.classCode === null || value.classCode === undefined || value.classCode === "") {
-      throw new Error("classCode là bắt buộc");
-    }
-
-    return true;
-  }),
 
   body("classCode")
     .optional({ nullable: true })
