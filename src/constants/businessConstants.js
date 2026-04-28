@@ -56,6 +56,7 @@ const AUDIT_ACTIONS = Object.freeze({
   COURSE_COMPETENCY_REQUIREMENT_UPDATED: "course.competency_requirement_updated",
   INSTRUCTOR_COMPETENCY_SUBMITTED: "instructor.competency_submitted",
   INSTRUCTOR_COMPETENCY_REVIEWED: "instructor.competency_reviewed",
+  INSTRUCTOR_COMPETENCY_DELETED: "instructor.competency_deleted",
 });
 
 const AUDIT_STATUSES = Object.freeze({

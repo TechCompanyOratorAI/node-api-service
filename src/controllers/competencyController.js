@@ -29,10 +29,34 @@ class CompetencyController {
     return res.status(result.success ? 200 : 400).json(result);
   }
 
+  async getInstructorCompetencies(req, res) {
+    const actorId = req.user.userId;
+    const instructorId = parseInt(req.params.id, 10);
+    const actorRoles = req.userRoles || [];
+    const canManageOthers = actorRoles.includes("Admin") || actorRoles.includes("AcademicCoordinator");
+    if (!canManageOthers && actorId !== instructorId) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view competencies for your own instructor profile",
+      });
+    }
+
+    const result = await competencyService.getInstructorCompetencies(instructorId);
+    return res.status(result.success ? 200 : 400).json(result);
+  }
+
   async approveInstructorCompetency(req, res) {
     const result = await competencyService.approveInstructorCompetency(
       parseInt(req.params.id, 10),
       req.body,
+      req.user.userId
+    );
+    return res.status(result.success ? 200 : 400).json(result);
+  }
+
+  async deleteInstructorCompetency(req, res) {
+    const result = await competencyService.deleteInstructorCompetency(
+      parseInt(req.params.id, 10),
       req.user.userId
     );
     return res.status(result.success ? 200 : 400).json(result);
