@@ -302,6 +302,12 @@ class ClassService {
         where,
         include: [
           {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            through: { attributes: ["isPrimary"] },
+            required: false,
+          },
+          {
             model: Course,
             as: "course",
             attributes: ["courseId", "courseCode", "courseName", "academicBlockId"],
@@ -340,6 +346,7 @@ class ClassService {
   data: classes.map((c) => {
     const classData = {
       ...c.toJSON(),
+      academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
       enrollmentCount: c.enrollments?.length || 0,
       activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
     };
@@ -401,6 +408,12 @@ class ClassService {
         where,
         include: [
           {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            through: { attributes: ["isPrimary"] },
+            required: false,
+          },
+          {
             model: Course,
             as: "course",
             attributes: ["courseId", "courseCode", "courseName", "academicBlockId"],
@@ -439,6 +452,7 @@ class ClassService {
         data: classes.map((c) => {
           const classData = {
             ...c.toJSON(),
+            academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
             enrollmentCount: c.enrollments?.length || 0,
             activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
           };
@@ -494,6 +508,12 @@ class ClassService {
       const classes = await Class.findAll({
         where: { classId: { [Op.in]: classIds } },
         include: [
+          {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            through: { attributes: ["isPrimary"] },
+            required: false,
+          },
           {
             model: Course,
             as: "course",
@@ -553,6 +573,8 @@ class ClassService {
           endDate: c.endDate,
           maxStudents: c.maxStudents,
           maxGroupMembers: c.maxGroupMembers,
+          academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
+          academicBlocks: c.academicBlocks || [],
           course: c.course,
           instructors: c.instructors,
           enrollmentCount: c.enrollments?.length || 0,
@@ -577,6 +599,12 @@ class ClassService {
     try {
       const classData = await Class.findByPk(classId, {
         include: [
+          {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            through: { attributes: ["isPrimary"] },
+            required: false,
+          },
           {
             model: Course,
             as: "course",
@@ -686,6 +714,7 @@ class ClassService {
         success: true,
         class: {
           ...response,
+          academicBlockIds: (response.academicBlocks || []).map((b) => b.academicBlockId),
           totalStudents: response.enrollments?.length || 0,
           // topics is now directly on the class
         },
