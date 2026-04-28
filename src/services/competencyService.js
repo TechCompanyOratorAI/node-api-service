@@ -164,6 +164,19 @@ class CompetencyService {
         return { success: false, message: "One or more competencyId are invalid or inactive" };
       }
 
+      if (instructor.departmentId) {
+        const invalidCompetency = existingCompetencies.find(
+          (item) => item.departmentId && item.departmentId !== instructor.departmentId
+        );
+        if (invalidCompetency) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: `Competency ${invalidCompetency.competencyCode} does not belong to instructor department`,
+          };
+        }
+      }
+
       const results = [];
       for (const item of competencies) {
         const competencyId = parseInt(item.competencyId, 10);

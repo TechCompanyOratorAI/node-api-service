@@ -1,10 +1,24 @@
 "use strict";
 
 const competencyService = require("../services/competencyService");
+const db = require("../models");
 
 class CompetencyController {
   async listCompetencies(req, res) {
-    const result = await competencyService.listCompetencies(req.query);
+    const filters = { ...req.query };
+    const actorRoles = req.userRoles || [];
+    const isPrivileged = actorRoles.includes("Admin") || actorRoles.includes("AcademicCoordinator");
+
+    if (!isPrivileged && actorRoles.includes("Instructor")) {
+      const user = await db.User.findByPk(req.user.userId, {
+        attributes: ["departmentId"],
+      });
+      if (user?.departmentId) {
+        filters.departmentId = user.departmentId;
+      }
+    }
+
+    const result = await competencyService.listCompetencies(filters);
     return res.status(result.success ? 200 : 400).json(result);
   }
 
