@@ -8,7 +8,6 @@ const {
   CompetencyCatalog,
   Department,
   SubjectArea,
-  CourseCompetencyRequirement,
   InstructorCompetency,
   InstructorCompetencyEvidence,
   Course,
@@ -132,135 +131,6 @@ class CompetencyService {
     }
   }
 
-  normalizeRequirementPayload(payload) {
-    if (Array.isArray(payload?.requirements)) return payload.requirements;
-    if (Array.isArray(payload)) return payload;
-    if (payload?.competencyId) return [payload];
-    return [];
-  }
-
-  async setCourseCompetencyRequirements(courseId, payload, actorUserId) {
-    const transaction = await db.sequelize.transaction();
-    try {
-      const normalizedCourseId = this.normalizePositiveInt(courseId);
-      if (!normalizedCourseId) {
-        await transaction.rollback();
-        return { success: false, message: "courseId is invalid" };
-      }
-
-      const requirements = this.normalizeRequirementPayload(payload);
-      if (!requirements.length) {
-        await transaction.rollback();
-        return { success: false, message: "requirements payload is required" };
-      }
-
-      for (const requirement of requirements) {
-        const normalizedCompetencyId = this.normalizePositiveInt(requirement?.competencyId);
-        if (!normalizedCompetencyId) {
-          await transaction.rollback();
-          return { success: false, message: "Each requirement.competencyId must be a positive integer" };
-        }
-      }
-
-      const course = await Course.findByPk(normalizedCourseId, { transaction });
-      if (!course) {
-        await transaction.rollback();
-        return { success: false, message: "Course not found" };
-      }
-
-      const competencyIds = [
-        ...new Set(requirements.map((r) => this.normalizePositiveInt(r.competencyId)).filter(Boolean)),
-      ];
-      const existingCompetencies = await CompetencyCatalog.findAll({
-        where: { competencyId: competencyIds, isActive: true },
-        transaction,
-      });
-      if (existingCompetencies.length !== competencyIds.length) {
-        await transaction.rollback();
-        return { success: false, message: "One or more competencyId are invalid or inactive" };
-      }
-      if (course.departmentId) {
-        const crossDepartment = existingCompetencies.find(
-          (item) => item.departmentId && item.departmentId !== course.departmentId
-        );
-        if (crossDepartment) {
-          await transaction.rollback();
-          return {
-            success: false,
-            message: `Competency ${crossDepartment.competencyCode} does not belong to course department`,
-          };
-        }
-      }
-
-      const upserted = [];
-      for (const requirement of requirements) {
-        const competencyId = this.normalizePositiveInt(requirement.competencyId);
-        const minLevel = this.normalizeLevel(requirement.minLevel);
-        if (!competencyId) {
-          await transaction.rollback();
-          return { success: false, message: "Invalid competencyId in requirements" };
-        }
-        if (!minLevel) {
-          await transaction.rollback();
-          return { success: false, message: `Invalid minLevel for competency ${competencyId}` };
-        }
-
-        const existing = await CourseCompetencyRequirement.findOne({
-          where: { courseId: normalizedCourseId, competencyId },
-          transaction,
-        });
-
-        if (existing) {
-          await existing.update(
-            {
-              minLevel,
-              isRequired: requirement.isRequired !== undefined ? !!requirement.isRequired : true,
-              createdBy: actorUserId,
-            },
-            { transaction }
-          );
-          upserted.push(existing);
-        } else {
-          const created = await CourseCompetencyRequirement.create(
-            {
-              courseId: normalizedCourseId,
-              competencyId,
-              minLevel,
-              isRequired: requirement.isRequired !== undefined ? !!requirement.isRequired : true,
-              createdBy: actorUserId,
-            },
-            { transaction }
-          );
-          upserted.push(created);
-        }
-      }
-
-      await transaction.commit();
-
-      await auditLogService.log({
-        actorUserId,
-        action: AUDIT_ACTIONS.COURSE_COMPETENCY_REQUIREMENT_UPDATED,
-        entityType: "Course",
-        entityId: normalizedCourseId,
-        status: AUDIT_STATUSES.SUCCESS,
-        metadata: {
-          courseId: normalizedCourseId,
-          requirementCount: upserted.length,
-        },
-      });
-
-      return {
-        success: true,
-        message: "Course competency requirements updated successfully",
-        data: upserted,
-      };
-    } catch (error) {
-      await transaction.rollback();
-      console.error("Set course competency requirements error:", error);
-      return { success: false, message: "Failed to set competency requirements", error: error.message };
-    }
-  }
-
   normalizeInstructorCompetencyPayload(payload) {
     if (Array.isArray(payload?.competencies)) return payload.competencies;
     if (Array.isArray(payload)) return payload;
@@ -297,7 +167,9 @@ class CompetencyService {
       const results = [];
       for (const item of competencies) {
         const competencyId = parseInt(item.competencyId, 10);
-        const level = this.normalizeLevel(item.level);
+        const level = item.level === undefined || item.level === null
+          ? 1
+          : this.normalizeLevel(item.level);
         if (!level) {
           await transaction.rollback();
           return { success: false, message: `Invalid level for competency ${competencyId}` };
@@ -424,17 +296,7 @@ class CompetencyService {
       const normalizedInstructorId = parseInt(instructorId, 10);
 
       const [course, instructor] = await Promise.all([
-        Course.findByPk(normalizedCourseId, {
-          include: [
-            {
-              model: CourseCompetencyRequirement,
-              as: "competencyRequirements",
-              where: { isRequired: true },
-              required: false,
-              include: [{ model: CompetencyCatalog, as: "competency" }],
-            },
-          ],
-        }),
+        Course.findByPk(normalizedCourseId),
         User.findByPk(normalizedInstructorId, {
           include: [
             {
@@ -458,33 +320,47 @@ class CompetencyService {
         reasons.push("Department mismatch");
       }
 
-      const approvedMap = new Map(
-        (instructor.instructorCompetencies || []).map((item) => [item.competencyId, item])
-      );
+      const approvedCompetencies = instructor.instructorCompetencies || [];
       const competencyGaps = [];
-      for (const requirement of course.competencyRequirements || []) {
-        const approved = approvedMap.get(requirement.competencyId);
-        if (!approved) {
+
+      // Course-level competency baseline:
+      // Instructor must have at least one approved competency in the same department as course
+      // (or no department binding on competency record).
+      const departmentRelevantApproved = approvedCompetencies.filter((item) => {
+        const competencyDeptId = item.competency?.departmentId || null;
+        if (!course.departmentId) return true;
+        return competencyDeptId === null || competencyDeptId === course.departmentId;
+      });
+      if (departmentRelevantApproved.length === 0) {
+        competencyGaps.push({
+          competencyId: null,
+          competencyCode: null,
+          requiredLevel: null,
+          instructorLevel: null,
+          reason: "no_approved_competency_for_course_department",
+        });
+        reasons.push("Missing approved competency");
+      }
+
+      // Subject area check:
+      // If course has subjectAreaId, instructor must have at least one approved competency
+      // mapped to that subject area (or generic competency without subjectArea).
+      if (course.subjectAreaId) {
+        const subjectAreaMatched = approvedCompetencies.some((item) => {
+          const competencySubjectAreaId = item.competency?.subjectAreaId || null;
+          return competencySubjectAreaId === null || competencySubjectAreaId === course.subjectAreaId;
+        });
+        if (!subjectAreaMatched) {
           competencyGaps.push({
-            competencyId: requirement.competencyId,
-            competencyCode: requirement.competency?.competencyCode || null,
-            requiredLevel: requirement.minLevel,
+            competencyId: null,
+            competencyCode: null,
+            requiredLevel: null,
             instructorLevel: null,
-            reason: "not_declared_or_not_approved",
+            reason: "no_approved_competency_for_course_subject_area",
           });
-          continue;
-        }
-        if (approved.level < requirement.minLevel) {
-          competencyGaps.push({
-            competencyId: requirement.competencyId,
-            competencyCode: requirement.competency?.competencyCode || null,
-            requiredLevel: requirement.minLevel,
-            instructorLevel: approved.level,
-            reason: "insufficient_level",
-          });
+          reasons.push("Subject area competency mismatch");
         }
       }
-      if (competencyGaps.length) reasons.push("Missing required competency");
 
       const today = new Date();
       const activeClassCount = await ClassInstructor.count({

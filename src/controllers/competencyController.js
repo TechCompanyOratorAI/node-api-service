@@ -13,15 +13,6 @@ class CompetencyController {
     return res.status(result.success ? 201 : 400).json(result);
   }
 
-  async setCourseRequirements(req, res) {
-    const result = await competencyService.setCourseCompetencyRequirements(
-      req.params.courseId,
-      req.body,
-      req.user.userId
-    );
-    return res.status(result.success ? 200 : 400).json(result);
-  }
-
   async declareInstructorCompetencies(req, res) {
     const actorId = req.user.userId;
     const instructorId = parseInt(req.params.id, 10);
@@ -54,4 +45,3 @@ class CompetencyController {
 }
 
 module.exports = new CompetencyController();
-

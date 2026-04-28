@@ -25,12 +25,6 @@ router.post(
   competencyController.createCompetency
 );
 
-router.post(
-  "/courses/:courseId/competency-requirements",
-  requireRole(["Admin", "AcademicCoordinator"]),
-  competencyController.setCourseRequirements
-);
-
 router.get(
   "/courses/:courseId/eligible-instructors",
   requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
@@ -50,4 +44,3 @@ router.patch(
 );
 
 module.exports = router;
-
