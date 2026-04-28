@@ -140,6 +140,24 @@ class ClassService {
       return { success: false, message: "Dữ liệu không hợp lệ" };
     }
 
+    // FPT rule: one class must belong to only one term (SPRING or SUMMER or FALL)
+    // Course can span multiple terms, but each class is opened per-term.
+    const distinctTerms = [...new Set(blocks.map((block) => block.term))];
+    if (distinctTerms.length > 1) {
+      return {
+        success: false,
+        message: "Một lớp chỉ được thuộc một kỳ (term). Sang kỳ mới phải tạo lớp mới.",
+      };
+    }
+
+    const distinctAcademicYears = [...new Set(blocks.map((block) => block.academicYearId))];
+    if (distinctAcademicYears.length > 1) {
+      return {
+        success: false,
+        message: "Một lớp chỉ được thuộc một niên khóa.",
+      };
+    }
+
     const minStart = blocks.reduce((acc, block) => (!acc || new Date(block.startDate) < new Date(acc) ? block.startDate : acc), null);
     const maxEnd = blocks.reduce((acc, block) => (!acc || new Date(block.endDate) > new Date(acc) ? block.endDate : acc), null);
     const nextStart = startDate || minStart;
