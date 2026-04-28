@@ -80,6 +80,16 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "academicBlockId",
       as: "academicBlock",
     });
+    Class.belongsToMany(models.AcademicBlock, {
+      through: models.ClassAcademicBlock,
+      foreignKey: "classId",
+      otherKey: "academicBlockId",
+      as: "academicBlocks",
+    });
+    Class.hasMany(models.ClassAcademicBlock, {
+      foreignKey: "classId",
+      as: "classAcademicBlocks",
+    });
     Class.belongsTo(models.User, {
       foreignKey: "createdBy",
       as: "creator",

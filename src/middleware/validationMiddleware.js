@@ -464,6 +464,16 @@ export const validateCreateClass = [
     .isInt({ min: 1 })
     .withMessage("Academic block ID phải là số nguyên dương"),
 
+  body("academicBlockIds")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage("Academic block IDs must be a non-empty array"),
+
+  body("academicBlockIds.*")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Each academic block ID must be a positive integer"),
+
   // Enrollment key fields (required)
   body("enrollKey")
     .trim()
@@ -550,6 +560,16 @@ export const validateUpdateClass = [
     .optional({ nullable: true })
     .isInt({ min: 1 })
     .withMessage("Academic block ID phải là số nguyên dương"),
+
+  body("academicBlockIds")
+    .optional({ nullable: true })
+    .isArray({ min: 1 })
+    .withMessage("Academic block IDs must be a non-empty array"),
+
+  body("academicBlockIds.*")
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage("Each academic block ID must be a positive integer"),
 
   body("maxStudents")
     .optional({ nullable: true })
@@ -1043,3 +1063,5 @@ export default {
   validateDeleteCriterionFeedback,
   validateShareInvite,
 };
+
+

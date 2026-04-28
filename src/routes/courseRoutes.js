@@ -56,6 +56,14 @@ const validateCreateClassWithoutKey = [
         .optional()
         .isInt({ min: 1 })
         .withMessage('academicBlockId phải là số nguyên dương'),
+    body('academicBlockIds')
+        .optional()
+        .isArray({ min: 1 })
+        .withMessage('academicBlockIds phải là mảng và có ít nhất 1 phần tử'),
+    body('academicBlockIds.*')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('Mỗi academicBlockId phải là số nguyên dương'),
     body('status')
         .optional()
         .isIn(['active', 'closed', 'archived'])
