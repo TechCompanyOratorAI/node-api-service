@@ -65,6 +65,12 @@ const validateCreateClassWithoutKey = [
         .isInt({ min: 1 })
         .withMessage('Mỗi academicBlockId phải là số nguyên dương'),
     body('status')
+    body().custom((value) => {
+        if (value.academicBlockId !== undefined && value.academicBlockIds !== undefined) {
+            throw new Error('Chi truyen academicBlockId hoac academicBlockIds, khong truyen ca hai');
+        }
+        return true;
+    }),
         .optional()
         .isIn(['active', 'closed', 'archived'])
         .withMessage('status phải là active, closed hoặc archived'),
