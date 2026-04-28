@@ -26,7 +26,7 @@ router.get("/presentation/:id", authenticateToken, async (req, res) => {
     if (!presentation) {
       return res.status(404).json({
         success: false,
-        message: "Presentation not found or access denied"
+        message: "Bạn không có quyền thực hiện thao tác này"
       });
     }
 
@@ -54,7 +54,7 @@ router.get("/presentation/:id", authenticateToken, async (req, res) => {
     if (!speechAnalysis) {
       return res.status(404).json({
         success: false,
-        message: "Speech quality analysis not found for this presentation"
+        message: "Không tìm thấy dữ liệu"
       });
     }
 
@@ -67,7 +67,7 @@ router.get("/presentation/:id", authenticateToken, async (req, res) => {
     console.error("Error fetching speech quality analysis:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "Lỗi máy chủ nội bộ"
     });
   }
 });
@@ -90,7 +90,7 @@ router.get("/presentation/:id/hesitation-patterns", authenticateToken, async (re
     if (!presentation) {
       return res.status(404).json({
         success: false,
-        message: "Presentation not found or access denied"
+        message: "Bạn không có quyền thực hiện thao tác này"
       });
     }
 
@@ -156,7 +156,7 @@ router.get("/presentation/:id/hesitation-patterns", authenticateToken, async (re
     console.error("Error fetching hesitation patterns:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "Lỗi máy chủ nội bộ"
     });
   }
 });
@@ -178,7 +178,7 @@ router.get("/presentation/:id/segment-quality", authenticateToken, async (req, r
     if (!presentation) {
       return res.status(404).json({
         success: false,
-        message: "Presentation not found or access denied"
+        message: "Bạn không có quyền thực hiện thao tác này"
       });
     }
 
@@ -206,7 +206,7 @@ router.get("/presentation/:id/segment-quality", authenticateToken, async (req, r
     console.error("Error fetching segment speech quality:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "Lỗi máy chủ nội bộ"
     });
   }
 });
@@ -228,7 +228,7 @@ router.get("/presentation/:id/summary", authenticateToken, async (req, res) => {
     if (!presentation) {
       return res.status(404).json({
         success: false,
-        message: "Presentation not found or access denied"
+        message: "Bạn không có quyền thực hiện thao tác này"
       });
     }
 
@@ -246,7 +246,7 @@ router.get("/presentation/:id/summary", authenticateToken, async (req, res) => {
     if (!speechAnalysis) {
       return res.status(404).json({
         success: false,
-        message: "Speech quality analysis not found"
+        message: "Không tìm thấy phân tích chất lượng giọng nói"
       });
     }
 
@@ -307,7 +307,7 @@ router.get("/presentation/:id/summary", authenticateToken, async (req, res) => {
     console.error("Error fetching speech quality summary:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "Lỗi máy chủ nội bộ"
     });
   }
 });

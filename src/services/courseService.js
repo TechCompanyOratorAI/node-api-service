@@ -32,7 +32,7 @@ class CourseService {
         if (blocks.length !== academicBlockIds.length) {
             return {
                 success: false,
-                message: "One or more academicBlockIds are invalid or inactive",
+                message: "Dữ liệu không hợp lệ",
             };
         }
 
@@ -57,12 +57,12 @@ class CourseService {
         const actualEnd = endDate || maxEnd;
 
         if (new Date(actualStart) >= new Date(actualEnd)) {
-            return { success: false, message: "Course endDate must be after startDate" };
+            return { success: false, message: "Có lỗi xảy ra" };
         }
         if (new Date(actualStart) < new Date(minStart) || new Date(actualEnd) > new Date(maxEnd)) {
             return {
                 success: false,
-                message: "Course dates must be inside selected academic blocks range",
+                message: "Có lỗi xảy ra",
             };
         }
 
@@ -153,7 +153,7 @@ class CourseService {
                 await transaction.rollback();
                 return {
                     success: false,
-                    message: 'Course code already exists'
+                    message: 'Mã môn học đã tồn tại'
                 };
             }
 
@@ -216,7 +216,7 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Course created successfully',
+                message: 'Môn học đã tạo thành công',
                 course: courseWithInstructors
             };
         } catch (error) {
@@ -224,7 +224,7 @@ class CourseService {
             console.error('Create course error:', error);
             return {
                 success: false,
-                message: 'Failed to create course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -357,7 +357,7 @@ class CourseService {
             console.error('Get all courses error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve courses',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -371,7 +371,7 @@ class CourseService {
             if (!instructor) {
                 return {
                     success: false,
-                    message: 'Instructor not found'
+                    message: 'Không tìm thấy giảng viên'
                 };
             }
 
@@ -468,7 +468,7 @@ class CourseService {
             console.error('Get courses by instructor error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve courses by instructor',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -530,7 +530,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -571,7 +571,7 @@ class CourseService {
             console.error('Get course by ID error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -588,7 +588,7 @@ class CourseService {
                 await transaction.rollback();
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -603,7 +603,7 @@ class CourseService {
                     await transaction.rollback();
                     return {
                         success: false,
-                        message: 'You do not have permission to update this course'
+                        message: 'Có lỗi xảy ra'
                     };
                 }
             }
@@ -621,7 +621,7 @@ class CourseService {
                 isActive,
                 departmentId,
                 subjectAreaId,
-                instructorIds // Array of instructor IDs to update
+                instructorIds // Array of instructor IDs để cập nhật
             } = courseData;
             const hasAcademicBlocksInPayload = Array.isArray(academicBlockIds) || academicBlockId !== undefined;
 
@@ -640,7 +640,7 @@ class CourseService {
                     await transaction.rollback();
                     return {
                         success: false,
-                        message: 'Course code already exists'
+                        message: 'Mã môn học đã tồn tại'
                     };
                 }
             }
@@ -694,7 +694,7 @@ class CourseService {
                     await transaction.rollback();
                     return {
                         success: false,
-                        message: 'Cannot remove all instructors from an active course'
+                        message: 'Thao tác thất bại'
                     };
                 }
 
@@ -735,7 +735,7 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Course updated successfully',
+                message: 'Môn học đã cập nhật thành công',
                 course: updatedCourse
             };
         } catch (error) {
@@ -743,7 +743,7 @@ class CourseService {
             console.error('Update course error:', error);
             return {
                 success: false,
-                message: 'Failed to update course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -757,7 +757,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -770,7 +770,7 @@ class CourseService {
                 if (!isInstructor) {
                     return {
                         success: false,
-                        message: 'You do not have permission to delete this course'
+                        message: 'Có lỗi xảy ra'
                     };
                 }
             }
@@ -785,7 +785,7 @@ class CourseService {
                 await course.update({ isActive: false });
                 return {
                     success: true,
-                    message: 'Course deactivated successfully (has existing presentations)',
+                    message: 'Thao tác thành công',
                     softDeleted: true
                 };
             } else {
@@ -793,7 +793,7 @@ class CourseService {
                 await course.destroy();
                 return {
                     success: true,
-                    message: 'Course deleted successfully',
+                    message: 'Môn học đã xóa thành công',
                     softDeleted: false
                 };
             }
@@ -801,7 +801,7 @@ class CourseService {
             console.error('Delete course error:', error);
             return {
                 success: false,
-                message: 'Failed to delete course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -815,7 +815,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -827,7 +827,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'You do not have permission to create topics for this course'
+                    message: 'Có lỗi xảy ra'
                 };
             }
 
@@ -845,7 +845,7 @@ class CourseService {
                 if (existingTopic) {
                     return {
                         success: false,
-                        message: 'Sequence number already exists for this course'
+                        message: 'Có lỗi xảy ra'
                     };
                 }
             }
@@ -865,7 +865,7 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Topic created successfully',
+                message: 'Chủ đề đã tạo thành công',
                 topic: {
                     topicId: topic.topicId,
                     courseId: topic.courseId,
@@ -882,7 +882,7 @@ class CourseService {
             console.error('Create topic error:', error);
             return {
                 success: false,
-                message: 'Failed to create topic',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -896,7 +896,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -937,7 +937,7 @@ class CourseService {
             console.error('Get topics by course error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve topics',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -979,7 +979,7 @@ class CourseService {
             if (!topic) {
                 return {
                     success: false,
-                    message: 'Topic not found'
+                    message: 'Chủ đề không tìm thấy'
                 };
             }
 
@@ -1043,7 +1043,7 @@ class CourseService {
             console.error('Get topic by ID error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve topic',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1066,7 +1066,7 @@ class CourseService {
             if (!topic) {
                 return {
                     success: false,
-                    message: 'Topic not found'
+                    message: 'Chủ đề không tìm thấy'
                 };
             }
 
@@ -1078,7 +1078,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'You do not have permission to update this topic'
+                    message: 'Có lỗi xảy ra'
                 };
             }
 
@@ -1097,7 +1097,7 @@ class CourseService {
                 if (existingTopic) {
                     return {
                         success: false,
-                        message: 'Sequence number already exists for this course'
+                        message: 'Có lỗi xảy ra'
                     };
                 }
             }
@@ -1113,7 +1113,7 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Topic updated successfully',
+                message: 'Chủ đề đã cập nhật thành công',
                 topic: {
                     topicId: topic.topicId,
                     courseId: topic.courseId,
@@ -1130,7 +1130,7 @@ class CourseService {
             console.error('Update topic error:', error);
             return {
                 success: false,
-                message: 'Failed to update topic',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1153,7 +1153,7 @@ class CourseService {
             if (!topic) {
                 return {
                     success: false,
-                    message: 'Topic not found'
+                    message: 'Chủ đề không tìm thấy'
                 };
             }
 
@@ -1165,7 +1165,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'You do not have permission to delete this topic'
+                    message: 'Có lỗi xảy ra'
                 };
             }
 
@@ -1177,7 +1177,7 @@ class CourseService {
             if (presentationCount > 0) {
                 return {
                     success: false,
-                    message: 'Cannot delete topic with existing presentations'
+                    message: 'Thao tác thất bại'
                 };
             }
 
@@ -1185,13 +1185,13 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Topic deleted successfully'
+                message: 'Chủ đề đã xóa thành công'
             };
         } catch (error) {
             console.error('Delete topic error:', error);
             return {
                 success: false,
-                message: 'Failed to delete topic',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1215,7 +1215,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -1224,7 +1224,7 @@ class CourseService {
             if (!instructor) {
                 return {
                     success: false,
-                    message: 'Instructor not found'
+                    message: 'Không tìm thấy giảng viên'
                 };
             }
 
@@ -1236,7 +1236,7 @@ class CourseService {
             if (existing) {
                 return {
                     success: false,
-                    message: 'Instructor already assigned to this course'
+                    message: 'Có lỗi xảy ra'
                 };
             }
 
@@ -1249,13 +1249,13 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Instructor assigned to course successfully'
+                message: 'Thao tác thành công'
             };
         } catch (error) {
             console.error('Add course instructor error:', error);
             return {
                 success: false,
-                message: 'Failed to assign instructor to course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1276,7 +1276,7 @@ class CourseService {
             if (!assignment) {
                 return {
                     success: false,
-                    message: 'Instructor not assigned to this course'
+                    message: 'Có lỗi xảy ra'
                 };
             }
 
@@ -1284,13 +1284,13 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Instructor removed from course successfully'
+                message: 'Đã gỡ giảng viên khỏi môn học thành công'
             };
         } catch (error) {
             console.error('Remove course instructor error:', error);
             return {
                 success: false,
-                message: 'Failed to remove instructor from course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1319,7 +1319,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -1331,7 +1331,7 @@ class CourseService {
             console.error('Get course instructors error:', error);
             return {
                 success: false,
-                message: 'Failed to get course instructors',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1350,7 +1350,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -1426,7 +1426,7 @@ class CourseService {
             console.error('Get available instructors error:', error);
             return {
                 success: false,
-                message: 'Failed to get available instructors',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }

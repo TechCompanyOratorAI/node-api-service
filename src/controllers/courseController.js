@@ -10,7 +10,7 @@ class CourseController {
             if (!errors.isEmpty()) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Validation failed',
+                    message: 'Validation thất bại',
                     errors: errors.array()
                 });
             }
@@ -26,7 +26,7 @@ class CourseController {
             console.error('Create course controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -63,7 +63,7 @@ class CourseController {
             console.error('Get all courses controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -99,7 +99,7 @@ class CourseController {
             console.error('Get my courses controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -132,7 +132,7 @@ class CourseController {
             console.error('Get course by ID controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -144,7 +144,7 @@ class CourseController {
             if (!errors.isEmpty()) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Validation failed',
+                    message: 'Validation thất bại',
                     errors: errors.array()
                 });
             }
@@ -163,7 +163,7 @@ class CourseController {
             console.error('Update course controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -185,7 +185,7 @@ class CourseController {
             console.error('Delete course controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -197,7 +197,7 @@ class CourseController {
             if (!errors.isEmpty()) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Validation failed',
+                    message: 'Validation thất bại',
                     errors: errors.array()
                 });
             }
@@ -214,7 +214,7 @@ class CourseController {
             console.error('Create topic controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -234,7 +234,7 @@ class CourseController {
             console.error('Get topics by course controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -254,7 +254,7 @@ class CourseController {
             console.error('Get topic by ID controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -266,7 +266,7 @@ class CourseController {
             if (!errors.isEmpty()) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Validation failed',
+                    message: 'Validation thất bại',
                     errors: errors.array()
                 });
             }
@@ -283,7 +283,7 @@ class CourseController {
             console.error('Update topic controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -303,7 +303,7 @@ class CourseController {
             console.error('Delete topic controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -319,7 +319,7 @@ class CourseController {
             if (!errors.isEmpty()) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Validation failed',
+                    message: 'Validation thất bại',
                     errors: errors.array()
                 });
             }
@@ -373,7 +373,7 @@ class CourseController {
             console.error('Add course instructor controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -397,7 +397,7 @@ class CourseController {
             console.error('Remove course instructor controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -418,7 +418,7 @@ class CourseController {
             console.error('Get course instructors controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }
@@ -445,7 +445,7 @@ class CourseController {
             console.error('Get available instructors controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Lỗi máy chủ nội bộ'
             });
         }
     }

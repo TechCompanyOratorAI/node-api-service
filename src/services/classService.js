@@ -47,7 +47,7 @@ class ClassService {
       if (!allowedBlockIds.includes(normalizedRequestedBlockId)) {
         return {
           success: false,
-          message: "Academic block of class must belong to course academic blocks",
+          message: "Có lỗi xảy ra",
         };
       }
       return {
@@ -65,7 +65,7 @@ class ClassService {
 
     return {
       success: false,
-      message: "Course has multiple academic blocks, class academicBlockId is required",
+      message: "Dữ liệu không hợp lệ",
     };
   }
 
@@ -837,7 +837,7 @@ class ClassService {
       if (!eligibility.eligible && !(canOverride && overrideReason)) {
         return {
           success: false,
-          message: "Instructor is not eligible by competency/workload/schedule",
+          message: "Có lỗi xảy ra",
           eligibility,
         };
       }

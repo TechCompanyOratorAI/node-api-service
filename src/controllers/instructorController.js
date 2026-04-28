@@ -341,7 +341,7 @@ class InstructorController {
       console.error('Instructor dashboard error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to fetch instructor dashboard',
+        message: 'Thao tác thất bại',
         error: error.message,
       });
     }
@@ -470,7 +470,7 @@ class InstructorController {
       console.error('Get instructor presentations error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to fetch instructor presentations',
+        message: 'Thao tác thất bại',
         error: error.message,
       });
     }
@@ -487,7 +487,7 @@ class InstructorController {
       if (Number.isNaN(parsedPresentationId)) {
         return res.status(400).json({
           success: false,
-          message: 'presentationId must be a number',
+          message: 'PresentationId phải là số',
         });
       }
 
@@ -502,7 +502,7 @@ class InstructorController {
       if (!presentation) {
         return res.status(404).json({
           success: false,
-          message: 'Presentation not found',
+          message: 'Không tìm thấy bài thuyết trình',
         });
       }
 
@@ -557,7 +557,7 @@ class InstructorController {
       if (presentation.instructorApproved) {
         return res.status(400).json({
           success: false,
-          message: 'Presentation is already approved',
+          message: 'Có lỗi xảy ra',
           instructorApproved: true,
           approvedBy: presentation.approvedBy,
           approvedAt: presentation.approvedAt,
@@ -580,7 +580,7 @@ class InstructorController {
 
       return res.status(200).json({
         success: true,
-        message: 'Presentation approved for submission',
+        message: 'Có lỗi xảy ra',
         data: {
           presentationId: parsedPresentationId,
           instructorApproved: true,
@@ -596,7 +596,7 @@ class InstructorController {
       console.error('Approve submission error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to approve submission',
+        message: 'Thao tác thất bại',
         error: error.message,
       });
     }
@@ -612,7 +612,7 @@ class InstructorController {
       if (Number.isNaN(parsedPresentationId)) {
         return res.status(400).json({
           success: false,
-          message: 'presentationId must be a number',
+          message: 'PresentationId phải là số',
         });
       }
 
@@ -621,7 +621,7 @@ class InstructorController {
       if (!presentation) {
         return res.status(404).json({
           success: false,
-          message: 'Presentation not found',
+          message: 'Không tìm thấy bài thuyết trình',
         });
       }
 
@@ -671,7 +671,7 @@ class InstructorController {
       if (!presentation.instructorApproved) {
         return res.status(400).json({
           success: false,
-          message: 'Presentation is not approved yet',
+          message: 'Có lỗi xảy ra',
           instructorApproved: false,
         });
       }
@@ -687,7 +687,7 @@ class InstructorController {
 
       return res.status(200).json({
         success: true,
-        message: 'Approval revoked',
+        message: 'Có lỗi xảy ra',
         data: {
           presentationId: parsedPresentationId,
           instructorApproved: false,
@@ -697,7 +697,7 @@ class InstructorController {
       console.error('Unapprove submission error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to revoke approval',
+        message: 'Thao tác thất bại',
         error: error.message,
       });
     }
@@ -712,7 +712,7 @@ class InstructorController {
       if (Number.isNaN(parsedPresentationId)) {
         return res.status(400).json({
           success: false,
-          message: 'presentationId must be a number',
+          message: 'PresentationId phải là số',
         });
       }
 
@@ -725,7 +725,7 @@ class InstructorController {
       if (!presentation) {
         return res.status(404).json({
           success: false,
-          message: 'Presentation not found',
+          message: 'Không tìm thấy bài thuyết trình',
         });
       }
 
@@ -748,7 +748,7 @@ class InstructorController {
       console.error('Get approval status error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to get approval status',
+        message: 'Thao tác thất bại',
         error: error.message,
       });
     }
@@ -842,7 +842,7 @@ class InstructorController {
       console.error('Get pending approvals error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to get pending approvals',
+        message: 'Thao tác thất bại',
         error: error.message,
       });
     }
@@ -926,7 +926,7 @@ class InstructorController {
       console.error('Get approved presentations error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to get approved presentations',
+        message: 'Thao tác thất bại',
         error: error.message,
       });
     }

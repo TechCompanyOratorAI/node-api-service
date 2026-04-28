@@ -4,78 +4,78 @@ import { body, param } from "express-validator";
 export const validateRegistration = [
   body("username")
     .isLength({ min: 3, max: 50 })
-    .withMessage("Username must be between 3 and 50 characters")
+    .withMessage("Tên đăng nhập phải từ 3 đến 50 ký tự")
     .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage("Username can only contain letters, numbers, and underscores"),
+    .withMessage("Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới"),
 
   body("email")
     .isEmail()
-    .withMessage("Please provide a valid email address")
+    .withMessage("Vui lòng cung cấp địa chỉ email hợp lệ")
     .normalizeEmail(),
 
   body("password")
     .isLength({ min: 8 })
-    .withMessage("Password must be at least 8 characters long")
+    .withMessage("Mật khẩu phải có ít nhất 8 ký tự")
     .matches(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#+\-_=])[A-Za-z\d@$!%*?&#+\-_=]/
     )
     .withMessage(
-      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+      "Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số và 1 ký tự đặc biệt"
     ),
 
   body("firstName")
     .optional()
     .isLength({ max: 100 })
-    .withMessage("First name must be less than 100 characters")
+    .withMessage("Tên không được vượt quá 100 ký tự")
     .trim(),
 
   body("lastName")
     .optional()
     .isLength({ max: 100 })
-    .withMessage("Last name must be less than 100 characters")
+    .withMessage("Họ không được vượt quá 100 ký tự")
     .trim(),
 ];
 
 export const validateInstructorRegistration = [
   body("username")
     .isLength({ min: 3, max: 50 })
-    .withMessage("Username must be between 3 and 50 characters")
+    .withMessage("Tên đăng nhập phải từ 3 đến 50 ký tự")
     .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage("Username can only contain letters, numbers, and underscores"),
+    .withMessage("Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới"),
 
   body("email")
     .isEmail()
-    .withMessage("Please provide a valid email address")
+    .withMessage("Vui lòng cung cấp địa chỉ email hợp lệ")
     .normalizeEmail(),
 
   body("password")
     .isLength({ min: 8 })
-    .withMessage("Password must be at least 8 characters long")
+    .withMessage("Mật khẩu phải có ít nhất 8 ký tự")
     .matches(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#+\-_=])[A-Za-z\d@$!%*?&#+\-_=]/
     )
     .withMessage(
-      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+      "Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số và 1 ký tự đặc biệt"
     ),
 
   body("firstName")
     .notEmpty()
-    .withMessage("First name is required")
+    .withMessage("Tên là bắt buộc")
     .isLength({ max: 100 })
-    .withMessage("First name must be less than 100 characters")
+    .withMessage("Tên không được vượt quá 100 ký tự")
     .trim(),
 
   body("lastName")
     .notEmpty()
-    .withMessage("Last name is required")
+    .withMessage("Họ là bắt buộc")
     .isLength({ max: 100 })
-    .withMessage("Last name must be less than 100 characters")
+    .withMessage("Họ không được vượt quá 100 ký tự")
     .trim(),
 
   body("studyMajor")
     .optional()
     .isLength({ min: 2, max: 255 })
-    .withMessage("Study major must be between 2 and 255 characters")
+    .withMessage("Chuyên ngành phải từ 2 đến 255 ký tự")
     .trim(),
 ];
 
@@ -83,36 +83,36 @@ export const validateInstructorRegistration = [
 export const validateLogin = [
   body("emailOrUsername")
     .notEmpty()
-    .withMessage("Email or username is required")
+    .withMessage("Email hoặc tên đăng nhập là bắt buộc")
     .trim(),
 
-  body("password").notEmpty().withMessage("Password is required"),
+  body("password").notEmpty().withMessage("Mật khẩu là bắt buộc"),
 
   body("selectedRole")
     .optional()
     .isIn(["Student", "Instructor", "Admin"])
-    .withMessage("Invalid role selected"),
+    .withMessage("Vai trò được chọn không hợp lệ"),
 ];
 
 // Email validation
 export const validateEmail = [
   body("email")
     .isEmail()
-    .withMessage("Please provide a valid email address")
+    .withMessage("Vui lòng cung cấp địa chỉ email hợp lệ")
     .normalizeEmail(),
 ];
 
 // Password reset validation
 export const validatePasswordReset = [
-  body("token").notEmpty().withMessage("Reset token is required"),
+  body("token").notEmpty().withMessage("Token đặt lại mật khẩu là bắt buộc"),
   body("password")
     .isLength({ min: 8 })
-    .withMessage("Password must be at least 8 characters long")
+    .withMessage("Mật khẩu phải có ít nhất 8 ký tự")
     .matches(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#+\-_=])[A-Za-z\d@$!%*?&#+\-_=]/
     )
     .withMessage(
-      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+      "Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số và 1 ký tự đặc biệt"
     ),
 ];
 
@@ -120,10 +120,10 @@ export const validatePasswordReset = [
 export const validateChangePassword = [
   body("currentPassword")
     .notEmpty()
-    .withMessage("Current password is required"),
+    .withMessage("Mật khẩu hiện tại là bắt buộc"),
   body("newPassword")
     .isLength({ min: 8 })
-    .withMessage("New password must be at least 8 characters long")
+    .withMessage("Mật khẩu mới phải có ít nhất 8 ký tự")
     .matches(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#+\-_=])[A-Za-z\d@$!%*?&#+\-_=]/
     )
@@ -132,7 +132,7 @@ export const validateChangePassword = [
     )
     .custom((value, { req }) => {
       if (value === req.body.currentPassword) {
-        throw new Error("New password must be different from current password");
+        throw new Error("Mật khẩu mới phải khác mật khẩu hiện tại");
       }
       return true;
     }),
@@ -142,88 +142,88 @@ export const validateChangePassword = [
 export const validateCourse = [
   body("courseCode")
     .isLength({ min: 2, max: 30 })
-    .withMessage("Course code must be between 2 and 30 characters")
+    .withMessage("Mã môn học phải từ 2 đến 30 ký tự")
     .trim(),
 
   body("courseName")
     .isLength({ min: 3, max: 200 })
-    .withMessage("Course name must be between 3 and 200 characters")
+    .withMessage("Tên môn học phải từ 3 đến 200 ký tự")
     .trim(),
 
   body("majorCode")
     .optional()
     .isLength({ min: 2, max: 20 })
-    .withMessage("Major code must be between 2 and 20 characters")
+    .withMessage("Mã chuyên ngành phải từ 2 đến 20 ký tự")
     .trim()
     .toUpperCase(),
 
   body("majorId")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("majorId must be a positive integer"),
+    .withMessage("majorId phải là số nguyên dương"),
 
   body("subjectAreaId")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("subjectAreaId must be a positive integer"),
+    .withMessage("subjectAreaId phải là số nguyên dương"),
 
   body("description")
     .optional()
     .isLength({ max: 5000 })
-    .withMessage("Description must be less than 5000 characters")
+    .withMessage("Mô tả không được vượt quá 5000 ký tự")
     .trim(),
 
   body("majorId")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("majorId must be a positive integer"),
+    .withMessage("majorId phải là số nguyên dương"),
 
   body("subjectAreaId")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("subjectAreaId must be a positive integer"),
+    .withMessage("subjectAreaId phải là số nguyên dương"),
 
   body("semester")
     .optional()
     .isLength({ max: 30 })
-    .withMessage("Semester must be less than 30 characters")
+    .withMessage("Học kỳ không được vượt quá 30 ký tự")
     .trim(),
 
   body("academicYear")
     .optional()
     .isInt({ min: 2000, max: 2100 })
-    .withMessage("Academic year must be a valid year between 2000 and 2100"),
+    .withMessage("Năm học phải là năm hợp lệ trong khoảng 2000 đến 2100"),
 
   body("academicBlockId")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Academic block ID must be a positive integer"),
+    .withMessage("Academic block ID phải là số nguyên dương"),
 
   body("academicBlockIds")
     .optional()
     .isArray({ min: 1 })
-    .withMessage("Academic block IDs must be a non-empty array"),
+    .withMessage("Academic block IDs phải là mảng không rỗng"),
 
   body("academicBlockIds.*")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Each academic block ID must be a positive integer"),
+    .withMessage("Each academic block ID phải là số nguyên dương"),
 
   body("startDate")
     .optional()
     .isISO8601()
-    .withMessage("Start date must be a valid date"),
+    .withMessage("Start date phải là ngày hợp lệ"),
 
   body("endDate")
     .optional()
     .isISO8601()
-    .withMessage("End date must be a valid date")
+    .withMessage("End date phải là ngày hợp lệ")
     .custom((value, { req }) => {
       if (req.body.startDate && value) {
         const start = new Date(req.body.startDate);
         const end = new Date(value);
         if (end <= start) {
-          throw new Error("End date must be after start date");
+          throw new Error("Ngày kết thúc phải sau ngày bắt đầu");
         }
       }
       return true;
@@ -235,110 +235,110 @@ export const validateCourseUpdate = [
   body("courseCode")
     .optional()
     .isLength({ min: 2, max: 30 })
-    .withMessage("Course code must be between 2 and 30 characters")
+    .withMessage("Mã môn học phải từ 2 đến 30 ký tự")
     .trim(),
 
   body("courseName")
     .optional()
     .isLength({ min: 3, max: 200 })
-    .withMessage("Course name must be between 3 and 200 characters")
+    .withMessage("Tên môn học phải từ 3 đến 200 ký tự")
     .trim(),
 
   body("description")
     .optional()
     .isLength({ max: 5000 })
-    .withMessage("Description must be less than 5000 characters")
+    .withMessage("Mô tả không được vượt quá 5000 ký tự")
     .trim(),
 
   body("semester")
     .optional()
     .isLength({ max: 30 })
-    .withMessage("Semester must be less than 30 characters")
+    .withMessage("Học kỳ không được vượt quá 30 ký tự")
     .trim(),
 
   body("academicYear")
     .optional()
     .isInt({ min: 2000, max: 2100 })
-    .withMessage("Academic year must be a valid year between 2000 and 2100"),
+    .withMessage("Năm học phải là năm hợp lệ trong khoảng 2000 đến 2100"),
 
   body("academicBlockId")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Academic block ID must be a positive integer"),
+    .withMessage("Academic block ID phải là số nguyên dương"),
 
   body("academicBlockIds")
     .optional()
     .isArray({ min: 1 })
-    .withMessage("Academic block IDs must be a non-empty array"),
+    .withMessage("Academic block IDs phải là mảng không rỗng"),
 
   body("academicBlockIds.*")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Each academic block ID must be a positive integer"),
+    .withMessage("Each academic block ID phải là số nguyên dương"),
 
   body("startDate")
     .optional()
     .isISO8601()
-    .withMessage("Start date must be a valid date"),
+    .withMessage("Start date phải là ngày hợp lệ"),
 
   body("endDate")
     .optional()
     .isISO8601()
-    .withMessage("End date must be a valid date"),
+    .withMessage("End date phải là ngày hợp lệ"),
 
   body("isActive")
     .optional()
     .isBoolean()
-    .withMessage("isActive must be a boolean value"),
+    .withMessage("isActive phải là giá trị boolean"),
 
   body("departmentId")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Department ID must be a positive integer"),
+    .withMessage("Department ID phải là số nguyên dương"),
 
   body("instructorIds")
     .optional()
     .isArray()
-    .withMessage("Instructor IDs must be an array"),
+    .withMessage("Danh sách ID giảng viên phải là mảng"),
 
   body("instructorIds.*")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Each instructor ID must be a positive integer"),
+    .withMessage("Each instructor ID phải là số nguyên dương"),
 ];
 
 // Topic validation
 export const validateTopic = [
   body("topicName")
     .isLength({ min: 3, max: 200 })
-    .withMessage("Topic name must be between 3 and 200 characters")
+    .withMessage("Tên chủ đề phải từ 3 đến 200 ký tự")
     .trim(),
 
   body("description")
     .optional()
     .isLength({ max: 5000 })
-    .withMessage("Description must be less than 5000 characters")
+    .withMessage("Mô tả không được vượt quá 5000 ký tự")
     .trim(),
 
   body("sequenceNumber")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Sequence number must be a positive integer"),
+    .withMessage("Sequence number phải là số nguyên dương"),
 
   body("dueDate")
     .optional()
     .isISO8601()
-    .withMessage("Due date must be a valid date"),
+    .withMessage("Due date phải là ngày hợp lệ"),
 
   body("maxDurationMinutes")
     .optional()
     .isInt({ min: 1, max: 300 })
-    .withMessage("Max duration must be between 1 and 300 minutes"),
+    .withMessage("Thời lượng tối đa phải từ 1 đến 300 phút"),
 
   body("requirements")
     .optional()
     .isLength({ max: 5000 })
-    .withMessage("Requirements must be less than 5000 characters")
+    .withMessage("Yêu cầu không được vượt quá 5000 ký tự")
     .trim(),
 ];
 
@@ -347,34 +347,34 @@ export const validateTopicUpdate = [
   body("topicName")
     .optional()
     .isLength({ min: 3, max: 200 })
-    .withMessage("Topic name must be between 3 and 200 characters")
+    .withMessage("Tên chủ đề phải từ 3 đến 200 ký tự")
     .trim(),
 
   body("description")
     .optional()
     .isLength({ max: 5000 })
-    .withMessage("Description must be less than 5000 characters")
+    .withMessage("Mô tả không được vượt quá 5000 ký tự")
     .trim(),
 
   body("sequenceNumber")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Sequence number must be a positive integer"),
+    .withMessage("Sequence number phải là số nguyên dương"),
 
   body("dueDate")
     .optional()
     .isISO8601()
-    .withMessage("Due date must be a valid date"),
+    .withMessage("Due date phải là ngày hợp lệ"),
 
   body("maxDurationMinutes")
     .optional()
     .isInt({ min: 1, max: 300 })
-    .withMessage("Max duration must be between 1 and 300 minutes"),
+    .withMessage("Thời lượng tối đa phải từ 1 đến 300 phút"),
 
   body("requirements")
     .optional()
     .isLength({ max: 5000 })
-    .withMessage("Requirements must be less than 5000 characters")
+    .withMessage("Yêu cầu không được vượt quá 5000 ký tự")
     .trim(),
 ];
 
@@ -382,20 +382,20 @@ export const validateTopicUpdate = [
 export const validatePresentationCreate = [
   body("topicId")
     .isInt({ min: 1 })
-    .withMessage("topicId must be a valid integer"),
+    .withMessage("topicId phải là số nguyên hợp lệ"),
   body("title")
     .isLength({ min: 1, max: 255 })
-    .withMessage("Title must be between 1 and 255 characters")
+    .withMessage("Tiêu đề phải từ 1 đến 255 ký tự")
     .trim(),
   body("description")
     .optional()
     .isLength({ max: 5000 })
-    .withMessage("Description must be less than 5000 characters")
+    .withMessage("Mô tả không được vượt quá 5000 ký tự")
     .trim(),
   body("groupCode")
     .optional()
     .isLength({ max: 50 })
-    .withMessage("groupCode must be less than 50 characters")
+    .withMessage("groupCode không được vượt quá 50 ký tự")
     .trim(),
 ];
 
@@ -404,17 +404,17 @@ export const validatePresentationUpdate = [
   body("title")
     .optional()
     .isLength({ min: 1, max: 255 })
-    .withMessage("Title must be between 1 and 255 characters")
+    .withMessage("Tiêu đề phải từ 1 đến 255 ký tự")
     .trim(),
   body("description")
     .optional()
     .isLength({ max: 5000 })
-    .withMessage("Description must be less than 5000 characters")
+    .withMessage("Mô tả không được vượt quá 5000 ký tự")
     .trim(),
   body("groupCode")
     .optional()
     .isLength({ max: 50 })
-    .withMessage("groupCode must be less than 50 characters")
+    .withMessage("groupCode không được vượt quá 50 ký tự")
     .trim(),
 ];
 
@@ -462,7 +462,7 @@ export const validateCreateClass = [
   body("academicBlockId")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Academic block ID must be a positive integer"),
+    .withMessage("Academic block ID phải là số nguyên dương"),
 
   // Enrollment key fields (required)
   body("enrollKey")
@@ -549,7 +549,7 @@ export const validateUpdateClass = [
   body("academicBlockId")
     .optional({ nullable: true })
     .isInt({ min: 1 })
-    .withMessage("Academic block ID must be a positive integer"),
+    .withMessage("Academic block ID phải là số nguyên dương"),
 
   body("maxStudents")
     .optional({ nullable: true })
@@ -652,7 +652,7 @@ export const validateAssignInstructor = [
   body("overrideReason")
     .optional()
     .isLength({ min: 5, max: 2000 })
-    .withMessage("overrideReason must be between 5 and 2000 characters"),
+    .withMessage("overrideReason phải có độ dài từ 5 đến 2000 ký tự"),
 ];
 
 // ============================================================

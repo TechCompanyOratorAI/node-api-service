@@ -76,7 +76,7 @@ class RoleService {
       if (existingUserRole) {
         return {
           success: false,
-          message: `User already has role '${roleName}'`,
+          message: `Người dùng đã có vai trò '${roleName}'`,
         };
       }
 
@@ -255,7 +255,7 @@ class RoleService {
         }
       }
 
-      return { success: true, message: "Default roles initialized" };
+      return { success: true, message: "Default vai tròs initialized" };
     } catch (error) {
       console.error("Initialize roles error:", error);
       return { success: false, error: error.message };

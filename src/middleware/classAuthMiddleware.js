@@ -135,7 +135,7 @@ export const requireCourseInstructor = async (req, res, next) => {
 /**
  * Check if student is enrolled in class (for presentation submission)
  * Middleware to verify that the authenticated student is actively enrolled in the specified class.
- * Used when students attempt to create presentations or access class-specific resources.
+ * Used when students attempt để tạo presentations or access class-specific resources.
  * 
  * Usage: Apply to routes that require active class enrollment
  * Example: POST /presentations (when creating presentation for a class)

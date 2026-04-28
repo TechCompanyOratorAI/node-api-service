@@ -10,7 +10,7 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "Validation thất bại",
           errors: errors.array(),
         });
       }
@@ -26,7 +26,7 @@ class AuthController {
       console.error("Register controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -39,7 +39,7 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "Validation thất bại",
           errors: errors.array(),
         });
       }
@@ -55,7 +55,7 @@ class AuthController {
       console.error("Register instructor controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -68,7 +68,7 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "Validation thất bại",
           errors: errors.array(),
         });
       }
@@ -96,7 +96,7 @@ class AuthController {
       console.error("Login controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -109,13 +109,13 @@ class AuthController {
 
       return res.status(200).json({
         success: true,
-        message: "Logged out successfully",
+        message: "Logged out thành công",
       });
     } catch (error) {
       console.error("Logout controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -128,7 +128,7 @@ class AuthController {
       if (!token) {
         return res.status(400).json({
           success: false,
-          message: "Verification token is required",
+          message: "Dữ liệu không hợp lệ",
         });
       }
 
@@ -143,7 +143,7 @@ class AuthController {
       console.error("Verify email controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -156,7 +156,7 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "Validation thất bại",
           errors: errors.array(),
         });
       }
@@ -173,7 +173,7 @@ class AuthController {
       console.error("Resend verification controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -186,7 +186,7 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "Validation thất bại",
           errors: errors.array(),
         });
       }
@@ -198,13 +198,13 @@ class AuthController {
       return res.status(200).json({
         success: true,
         message:
-          "If an account with that email exists, a password reset link has been sent.",
+          "Có lỗi xảy ra",
       });
     } catch (error) {
       console.error("Forgot password controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -217,7 +217,7 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "Validation thất bại",
           errors: errors.array(),
         });
       }
@@ -234,7 +234,7 @@ class AuthController {
       console.error("Reset password controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -247,7 +247,7 @@ class AuthController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "Validation thất bại",
           errors: errors.array(),
         });
       }
@@ -270,7 +270,7 @@ class AuthController {
       console.error("Change password controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -283,7 +283,7 @@ class AuthController {
       if (!refreshToken) {
         return res.status(401).json({
           success: false,
-          message: "Refresh token not provided",
+          message: "Có lỗi xảy ra",
         });
       }
 
@@ -312,7 +312,7 @@ class AuthController {
       console.error("Refresh token controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -331,7 +331,7 @@ class AuthController {
       console.error("Get profile controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }

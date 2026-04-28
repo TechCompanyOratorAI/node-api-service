@@ -38,7 +38,7 @@ class SpeakerService {
             // Validate presentation exists
             const presentation = await Presentation.findByPk(presentationId);
             if (!presentation) {
-                throw new Error(`Presentation not found: ${presentationId}`);
+                throw new Error(`Không tìm thấy bài thuyết trình: ${presentationId}`);
             }
 
             const speakers = [];
@@ -177,13 +177,13 @@ class SpeakerService {
         try {
             const speaker = await Speaker.findByPk(speakerId);
             if (!speaker) {
-                throw new Error(`Speaker not found: ${speakerId}`);
+                throw new Error(`Speaker không tìm thấy: ${speakerId}`);
             }
 
             // Validate student exists
             const student = await User.findByPk(studentId);
             if (!student) {
-                throw new Error(`Student not found: ${studentId}`);
+                throw new Error(`Student không tìm thấy: ${studentId}`);
             }
 
             // Check if student is already mapped to another speaker in same presentation
@@ -220,7 +220,7 @@ class SpeakerService {
         try {
             const speaker = await Speaker.findByPk(speakerId);
             if (!speaker) {
-                throw new Error(`Speaker not found: ${speakerId}`);
+                throw new Error(`Speaker không tìm thấy: ${speakerId}`);
             }
 
             await speaker.unmap();
@@ -364,7 +364,7 @@ class SpeakerService {
             });
 
             if (!speaker) {
-                throw new Error(`Speaker not found: ${speakerId}`);
+                throw new Error(`Speaker không tìm thấy: ${speakerId}`);
             }
 
             return speaker;
@@ -442,7 +442,7 @@ class SpeakerService {
         try {
             const speaker = await Speaker.findByPk(speakerId);
             if (!speaker) {
-                throw new Error(`Speaker not found: ${speakerId}`);
+                throw new Error(`Speaker không tìm thấy: ${speakerId}`);
             }
 
             const segments = await TranscriptSegment.findAll({
@@ -539,7 +539,7 @@ class SpeakerService {
         try {
             const speaker = await Speaker.findByPk(speakerId);
             if (!speaker) {
-                throw new Error(`Speaker not found: ${speakerId}`);
+                throw new Error(`Speaker không tìm thấy: ${speakerId}`);
             }
 
             // Unlink segments (set speakerId to null)

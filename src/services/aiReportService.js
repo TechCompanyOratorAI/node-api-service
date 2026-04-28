@@ -142,7 +142,7 @@ class AIReportService {
       if (!presentation) {
         return {
           success: false,
-          message: "Presentation không tìm thấy",
+          message: "Không tìm thấy bài thuyết trình",
         };
       }
 
@@ -660,7 +660,7 @@ class AIReportService {
       if (!["waiting", "draft", "rejected", "failed"].includes(report.reportStatus)) {
         return {
           success: false,
-          message: "Chỉ có thể xóa report ở trạng thái waiting, draft, rejected hoặc failed",
+          message: "Có lỗi xảy ra",
           code: "INVALID_STATUS",
         };
       }

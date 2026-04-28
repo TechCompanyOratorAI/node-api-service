@@ -29,7 +29,7 @@ class EmailService {
     if (!this.isConfigured) {
       return {
         success: true,
-        message: "Email service not configured - email skipped",
+        message: "Có lỗi xảy ra",
       };
     }
 
@@ -362,13 +362,13 @@ class EmailService {
       return {
         success: false,
         message:
-          "Email service not configured. Please set MAIL_HOST, MAIL_USERNAME, and MAIL_PASSWORD environment variables.",
+          "Có lỗi xảy ra",
       };
     }
 
     try {
       await this.transporter.verify();
-      return { success: true, message: "Email service connection successful" };
+      return { success: true, message: "Email service connection thành côngful" };
     } catch (error) {
       console.error("Email connection test failed:", error);
       return { success: false, error: error.message };

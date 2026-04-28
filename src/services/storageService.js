@@ -34,7 +34,7 @@ class StorageService {
    */
   async uploadBuffer({ key, body, contentType }) {
     if (!bucketName) {
-      throw new Error('AWS_S3_BUCKET is not configured');
+      throw new Error('Có lỗi xảy ra');
     }
 
     const command = new PutObjectCommand({
@@ -63,7 +63,7 @@ class StorageService {
    */
   async getPresignedUploadUrl({ key, contentType, expiresIn = 3600 }) {
     if (!bucketName) {
-      throw new Error('AWS_S3_BUCKET is not configured');
+      throw new Error('Có lỗi xảy ra');
     }
 
     const command = new PutObjectCommand({
@@ -90,7 +90,7 @@ class StorageService {
    */
   async getPresignedDownloadUrl(key, expiresIn = 3600, filename = null) {
     if (!bucketName) {
-      throw new Error('AWS_S3_BUCKET is not configured');
+      throw new Error('Có lỗi xảy ra');
     }
 
     const params = {
@@ -116,7 +116,7 @@ class StorageService {
    */
   async deleteFile(key) {
     if (!bucketName) {
-      throw new Error('AWS_S3_BUCKET is not configured');
+      throw new Error('Có lỗi xảy ra');
     }
 
     const command = new DeleteObjectCommand({
@@ -139,7 +139,7 @@ class StorageService {
    */
   async deleteMultipleFiles(keys) {
     if (!bucketName) {
-      throw new Error('AWS_S3_BUCKET is not configured');
+      throw new Error('Có lỗi xảy ra');
     }
 
     const results = {
@@ -152,7 +152,7 @@ class StorageService {
         await this.deleteFile(key);
         results.deletedCount++;
       } catch (error) {
-        console.error(`Failed to delete ${key}:`, error);
+        console.error(`Failed để xóa ${key}:`, error);
         results.failed.push(key);
       }
     }
@@ -196,7 +196,7 @@ class StorageService {
    */
   async fileExists(key) {
     if (!bucketName) {
-      throw new Error('AWS_S3_BUCKET is not configured');
+      throw new Error('Có lỗi xảy ra');
     }
 
     try {

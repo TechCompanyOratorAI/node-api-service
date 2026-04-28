@@ -364,7 +364,7 @@ class EnrollmentService {
     try {
       const topic = await Topic.findByPk(topicId);
       if (!topic) {
-        return { success: false, message: "Topic not found" };
+        return { success: false, message: "Chủ đề không tìm thấy" };
       }
 
       // Check if student enrolled in any class of the course
@@ -382,7 +382,7 @@ class EnrollmentService {
       if (!classEnrollment) {
         return {
           success: false,
-          message: "You must enroll in a class before enrolling in a topic",
+          message: "Có lỗi xảy ra",
         };
       }
 
@@ -392,7 +392,7 @@ class EnrollmentService {
 
       if (existing) {
         if (existing.status === "enrolled") {
-          return { success: false, message: "Already enrolled in this topic" };
+          return { success: false, message: "Có lỗi xảy ra" };
         }
 
         await TopicEnrollment.update(
@@ -402,7 +402,7 @@ class EnrollmentService {
 
         return {
           success: true,
-          message: "Re-enrolled in topic",
+          message: "Re-enrolled in chủ đề",
           topicEnrollmentId: existing.topicEnrollmentId,
         };
       }
@@ -415,14 +415,14 @@ class EnrollmentService {
 
       return {
         success: true,
-        message: "Enrolled in topic",
+        message: "Enrolled in chủ đề",
         topicEnrollmentId: topicEnrollment.topicEnrollmentId,
       };
     } catch (error) {
       console.error("Enroll topic error:", error);
       return {
         success: false,
-        message: "Failed to enroll in topic",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -437,7 +437,7 @@ class EnrollmentService {
       if (!existing || existing.status !== "enrolled") {
         return {
           success: false,
-          message: "You are not enrolled in this topic",
+          message: "Có lỗi xảy ra",
         };
       }
 
@@ -446,12 +446,12 @@ class EnrollmentService {
         { where: { topicEnrollmentId: existing.topicEnrollmentId } }
       );
 
-      return { success: true, message: "Dropped topic successfully" };
+      return { success: true, message: "Dropped chủ đề thành công" };
     } catch (error) {
       console.error("Drop topic error:", error);
       return {
         success: false,
-        message: "Failed to drop topic",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -516,7 +516,7 @@ class EnrollmentService {
       console.error("List my topics error:", error);
       return {
         success: false,
-        message: "Failed to retrieve topics",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }

@@ -41,7 +41,7 @@ class GroupGradeDistributionService {
       const presentation = await Presentation.findByPk(report.presentationId);
       if (!presentation) {
         await transaction.rollback();
-        return { success: false, message: "Presentation không tìm thấy" };
+        return { success: false, message: "Không tìm thấy bài thuyết trình" };
       }
 
       // 3. Tìm TopicEnrollment → groupId
@@ -320,7 +320,7 @@ class GroupGradeDistributionService {
       if (!report) return { success: false, message: "AI Report không tìm thấy" };
 
       const presentation = await Presentation.findByPk(report.presentationId);
-      if (!presentation) return { success: false, message: "Presentation không tìm thấy" };
+      if (!presentation) return { success: false, message: "Không tìm thấy bài thuyết trình" };
 
       const topicEnrollment = await db.TopicEnrollment.findOne({
         where: { topicId: presentation.topicId, status: "enrolled" },
