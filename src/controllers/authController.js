@@ -283,7 +283,7 @@ class AuthController {
       if (!refreshToken) {
         return res.status(401).json({
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Thiếu refresh token",
         });
       }
 

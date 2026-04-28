@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 import db from '../models/index.js';
 
 const { Feedback, User, Presentation } = db;
@@ -75,7 +75,7 @@ class FeedbackService {
             }
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi tạo feedback'
+                message: 'Không thể tạo feedback'
             };
         }
     }
@@ -116,7 +116,7 @@ class FeedbackService {
             }
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy feedback'
+                message: 'Không thể lấy feedback'
             };
         }
     }
@@ -147,7 +147,7 @@ class FeedbackService {
             }
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy feedback của presentation'
+                message: 'Không thể lấy feedback của presentation'
             };
         }
     }
@@ -178,7 +178,7 @@ class FeedbackService {
             }
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy feedback của reviewer'
+                message: 'Không thể lấy feedback của reviewer'
             };
         }
     }
@@ -233,7 +233,7 @@ class FeedbackService {
             }
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi cập nhật feedback'
+                message: 'Không thể cập nhật feedback'
             };
         }
     }
@@ -268,7 +268,7 @@ class FeedbackService {
             }
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi xóa feedback'
+                message: 'Không thể xóa feedback'
             };
         }
     }
@@ -303,7 +303,7 @@ class FeedbackService {
             }
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy danh sách feedback'
+                message: 'Không thể lấy danh sách feedback'
             };
         }
     }

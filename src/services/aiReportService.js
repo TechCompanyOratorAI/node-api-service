@@ -660,7 +660,7 @@ class AIReportService {
       if (!["waiting", "draft", "rejected", "failed"].includes(report.reportStatus)) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: `Không thể xóa report ở trạng thái hiện tại: ${report.reportStatus}`,
           code: "INVALID_STATUS",
         };
       }

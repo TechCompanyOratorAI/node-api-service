@@ -109,7 +109,7 @@ class AuthService {
       return {
         success: true,
         message:
-          "Thao tác thành công",
+          "Đăng ký tài khoản thành công, vui lòng kiểm tra email để xác thực",
         user: {
           userId: user.userId,
           username: user.username,
@@ -197,7 +197,7 @@ class AuthService {
       return {
         success: true,
         message:
-          "Thao tác thành công",
+          "Đăng ký tài khoản giảng viên thành công, vui lòng kiểm tra email để xác thực",
         user: {
           userId: user.userId,
           username: user.username,
@@ -253,7 +253,7 @@ class AuthService {
       if (!user.isActive) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Tài khoản đã bị vô hiệu hóa",
         };
       }
 
@@ -403,7 +403,7 @@ class AuthService {
       if (user.isEmailVerified) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Email đã được xác thực",
         };
       }
 
@@ -565,7 +565,7 @@ class AuthService {
       if (!isCurrentPasswordValid) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Mật khẩu hiện tại không chính xác",
         };
       }
 

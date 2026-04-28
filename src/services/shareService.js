@@ -225,7 +225,7 @@ class ShareService {
       const successCount = results.filter((r) => r.success).length;
       return {
         success: true,
-        message: `Thao tác thành công`,
+        message: `Đã gửi lời mời chia sẻ cho ${successCount}/${results.length} email`,
         results,
       };
     } catch (error) {

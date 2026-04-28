@@ -179,7 +179,7 @@ class JobService {
           break;
 
         default:
-          throw new Error(`Có lỗi xảy ra`);
+          throw new Error(`Loại job không được hỗ trợ: ${jobType}`);
       }
 
       // Extract messageId from response object

@@ -57,12 +57,12 @@ class CourseService {
         const actualEnd = endDate || maxEnd;
 
         if (new Date(actualStart) >= new Date(actualEnd)) {
-            return { success: false, message: "Có lỗi xảy ra" };
+            return { success: false, message: "Ngày kết thúc phải sau ngày bắt đầu" };
         }
         if (new Date(actualStart) < new Date(minStart) || new Date(actualEnd) > new Date(maxEnd)) {
             return {
                 success: false,
-                message: "Có lỗi xảy ra",
+                message: "Ngày bắt đầu/kết thúc phải nằm trong phạm vi kỳ học đã chọn",
             };
         }
 
@@ -603,7 +603,7 @@ class CourseService {
                     await transaction.rollback();
                     return {
                         success: false,
-                        message: 'Có lỗi xảy ra'
+                        message: 'Bạn không có quyền cập nhật môn học này'
                     };
                 }
             }
@@ -661,8 +661,18 @@ class CourseService {
                 return resolvedBlocks;
             }
 
-            const nextStartDate = startDate || course.startDate;
-            const nextEndDate = endDate || course.endDate;
+            const nextStartDate =
+                startDate !== undefined
+                    ? startDate
+                    : hasAcademicBlocksInPayload
+                        ? null
+                        : course.startDate;
+            const nextEndDate =
+                endDate !== undefined
+                    ? endDate
+                    : hasAcademicBlocksInPayload
+                        ? null
+                        : course.endDate;
             const dateValidation = this.validateCourseDateWithinBlocks(nextStartDate, nextEndDate, resolvedBlocks.blocks);
             if (!dateValidation.success) {
                 await transaction.rollback();
@@ -770,7 +780,7 @@ class CourseService {
                 if (!isInstructor) {
                     return {
                         success: false,
-                        message: 'Có lỗi xảy ra'
+                        message: 'Bạn không có quyền xóa môn học này'
                     };
                 }
             }
@@ -785,7 +795,7 @@ class CourseService {
                 await course.update({ isActive: false });
                 return {
                     success: true,
-                    message: 'Thao tác thành công',
+                    message: 'Môn học đã được lưu trữ do đã có dữ liệu trình bày',
                     softDeleted: true
                 };
             } else {
@@ -827,7 +837,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'Có lỗi xảy ra'
+                    message: 'Bạn không có quyền tạo topic cho môn học này'
                 };
             }
 
@@ -845,7 +855,7 @@ class CourseService {
                 if (existingTopic) {
                     return {
                         success: false,
-                        message: 'Có lỗi xảy ra'
+                        message: 'Số thứ tự topic đã tồn tại trong môn học'
                     };
                 }
             }
@@ -1078,7 +1088,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'Có lỗi xảy ra'
+                    message: 'Bạn không có quyền cập nhật topic của môn học này'
                 };
             }
 
@@ -1097,7 +1107,7 @@ class CourseService {
                 if (existingTopic) {
                     return {
                         success: false,
-                        message: 'Có lỗi xảy ra'
+                        message: 'Số thứ tự topic đã tồn tại trong môn học'
                     };
                 }
             }
@@ -1165,7 +1175,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'Có lỗi xảy ra'
+                    message: 'Bạn không có quyền xóa topic của môn học này'
                 };
             }
 
@@ -1236,7 +1246,7 @@ class CourseService {
             if (existing) {
                 return {
                     success: false,
-                    message: 'Có lỗi xảy ra'
+                    message: 'Giảng viên đã được phân công vào môn học này'
                 };
             }
 
@@ -1249,7 +1259,7 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Thao tác thành công'
+                message: 'Đã phân công giảng viên vào môn học thành công'
             };
         } catch (error) {
             console.error('Add course instructor error:', error);
@@ -1276,7 +1286,7 @@ class CourseService {
             if (!assignment) {
                 return {
                     success: false,
-                    message: 'Có lỗi xảy ra'
+                    message: 'Không tìm thấy phân công giảng viên trong môn học'
                 };
             }
 

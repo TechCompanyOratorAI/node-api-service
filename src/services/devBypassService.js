@@ -190,7 +190,7 @@ class DevBypassService {
       if (!audioRecord) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Bài thuyết trình chưa có bản ghi âm",
         };
       }
 
@@ -261,7 +261,7 @@ class DevBypassService {
 
       return {
         success: true,
-        message: "Thao tác thành công",
+        message: "Đã tạo lại các job xử lý cho bài thuyết trình",
         presentationId,
         asrJob,
         slideJobs,

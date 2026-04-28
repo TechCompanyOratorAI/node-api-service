@@ -119,7 +119,7 @@ class StorageController {
             if (!Array.isArray(keys) || keys.length === 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Có lỗi xảy ra'
+                    message: 'Danh sách keys không hợp lệ hoặc đang rỗng'
                 });
             }
 

@@ -6,7 +6,7 @@ export const generalRateLimit = rateLimit({
   max: 100000, // Disabled: no effective limit
   message: {
     success: false,
-    message: 'Có lỗi xảy ra'
+    message: 'Bạn đã gửi quá nhiều yêu cầu, vui lòng thử lại sau'
   },
   standardHeaders: true,
   legacyHeaders: false,

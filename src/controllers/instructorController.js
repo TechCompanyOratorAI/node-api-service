@@ -557,7 +557,7 @@ class InstructorController {
       if (presentation.instructorApproved) {
         return res.status(400).json({
           success: false,
-          message: 'Có lỗi xảy ra',
+          message: 'Bài thuyết trình đã được duyệt trước đó',
           instructorApproved: true,
           approvedBy: presentation.approvedBy,
           approvedAt: presentation.approvedAt,
@@ -671,7 +671,7 @@ class InstructorController {
       if (!presentation.instructorApproved) {
         return res.status(400).json({
           success: false,
-          message: 'Có lỗi xảy ra',
+          message: 'Bài thuyết trình chưa được duyệt',
           instructorApproved: false,
         });
       }

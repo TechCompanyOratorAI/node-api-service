@@ -127,7 +127,7 @@ class PresentationService {
       if (!classEnrollment) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Bạn chưa đăng ký lớp học này",
         };
       }
 
@@ -141,7 +141,7 @@ class PresentationService {
       if (topic.classId !== parseInt(classId)) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Chủ đề không thuộc lớp học đã chọn",
         };
       }
 
@@ -186,7 +186,7 @@ class PresentationService {
         if (!topicEnrollment) {
           return {
             success: false,
-            message: "Có lỗi xảy ra",
+            message: "Bạn chưa đăng ký chủ đề này",
           };
         }
       }
@@ -501,7 +501,7 @@ class PresentationService {
         if (!enrollment) {
           return {
             success: false,
-            message: "Có lỗi xảy ra",
+            message: "Bạn không có quyền truy cập bài thuyết trình này",
           };
         }
       }
@@ -543,7 +543,7 @@ class PresentationService {
       if (!validationResult.isValid) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Bài thuyết trình chưa đủ điều kiện để nộp",
           validation: validationResult,
         };
       }
@@ -552,7 +552,7 @@ class PresentationService {
       if (presentation.status === "completed") {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Bài thuyết trình đã hoàn tất, không thể nộp lại",
         };
       }
 
@@ -568,7 +568,7 @@ class PresentationService {
         if (activeJob) {
           return {
             success: false,
-            message: "Có lỗi xảy ra",
+            message: "Đang có tiến trình xử lý dở dang cho bài thuyết trình này",
             job: activeJob,
           };
         }
@@ -703,7 +703,7 @@ class PresentationService {
         return {
           success: false,
           message:
-            "Có lỗi xảy ra" +
+            "Bài thuyết trình chưa đủ điều kiện để xử lý: " +
             validationResult.errors.join(" "),
           validation: validationResult,
         };
@@ -795,7 +795,7 @@ class PresentationService {
       return {
         success: true,
         message:
-          "Thao tác thành công",
+          "Đã gửi lại bài thuyết trình để xử lý",
         presentation: await this.getPresentationById(presentationId, studentId),
         job,
       };

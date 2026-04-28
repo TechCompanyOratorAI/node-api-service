@@ -59,7 +59,7 @@ class ClassService {
       if (!allowedBlockIds.includes(normalizedRequestedBlockId)) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Academic block không thuộc phạm vi của khóa học",
         };
       }
       return {
@@ -976,7 +976,7 @@ class ClassService {
       if (!eligibility.eligible && !(canOverride && overrideReason)) {
         return {
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Giảng viên chưa đủ điều kiện phụ trách lớp (cần overrideReason nếu muốn override)",
           eligibility,
         };
       }
