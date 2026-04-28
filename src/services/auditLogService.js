@@ -35,7 +35,7 @@ class AuditLogService {
       };
 
       if (!payload.action || !payload.entityType) {
-        return { success: false, message: "action and entityType are required" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       const auditLog = await AuditLog.create(payload, {
@@ -45,7 +45,7 @@ class AuditLogService {
       return { success: true, auditLog };
     } catch (error) {
       console.error("Audit log write failed:", error);
-      return { success: false, message: "Failed to write audit log", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -103,7 +103,7 @@ class AuditLogService {
       };
     } catch (error) {
       console.error("List audit logs error:", error);
-      return { success: false, message: "Failed to retrieve audit logs", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 }

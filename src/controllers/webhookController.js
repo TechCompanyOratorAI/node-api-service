@@ -50,7 +50,7 @@ const verifyWebhookAuth = (req, res, next) => {
   if (!authHeader) {
     return res.status(401).json({
       success: false,
-      message: "Missing authorization header",
+      message: "Có lỗi xảy ra",
     });
   }
 
@@ -60,7 +60,7 @@ const verifyWebhookAuth = (req, res, next) => {
     console.error("❌ Invalid webhook token");
     return res.status(403).json({
       success: false,
-      message: "Invalid webhook token",
+      message: "Không hợp lệ webhook token",
     });
   }
 
@@ -115,7 +115,7 @@ const asrComplete = async (req, res) => {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: jobId, presentationId, status",
+        message: "Thiếu trường bắt buộc: jobId, presentationId, status",
       });
     }
 
@@ -167,13 +167,13 @@ const asrComplete = async (req, res) => {
 
       return res.json({
         success: true,
-        message: "ASR failure recorded",
+        message: "Có lỗi xảy ra",
       });
     }
 
     // Handle success - Save transcript
     if (transcript && transcript.segments) {
-      // Get presentation with audioRecord to retrieve audioId
+      // Get presentation with audioRecord để lấy audioId
       const presentation = await Presentation.findByPk(presentationId, {
         include: [{ model: db.AudioRecord, as: "audioRecord" }],
         transaction,
@@ -187,7 +187,7 @@ const asrComplete = async (req, res) => {
         if (transaction && !transaction.finished) await transaction.rollback();
         return res.json({
           success: true,
-          message: `Presentation ${presentationId} not found, webhook acknowledged`,
+          message: `Presentation ${presentationId} không tìm thấy, webhook acknowledged`,
           acknowledged: true,
         });
       }
@@ -413,7 +413,7 @@ const asrComplete = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "ASR results saved successfully",
+      message: "ASR results đã lưu thành công",
       data: {
         jobId,
         presentationId,
@@ -447,7 +447,7 @@ const asrComplete = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to process ASR webhook",
+      message: "Thao tác thất bại",
       error: error.message,
     });
   }
@@ -519,7 +519,7 @@ const analysisComplete = async (req, res) => {
     if (!jobId || !presentationId || !status) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: "Thiếu trường bắt buộc",
       });
     }
 
@@ -530,7 +530,7 @@ const analysisComplete = async (req, res) => {
       if (e.message && e.message.includes('Job not found')) {
         console.log(`⚠️ Webhook for already-deleted job ${jobId}, ignoring`);
         if (transaction && !transaction.finished) await transaction.rollback();
-        return res.json({ success: true, message: 'Job already processed' });
+        return res.json({ success: true, message: 'Có lỗi xảy ra' });
       }
       throw e;
     }
@@ -538,7 +538,7 @@ const analysisComplete = async (req, res) => {
       if (transaction && !transaction.finished) await transaction.rollback();
       return res.status(404).json({
         success: false,
-        message: `Job not found: ${jobId}`,
+        message: `Job không tìm thấy: ${jobId}`,
       });
     }
 
@@ -547,7 +547,7 @@ const analysisComplete = async (req, res) => {
       console.log(`⚠️ Job ${jobId} is already completed, skipping processing`);
       const response = {
         success: true,
-        message: "Job already completed",
+        message: "Job đã completed",
         data: { jobId, presentationId },
       };
 
@@ -583,7 +583,7 @@ const analysisComplete = async (req, res) => {
 
       return res.json({
         success: true,
-        message: "Analysis failure recorded",
+        message: "Có lỗi xảy ra",
       });
     }
 
@@ -711,7 +711,7 @@ const analysisComplete = async (req, res) => {
 
     const response = {
       success: true,
-      message: "Analysis results saved successfully",
+      message: "Analysis results đã lưu thành công",
       data: responseData,
     };
 
@@ -754,7 +754,7 @@ const analysisComplete = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to process analysis webhook",
+      message: "Thao tác thất bại",
       error: error.message,
     });
   }
@@ -834,7 +834,7 @@ const reportComplete = async (req, res) => {
     if (!jobId || !presentationId || !status) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: jobId, presentationId, status",
+        message: "Thiếu trường bắt buộc: jobId, presentationId, status",
       });
     }
 
@@ -857,7 +857,7 @@ const reportComplete = async (req, res) => {
         }
         return res.json({
           success: true,
-          message: `Job ${jobId} not found, webhook acknowledged`,
+          message: `Job ${jobId} không tìm thấy, webhook acknowledged`,
           acknowledged: true,
         });
       }
@@ -867,7 +867,7 @@ const reportComplete = async (req, res) => {
         }
         return res.json({
           success: true,
-          message: `Job ${jobId} not found, webhook acknowledged`,
+          message: `Job ${jobId} không tìm thấy, webhook acknowledged`,
           acknowledged: true,
         });
       }
@@ -905,7 +905,7 @@ const reportComplete = async (req, res) => {
             console.log(`📋 Marked AIReport ${reportId} as failed`);
           }
         } catch (reportUpdateErr) {
-          console.error(`⚠️ Failed to update AIReport ${reportId} status:`, reportUpdateErr.message);
+          console.error(`⚠️ Failed để cập nhật AIReport ${reportId} status:`, reportUpdateErr.message);
         }
       }
 
@@ -921,7 +921,7 @@ const reportComplete = async (req, res) => {
 
       return res.json({
         success: true,
-        message: "Report failure recorded",
+        message: "Đã ghi nhận trạng thái thất bại của báo cáo",
       });
     }
 
@@ -1014,7 +1014,7 @@ const reportComplete = async (req, res) => {
             console.log(`✅ Updated AIReport ${reportId} with rubric scores`);
           }
         } catch (aiReportError) {
-          console.error(`⚠️ Failed to update AIReport:`, aiReportError.message);
+          console.error(`⚠️ Failed để cập nhật AIReport:`, aiReportError.message);
           // Don't fail the request - report is already saved
         }
       }
@@ -1069,7 +1069,7 @@ const reportComplete = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Report saved successfully",
+      message: "Báo cáo đã lưu thành công",
       data: responseData,
     });
   } catch (error) {
@@ -1098,7 +1098,7 @@ const reportComplete = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to process report webhook",
+      message: "Thao tác thất bại",
       error: error.message,
     });
   }
@@ -1140,7 +1140,7 @@ const slidesComplete = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "Missing required fields: jobId, presentationId, slideId, status",
+          "Thiếu trường bắt buộc: jobId, presentationId, slideId, status",
       });
     }
 
@@ -1157,7 +1157,7 @@ const slidesComplete = async (req, res) => {
       }
       return res.json({
         success: true,
-        message: `Job ${jobId} not found, webhook acknowledged`,
+        message: `Job ${jobId} không tìm thấy, webhook acknowledged`,
         acknowledged: true,
       });
     }
@@ -1167,7 +1167,7 @@ const slidesComplete = async (req, res) => {
       }
       return res.json({
         success: true,
-        message: `Job ${jobId} not found, webhook acknowledged`,
+        message: `Job ${jobId} không tìm thấy, webhook acknowledged`,
         acknowledged: true,
       });
     }
@@ -1193,7 +1193,7 @@ const slidesComplete = async (req, res) => {
 
       return res.json({
         success: true,
-        message: "Slides processing failure recorded",
+        message: "Có lỗi xảy ra",
       });
     }
 
@@ -1201,7 +1201,7 @@ const slidesComplete = async (req, res) => {
     if (result) {
       const slide = await Slide.findByPk(slideId, { transaction });
       if (!slide) {
-        throw new Error(`Slide not found: ${slideId}`);
+        throw new Error(`Slide không tìm thấy: ${slideId}`);
       }
 
       const updateData = {};
@@ -1229,7 +1229,7 @@ const slidesComplete = async (req, res) => {
       // Bug 5 fix: Slide model has no embedding column yet.
       // Persist embedding vector in job metadata so it is not lost.
       // When a dedicated Slides.embedding column is added via migration,
-      // move this into updateData above.
+      // move this inđể cập nhậtData above.
       if (result.embedding && result.embedding.length > 0) {
         console.log(
           `📊 Received embedding vector of length ${result.embedding.length} for slide ${slideId} — storing in job metadata`,
@@ -1287,7 +1287,7 @@ const slidesComplete = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Slides processing results saved successfully",
+      message: "Slides processing results đã lưu thành công",
       data: {
         jobId,
         presentationId,
@@ -1319,7 +1319,7 @@ const slidesComplete = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to process slides webhook",
+      message: "Thao tác thất bại",
       error: error.message,
     });
   }

@@ -57,14 +57,14 @@ class AcademicCalendarService {
       const startDate = normalizeDateOnlyOrNull(data.startDate);
       const endDate = normalizeDateOnlyOrNull(data.endDate);
       if (!startDate || !endDate) {
-        return { success: false, message: "Academic year startDate/endDate must be YYYY-MM-DD" };
+        return { success: false, message: "Ngày bắt đầu/kết thúc năm học phải có định dạng YYYY-MM-DD" };
       }
       const rangeError = this.validateDateRange(startDate, endDate, "Academic year");
       if (rangeError) return { success: false, message: rangeError };
 
       const existing = await AcademicYear.findOne({ where: { year } });
       if (existing) {
-        return { success: false, message: "Academic year already exists" };
+        return { success: false, message: "Năm học đã tồn tại" };
       }
 
       const academicYear = await AcademicYear.create({
@@ -75,10 +75,10 @@ class AcademicCalendarService {
         isActive,
       });
 
-      return { success: true, message: "Academic year created successfully", academicYear };
+      return { success: true, message: "Đã tạo năm học thành công", academicYear };
     } catch (error) {
       console.error("Create academic year error:", error);
-      return { success: false, message: "Failed to create academic year", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -104,22 +104,22 @@ class AcademicCalendarService {
       return { success: true, data: academicYears };
     } catch (error) {
       console.error("List academic years error:", error);
-      return { success: false, message: "Failed to retrieve academic years", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
   async updateAcademicYear(academicYearId, data) {
     try {
       const academicYear = await AcademicYear.findByPk(academicYearId);
-      if (!academicYear) return { success: false, message: "Academic year not found" };
+      if (!academicYear) return { success: false, message: "Không tìm thấy năm học" };
 
       const normalizedStart = data.startDate !== undefined ? normalizeDateOnlyOrNull(data.startDate) : null;
       const normalizedEnd = data.endDate !== undefined ? normalizeDateOnlyOrNull(data.endDate) : null;
       if (data.startDate !== undefined && !normalizedStart) {
-        return { success: false, message: "Academic year startDate must be YYYY-MM-DD" };
+        return { success: false, message: "Ngày bắt đầu năm học phải có định dạng YYYY-MM-DD" };
       }
       if (data.endDate !== undefined && !normalizedEnd) {
-        return { success: false, message: "Academic year endDate must be YYYY-MM-DD" };
+        return { success: false, message: "Ngày kết thúc năm học phải có định dạng YYYY-MM-DD" };
       }
       const startDate = normalizedStart || academicYear.startDate;
       const endDate = normalizedEnd || academicYear.endDate;
@@ -134,10 +134,10 @@ class AcademicCalendarService {
         isActive: data.isActive !== undefined ? data.isActive : academicYear.isActive,
       });
 
-      return { success: true, message: "Academic year updated successfully", academicYear };
+      return { success: true, message: "Đã cập nhật năm học thành công", academicYear };
     } catch (error) {
       console.error("Update academic year error:", error);
-      return { success: false, message: "Failed to update academic year", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -155,7 +155,7 @@ class AcademicCalendarService {
       const startDate = normalizeDateOnlyOrNull(rawStartDate);
       const endDate = normalizeDateOnlyOrNull(rawEndDate);
       if (!startDate || !endDate) {
-        return { success: false, message: "Academic block startDate/endDate must be YYYY-MM-DD" };
+        return { success: false, message: "Ngày bắt đầu/kết thúc học kỳ phải có định dạng YYYY-MM-DD" };
       }
 
       const validation = await this.validateBlockPayload({
@@ -171,7 +171,7 @@ class AcademicCalendarService {
       const academicYear = validation.academicYear;
       const blockCode = data.blockCode || this.buildBlockCode(academicYear.year, term, half, blockType);
       const existingCode = await AcademicBlock.findOne({ where: { blockCode } });
-      if (existingCode) return { success: false, message: "Academic block code already exists" };
+      if (existingCode) return { success: false, message: "Mã học kỳ đã tồn tại" };
 
       const academicBlock = await AcademicBlock.create({
         academicYearId,
@@ -184,31 +184,31 @@ class AcademicCalendarService {
         isActive,
       });
 
-      return { success: true, message: "Academic block created successfully", academicBlock };
+      return { success: true, message: "Đã tạo học kỳ thành công", academicBlock };
     } catch (error) {
       console.error("Create academic block error:", error);
-      return { success: false, message: "Failed to create academic block", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
   async validateBlockPayload(data, currentBlockId = null, transaction = null) {
     const { academicYearId, term, half, blockType, startDate, endDate } = data;
 
-    if (!academicYearId) return { success: false, message: "academicYearId is required" };
-    if (!ACADEMIC_TERM_VALUES.includes(term)) return { success: false, message: "Invalid academic term" };
-    if (!ACADEMIC_BLOCK_TYPE_VALUES.includes(blockType)) return { success: false, message: "Invalid academic block type" };
+    if (!academicYearId) return { success: false, message: "Dữ liệu không hợp lệ" };
+    if (!ACADEMIC_TERM_VALUES.includes(term)) return { success: false, message: "Học kỳ không hợp lệ" };
+    if (!ACADEMIC_BLOCK_TYPE_VALUES.includes(blockType)) return { success: false, message: "Loại học kỳ không hợp lệ" };
     if (blockType === ACADEMIC_BLOCK_TYPES.NORMAL && !ACADEMIC_HALF_VALUES.includes(half)) {
-      return { success: false, message: "Normal academic block requires half H1 or H2" };
+      return { success: false, message: "Có lỗi xảy ra" };
     }
 
     const rangeError = this.validateDateRange(startDate, endDate, "Academic block");
     if (rangeError) return { success: false, message: rangeError };
 
     const academicYear = await AcademicYear.findByPk(academicYearId, { transaction });
-    if (!academicYear) return { success: false, message: "Academic year not found" };
+    if (!academicYear) return { success: false, message: "Không tìm thấy năm học" };
 
     if (new Date(startDate) < new Date(academicYear.startDate) || new Date(endDate) > new Date(academicYear.endDate)) {
-      return { success: false, message: "Academic block dates must be inside the academic year" };
+      return { success: false, message: "Có lỗi xảy ra" };
     }
 
     const overlapWhere = {
@@ -223,7 +223,7 @@ class AcademicCalendarService {
     if (overlappingBlock) {
       return {
         success: false,
-        message: `Academic block overlaps with ${overlappingBlock.blockCode}`,
+        message: `Có lỗi xảy ra`,
       };
     }
 
@@ -233,7 +233,7 @@ class AcademicCalendarService {
   async deleteAcademicYear(academicYearId) {
     try {
       const academicYear = await AcademicYear.findByPk(academicYearId);
-      if (!academicYear) return { success: false, message: "Academic year not found" };
+      if (!academicYear) return { success: false, message: "Không tìm thấy năm học" };
 
       const blockCount = await AcademicBlock.count({
         where: { academicYearId },
@@ -241,15 +241,15 @@ class AcademicCalendarService {
       if (blockCount > 0) {
         return {
           success: false,
-          message: "Cannot delete academic year while blocks still exist",
+          message: "Thao tác thất bại",
         };
       }
 
       await academicYear.destroy();
-      return { success: true, message: "Academic year deleted successfully" };
+      return { success: true, message: "Đã xóa năm học thành công" };
     } catch (error) {
       console.error("Delete academic year error:", error);
-      return { success: false, message: "Failed to delete academic year", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -260,15 +260,15 @@ class AcademicCalendarService {
 
       if (!academicYearId) {
         await transaction.rollback();
-        return { success: false, message: "academicYearId is required" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
       if (!ACADEMIC_TERM_VALUES.includes(term)) {
         await transaction.rollback();
-        return { success: false, message: "Invalid academic term" };
+        return { success: false, message: "Học kỳ không hợp lệ" };
       }
       if (!Array.isArray(blocks) || blocks.length === 0) {
         await transaction.rollback();
-        return { success: false, message: "blocks must be a non-empty array" };
+        return { success: false, message: "Có lỗi xảy ra" };
       }
 
       const createdBlocks = [];
@@ -310,7 +310,7 @@ class AcademicCalendarService {
         });
         if (existingCode) {
           await transaction.rollback();
-          return { success: false, message: `Academic block code already exists: ${blockCode}` };
+          return { success: false, message: `Mã học kỳ đã tồn tại: ${blockCode}` };
         }
 
         const academicBlock = await AcademicBlock.create(
@@ -333,13 +333,13 @@ class AcademicCalendarService {
       await transaction.commit();
       return {
         success: true,
-        message: "Academic blocks created successfully",
+        message: "Đã tạo các học kỳ thành công",
         data: createdBlocks,
       };
     } catch (error) {
       await transaction.rollback();
       console.error("Create academic blocks bulk error:", error);
-      return { success: false, message: "Failed to create academic blocks", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -361,7 +361,7 @@ class AcademicCalendarService {
       return { success: true, data: academicBlocks };
     } catch (error) {
       console.error("List academic blocks error:", error);
-      return { success: false, message: "Failed to retrieve academic blocks", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -369,7 +369,7 @@ class AcademicCalendarService {
     try {
       const date = toDateOnly(referenceDate);
       if (!date) {
-        return { success: false, message: "Invalid date format. Use YYYY-MM-DD or a valid date string." };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
       const academicBlock = await AcademicBlock.findOne({
         where: {
@@ -384,22 +384,22 @@ class AcademicCalendarService {
       return { success: true, data: academicBlock || null };
     } catch (error) {
       console.error("Get current academic block error:", error);
-      return { success: false, message: "Failed to retrieve current academic block", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
   async updateAcademicBlock(academicBlockId, data) {
     try {
       const academicBlock = await AcademicBlock.findByPk(academicBlockId);
-      if (!academicBlock) return { success: false, message: "Academic block not found" };
+      if (!academicBlock) return { success: false, message: "Không tìm thấy học kỳ" };
 
       const normalizedStart = data.startDate !== undefined ? normalizeDateOnlyOrNull(data.startDate) : null;
       const normalizedEnd = data.endDate !== undefined ? normalizeDateOnlyOrNull(data.endDate) : null;
       if (data.startDate !== undefined && !normalizedStart) {
-        return { success: false, message: "Academic block startDate must be YYYY-MM-DD" };
+        return { success: false, message: "Ngày bắt đầu học kỳ phải có định dạng YYYY-MM-DD" };
       }
       if (data.endDate !== undefined && !normalizedEnd) {
-        return { success: false, message: "Academic block endDate must be YYYY-MM-DD" };
+        return { success: false, message: "Ngày kết thúc học kỳ phải có định dạng YYYY-MM-DD" };
       }
 
       const nextData = {
@@ -420,7 +420,7 @@ class AcademicCalendarService {
         const existingCode = await AcademicBlock.findOne({
           where: { blockCode, academicBlockId: { [Op.ne]: academicBlockId } },
         });
-        if (existingCode) return { success: false, message: "Academic block code already exists" };
+        if (existingCode) return { success: false, message: "Mã học kỳ đã tồn tại" };
       }
 
       await academicBlock.update({
@@ -430,23 +430,23 @@ class AcademicCalendarService {
         isActive: data.isActive !== undefined ? data.isActive : academicBlock.isActive,
       });
 
-      return { success: true, message: "Academic block updated successfully", academicBlock };
+      return { success: true, message: "Đã cập nhật học kỳ thành công", academicBlock };
     } catch (error) {
       console.error("Update academic block error:", error);
-      return { success: false, message: "Failed to update academic block", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
   async deleteAcademicBlock(academicBlockId) {
     try {
       const academicBlock = await AcademicBlock.findByPk(academicBlockId);
-      if (!academicBlock) return { success: false, message: "Academic block not found" };
+      if (!academicBlock) return { success: false, message: "Không tìm thấy học kỳ" };
 
       await academicBlock.destroy();
-      return { success: true, message: "Academic block deleted successfully" };
+      return { success: true, message: "Đã xóa học kỳ thành công" };
     } catch (error) {
       console.error("Delete academic block error:", error);
-      return { success: false, message: "Failed to delete academic block", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -455,7 +455,7 @@ class AcademicCalendarService {
 
     const academicBlock = await AcademicBlock.findByPk(academicBlockId);
     if (!academicBlock || !academicBlock.isActive) {
-      return { success: false, message: "Academic block not found or inactive" };
+      return { success: false, message: "Không tìm thấy dữ liệu" };
     }
 
     const actualStart = startDate || academicBlock.startDate;
@@ -464,7 +464,7 @@ class AcademicCalendarService {
     if (rangeError) return { success: false, message: rangeError };
 
     if (new Date(actualStart) < new Date(academicBlock.startDate) || new Date(actualEnd) > new Date(academicBlock.endDate)) {
-      return { success: false, message: `${entityLabel} dates must be inside academic block ${academicBlock.blockCode}` };
+      return { success: false, message: `Có lỗi xảy ra` };
     }
 
     return { success: true, academicBlock };

@@ -6,7 +6,7 @@ export const generalRateLimit = rateLimit({
   max: 100000, // Disabled: no effective limit
   message: {
     success: false,
-    message: 'Too many requests from this IP, please try again later.'
+    message: 'Có lỗi xảy ra'
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -18,7 +18,7 @@ export const authRateLimit = rateLimit({
   max: 100000, // Disabled: no effective limit
   message: {
     success: false,
-    message: 'Too many authentication attempts, please try again later.'
+    message: 'Too many authentication attempts, vui lòng try again later.'
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -30,7 +30,7 @@ export const passwordResetRateLimit = rateLimit({
   max: 100000, // Disabled: no effective limit
   message: {
     success: false,
-    message: 'Too many password reset attempts, please try again later.'
+    message: 'Too many mật khẩu reset attempts, vui lòng try again later.'
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -42,7 +42,7 @@ export const emailVerificationRateLimit = rateLimit({
   max: 100000, // Disabled: no effective limit
   message: {
     success: false,
-    message: 'Too many email verification attempts, please try again later.'
+    message: 'Too many email verification attempts, vui lòng try again later.'
   },
   standardHeaders: true,
   legacyHeaders: false,

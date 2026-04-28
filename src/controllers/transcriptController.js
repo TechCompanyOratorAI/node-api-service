@@ -5,7 +5,7 @@ class TranscriptController {
         try {
             const presentationId = parseInt(req.params.presentationId);
             if (isNaN(presentationId)) {
-                return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+                return res.status(400).json({ success: false, message: 'PresentationId phải là số' });
             }
 
             const result = await transcriptService.getTranscriptByPresentation(presentationId, req.user);
@@ -16,7 +16,7 @@ class TranscriptController {
             });
         } catch (error) {
             console.error('getByPresentation error:', error);
-            return res.status(500).json({ success: false, message: 'Internal server error' });
+            return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
         }
     }
 
@@ -24,7 +24,7 @@ class TranscriptController {
         try {
             const transcriptId = parseInt(req.params.transcriptId);
             if (isNaN(transcriptId)) {
-                return res.status(400).json({ success: false, message: 'transcriptId must be a number' });
+                return res.status(400).json({ success: false, message: 'TranscriptId phải là số' });
             }
 
             const result = await transcriptService.getTranscriptById(transcriptId, req.user);
@@ -35,7 +35,7 @@ class TranscriptController {
             });
         } catch (error) {
             console.error('getById error:', error);
-            return res.status(500).json({ success: false, message: 'Internal server error' });
+            return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
         }
     }
 
@@ -43,7 +43,7 @@ class TranscriptController {
         try {
             const transcriptId = parseInt(req.params.transcriptId);
             if (isNaN(transcriptId)) {
-                return res.status(400).json({ success: false, message: 'transcriptId must be a number' });
+                return res.status(400).json({ success: false, message: 'TranscriptId phải là số' });
             }
 
             const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -57,7 +57,7 @@ class TranscriptController {
             });
         } catch (error) {
             console.error('getSegments error:', error);
-            return res.status(500).json({ success: false, message: 'Internal server error' });
+            return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
         }
     }
 }

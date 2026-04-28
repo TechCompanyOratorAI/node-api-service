@@ -19,7 +19,7 @@ class RoleController {
       } else {
         return res.status(500).json({
           success: false,
-          message: 'Failed to get roles',
+          message: 'Thao tác thất bại',
           error: result.error
         });
       }
@@ -27,7 +27,7 @@ class RoleController {
       console.error('Get all roles controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -47,7 +47,7 @@ class RoleController {
       } else {
         return res.status(500).json({
           success: false,
-          message: 'Failed to get user roles',
+          message: 'Thao tác thất bại',
           error: result.error
         });
       }
@@ -55,7 +55,7 @@ class RoleController {
       console.error('Get user roles controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -75,7 +75,7 @@ class RoleController {
       } else {
         return res.status(500).json({
           success: false,
-          message: 'Failed to get your roles',
+          message: 'Thao tác thất bại',
           error: result.error
         });
       }
@@ -83,7 +83,7 @@ class RoleController {
       console.error('Get my roles controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -95,7 +95,7 @@ class RoleController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
+          message: 'Validation thất bại',
           errors: errors.array()
         });
       }
@@ -130,7 +130,7 @@ class RoleController {
       console.error('Assign role controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -142,7 +142,7 @@ class RoleController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
+          message: 'Validation thất bại',
           errors: errors.array()
         });
       }
@@ -177,7 +177,7 @@ class RoleController {
       console.error('Remove role controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -202,7 +202,7 @@ class RoleController {
       console.error('Get users by role controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -214,7 +214,7 @@ class RoleController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
+          message: 'Validation thất bại',
           errors: errors.array()
         });
       }
@@ -249,7 +249,7 @@ class RoleController {
       console.error('Update user role controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -268,7 +268,7 @@ class RoleController {
       console.error('Initialize roles controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }

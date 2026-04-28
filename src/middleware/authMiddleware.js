@@ -13,7 +13,7 @@ export const authenticateToken = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Access token is required'
+        message: 'Dữ liệu không hợp lệ'
       });
     }
 
@@ -41,14 +41,14 @@ export const authenticateToken = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'User not found'
+        message: 'Người dùng không tìm thấy'
       });
     }
 
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Account is deactivated'
+        message: 'Có lỗi xảy ra'
       });
     }
 
@@ -64,21 +64,21 @@ export const authenticateToken = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
-        message: 'Invalid access token'
+        message: 'Access token không hợp lệ'
       });
     }
     
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
-        message: 'Access token expired'
+        message: 'Access token đã hết hạn'
       });
     }
 
     console.error('Auth middleware error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Lỗi máy chủ nội bộ'
     });
   }
 };
@@ -137,14 +137,14 @@ export const requireEmailVerification = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
-      message: 'Authentication required'
+      message: 'Xác thực là bắt buộc'
     });
   }
 
   if (!req.user.isEmailVerified) {
     return res.status(403).json({
       success: false,
-      message: 'Email verification required'
+      message: 'Xác thực email là bắt buộc'
     });
   }
 
@@ -158,7 +158,7 @@ export const requireRole = (roles) => {
       if (!req.user) {
         return res.status(401).json({
           success: false,
-          message: 'Authentication required'
+          message: 'Xác thực là bắt buộc'
         });
       }
 
@@ -168,7 +168,7 @@ export const requireRole = (roles) => {
       if (!userRolesResult.success) {
         return res.status(500).json({
           success: false,
-          message: 'Failed to get user roles'
+          message: 'Thao tác thất bại'
         });
       }
 
@@ -178,7 +178,7 @@ export const requireRole = (roles) => {
       if (!hasRequiredRole) {
         return res.status(403).json({
           success: false,
-          message: 'Insufficient permissions'
+          message: 'Có lỗi xảy ra'
         });
       }
 
@@ -188,7 +188,7 @@ export const requireRole = (roles) => {
       console.error('Role middleware error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   };
@@ -200,7 +200,7 @@ export const requireCensored = () => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: 'Authentication required'
+        message: 'Xác thực là bắt buộc'
       });
     }
 
@@ -208,7 +208,7 @@ export const requireCensored = () => {
     if (!req.user.isCensored) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: Account is not verified/censored'
+        message: 'Bạn không có quyền thực hiện thao tác này'
       });
     }
 

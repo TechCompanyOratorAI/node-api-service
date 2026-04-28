@@ -35,7 +35,7 @@ class AuditLogController {
       console.error("Audit log list controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }

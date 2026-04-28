@@ -53,7 +53,7 @@ class SubjectAreaService {
       };
     } catch (error) {
       console.error("List subject areas error:", error);
-      return { success: false, message: "Failed to retrieve subject areas", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -64,11 +64,11 @@ class SubjectAreaService {
           { model: Department, as: "department", attributes: ["departmentId", "departmentCode", "departmentName"] },
         ],
       });
-      if (!subjectArea) return { success: false, message: "Subject area not found" };
+      if (!subjectArea) return { success: false, message: "Subject area không tìm thấy" };
       return { success: true, data: subjectArea };
     } catch (error) {
       console.error("Get subject area by ID error:", error);
-      return { success: false, message: "Failed to retrieve subject area", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -77,16 +77,16 @@ class SubjectAreaService {
       const subjectCode = (payload.subjectCode || "").trim().toUpperCase();
       const subjectName = (payload.subjectName || "").trim();
       if (!subjectCode || !subjectName) {
-        return { success: false, message: "subjectCode and subjectName are required" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       if (payload.departmentId) {
         const department = await Department.findByPk(payload.departmentId);
-        if (!department) return { success: false, message: "departmentId is invalid" };
+        if (!department) return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       const existing = await SubjectArea.findOne({ where: { subjectCode } });
-      if (existing) return { success: false, message: "subjectCode already exists" };
+      if (existing) return { success: false, message: "SubjectCode đã tồn tại" };
 
       const subjectArea = await SubjectArea.create({
         subjectCode,
@@ -96,38 +96,38 @@ class SubjectAreaService {
         isActive: payload.isActive !== undefined ? !!payload.isActive : true,
       });
 
-      return { success: true, message: "Subject area created successfully", data: subjectArea };
+      return { success: true, message: "Subject area đã tạo thành công", data: subjectArea };
     } catch (error) {
       console.error("Create subject area error:", error);
-      return { success: false, message: "Failed to create subject area", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
   async updateSubjectArea(subjectAreaId, payload) {
     try {
       const subjectArea = await SubjectArea.findByPk(subjectAreaId);
-      if (!subjectArea) return { success: false, message: "Subject area not found" };
+      if (!subjectArea) return { success: false, message: "Subject area không tìm thấy" };
 
       const updates = {};
       if (payload.subjectCode !== undefined) {
         const nextCode = String(payload.subjectCode).trim().toUpperCase();
-        if (!nextCode) return { success: false, message: "subjectCode cannot be empty" };
+        if (!nextCode) return { success: false, message: "Thao tác thất bại" };
         const existing = await SubjectArea.findOne({
           where: { subjectCode: nextCode, subjectAreaId: { [Op.ne]: subjectAreaId } },
         });
-        if (existing) return { success: false, message: "subjectCode already exists" };
+        if (existing) return { success: false, message: "SubjectCode đã tồn tại" };
         updates.subjectCode = nextCode;
       }
       if (payload.subjectName !== undefined) {
         const nextName = String(payload.subjectName).trim();
-        if (!nextName) return { success: false, message: "subjectName cannot be empty" };
+        if (!nextName) return { success: false, message: "Thao tác thất bại" };
         updates.subjectName = nextName;
       }
 
       const nextDepartmentId = payload.departmentId !== undefined ? payload.departmentId : subjectArea.departmentId;
       if (nextDepartmentId !== null && nextDepartmentId !== undefined) {
         const department = await Department.findByPk(nextDepartmentId);
-        if (!department) return { success: false, message: "departmentId is invalid" };
+        if (!department) return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       updates.majorId = null;
@@ -135,17 +135,17 @@ class SubjectAreaService {
       if (payload.isActive !== undefined) updates.isActive = !!payload.isActive;
 
       await subjectArea.update(updates);
-      return { success: true, message: "Subject area updated successfully", data: subjectArea };
+      return { success: true, message: "Subject area đã cập nhật thành công", data: subjectArea };
     } catch (error) {
       console.error("Update subject area error:", error);
-      return { success: false, message: "Failed to update subject area", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
   async deleteSubjectArea(subjectAreaId) {
     try {
       const subjectArea = await SubjectArea.findByPk(subjectAreaId);
-      if (!subjectArea) return { success: false, message: "Subject area not found" };
+      if (!subjectArea) return { success: false, message: "Subject area không tìm thấy" };
 
       const [courseCount, competencyCount] = await Promise.all([
         Course.count({ where: { subjectAreaId } }),
@@ -155,16 +155,16 @@ class SubjectAreaService {
       if (courseCount > 0 || competencyCount > 0) {
         return {
           success: false,
-          message: "Cannot delete subject area because it is referenced by courses or competencies",
+          message: "Thao tác thất bại",
           references: { courseCount, competencyCount },
         };
       }
 
       await subjectArea.destroy();
-      return { success: true, message: "Subject area deleted successfully" };
+      return { success: true, message: "Subject area đã xóa thành công" };
     } catch (error) {
       console.error("Delete subject area error:", error);
-      return { success: false, message: "Failed to delete subject area", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 }

@@ -20,7 +20,7 @@ router.post(
   authenticateToken,
   requireRole(["Admin"]),
   [
-    body("userId").isInt().withMessage("User ID must be a valid integer"),
+    body("userId").isInt().withMessage("User ID phải là số nguyên hợp lệ"),
     body("roleName")
       .isIn(ROLE_VALUES)
       .withMessage(`Role must be one of: ${ROLE_VALUES.join(", ")}`),
@@ -33,7 +33,7 @@ router.post(
   authenticateToken,
   requireRole(["Admin"]),
   [
-    body("userId").isInt().withMessage("User ID must be a valid integer"),
+    body("userId").isInt().withMessage("User ID phải là số nguyên hợp lệ"),
     body("roleName")
       .isIn(ROLE_VALUES)
       .withMessage(`Role must be one of: ${ROLE_VALUES.join(", ")}`),
@@ -46,7 +46,7 @@ router.put(
   authenticateToken,
   requireRole(["Admin"]),
   [
-    body("userId").isInt().withMessage("User ID must be a valid integer"),
+    body("userId").isInt().withMessage("User ID phải là số nguyên hợp lệ"),
     body("oldRoleName")
       .isIn(ROLE_VALUES)
       .withMessage(`Old role must be one of: ${ROLE_VALUES.join(", ")}`),

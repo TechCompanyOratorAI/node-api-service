@@ -60,7 +60,7 @@ class CompetencyService {
       return { success: true, data };
     } catch (error) {
       console.error("List competencies error:", error);
-      return { success: false, message: "Failed to retrieve competencies", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -70,12 +70,12 @@ class CompetencyService {
       const competencyName = (payload.competencyName || "").trim();
 
       if (!competencyCode || !competencyName) {
-        return { success: false, message: "competencyCode and competencyName are required" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       const existing = await CompetencyCatalog.findOne({ where: { competencyCode } });
       if (existing) {
-        return { success: false, message: "Competency code already exists" };
+        return { success: false, message: "Competency code đã tồn tại" };
       }
 
       const departmentId =
@@ -90,19 +90,19 @@ class CompetencyService {
       let department = null;
       if (departmentId !== null) {
         department = await Department.findOne({ where: { departmentId, isActive: true } });
-        if (!department) return { success: false, message: "departmentId is invalid or inactive" };
+        if (!department) return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       let subjectArea = null;
       if (subjectAreaId !== null) {
         subjectArea = await SubjectArea.findOne({ where: { subjectAreaId, isActive: true } });
-        if (!subjectArea) return { success: false, message: "subjectAreaId is invalid or inactive" };
+        if (!subjectArea) return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       if (department && subjectArea && subjectArea.departmentId && subjectArea.departmentId !== department.departmentId) {
         return {
           success: false,
-          message: "subjectAreaId does not belong to departmentId",
+          message: "Có lỗi xảy ra",
         };
       }
 
@@ -124,10 +124,10 @@ class CompetencyService {
         metadata: { competencyCode },
       });
 
-      return { success: true, message: "Competency created successfully", competency };
+      return { success: true, message: "Competency đã tạo thành công", competency };
     } catch (error) {
       console.error("Create competency error:", error);
-      return { success: false, message: "Failed to create competency", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -145,13 +145,13 @@ class CompetencyService {
       const competencies = this.normalizeInstructorCompetencyPayload(payload);
       if (!competencies.length) {
         await transaction.rollback();
-        return { success: false, message: "competencies payload is required" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       const instructor = await User.findByPk(normalizedInstructorId, { transaction });
       if (!instructor) {
         await transaction.rollback();
-        return { success: false, message: "Instructor not found" };
+        return { success: false, message: "Không tìm thấy giảng viên" };
       }
 
       const competencyIds = [...new Set(competencies.map((r) => parseInt(r.competencyId, 10)).filter(Boolean))];
@@ -161,7 +161,7 @@ class CompetencyService {
       });
       if (existingCompetencies.length !== competencyIds.length) {
         await transaction.rollback();
-        return { success: false, message: "One or more competencyId are invalid or inactive" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       const results = [];
@@ -172,7 +172,7 @@ class CompetencyService {
           : this.normalizeLevel(item.level);
         if (!level) {
           await transaction.rollback();
-          return { success: false, message: `Invalid level for competency ${competencyId}` };
+          return { success: false, message: `Dữ liệu không hợp lệ` };
         }
 
         const existing = await InstructorCompetency.findOne({
@@ -239,11 +239,11 @@ class CompetencyService {
         },
       });
 
-      return { success: true, message: "Instructor competencies submitted", data: results };
+      return { success: true, message: "Có lỗi xảy ra", data: results };
     } catch (error) {
       await transaction.rollback();
       console.error("Declare instructor competencies error:", error);
-      return { success: false, message: "Failed to submit instructor competencies", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -251,13 +251,13 @@ class CompetencyService {
     try {
       const normalizedInstructorId = this.normalizePositiveInt(instructorId);
       if (!normalizedInstructorId) {
-        return { success: false, message: "instructorId is invalid" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       const instructor = await User.findByPk(normalizedInstructorId, {
         attributes: ["userId", "username", "firstName", "lastName", "email", "departmentId", "studyMajor"],
       });
-      if (!instructor) return { success: false, message: "Instructor not found" };
+      if (!instructor) return { success: false, message: "Không tìm thấy giảng viên" };
 
       const data = await InstructorCompetency.findAll({
         where: { instructorId: normalizedInstructorId },
@@ -278,19 +278,19 @@ class CompetencyService {
       return { success: true, instructor, data };
     } catch (error) {
       console.error("Get instructor competencies error:", error);
-      return { success: false, message: "Failed to retrieve instructor competencies", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
   async approveInstructorCompetency(instructorCompetencyId, payload, approverId) {
     try {
       const record = await InstructorCompetency.findByPk(instructorCompetencyId);
-      if (!record) return { success: false, message: "Instructor competency not found" };
+      if (!record) return { success: false, message: "Instructor competency không tìm thấy" };
 
       if (payload.level !== undefined && payload.level !== null) {
         const normalizedLevel = this.normalizeLevel(payload.level);
         if (!normalizedLevel) {
-          return { success: false, message: "level must be an integer between 1 and 5" };
+          return { success: false, message: "Có lỗi xảy ra" };
         }
         await record.update({ level: normalizedLevel });
       }
@@ -326,10 +326,10 @@ class CompetencyService {
         },
       });
 
-      return { success: true, message: "Instructor competency updated", data: record };
+      return { success: true, message: "Instructor competency đã cập nhật", data: record };
     } catch (error) {
       console.error("Approve instructor competency error:", error);
-      return { success: false, message: "Failed to update instructor competency", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -337,11 +337,11 @@ class CompetencyService {
     try {
       const normalizedId = this.normalizePositiveInt(instructorCompetencyId);
       if (!normalizedId) {
-        return { success: false, message: "instructorCompetencyId is invalid" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       const record = await InstructorCompetency.findByPk(normalizedId);
-      if (!record) return { success: false, message: "Instructor competency not found" };
+      if (!record) return { success: false, message: "Instructor competency không tìm thấy" };
 
       await InstructorCompetencyEvidence.destroy({
         where: { instructorCompetencyId: normalizedId },
@@ -360,10 +360,10 @@ class CompetencyService {
         },
       });
 
-      return { success: true, message: "Instructor competency deleted" };
+      return { success: true, message: "Instructor competency đã xóa" };
     } catch (error) {
       console.error("Delete instructor competency error:", error);
-      return { success: false, message: "Failed to delete instructor competency", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -388,7 +388,7 @@ class CompetencyService {
       ]);
 
       if (!course || !instructor) {
-        return { success: false, message: "Course or instructor not found" };
+        return { success: false, message: "Không tìm thấy dữ liệu" };
       }
 
       const reasons = [];
@@ -500,7 +500,7 @@ class CompetencyService {
       };
     } catch (error) {
       console.error("Evaluate instructor eligibility error:", error);
-      return { success: false, message: "Failed to evaluate instructor eligibility", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -508,7 +508,7 @@ class CompetencyService {
     try {
       const normalizedCourseId = parseInt(courseId, 10);
       const course = await Course.findByPk(normalizedCourseId);
-      if (!course) return { success: false, message: "Course not found" };
+      if (!course) return { success: false, message: "Môn học không tìm thấy" };
 
       const where = { isActive: true };
       if (course.departmentId) where.departmentId = course.departmentId;
@@ -554,7 +554,7 @@ class CompetencyService {
       };
     } catch (error) {
       console.error("Get eligible instructors error:", error);
-      return { success: false, message: "Failed to retrieve eligible instructors", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 }

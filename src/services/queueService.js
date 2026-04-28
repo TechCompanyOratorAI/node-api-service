@@ -158,7 +158,7 @@ class QueueService {
     const queueUrl = QUEUE_URLS[queueType];
 
     if (!queueUrl) {
-      throw new Error(`Queue URL not configured for ${queueType}`);
+      throw new Error(`Có lỗi xảy ra`);
     }
 
     try {
@@ -197,7 +197,7 @@ class QueueService {
     const queueUrl = QUEUE_URLS[queueType];
 
     if (!queueUrl) {
-      throw new Error(`Queue URL not configured for ${queueType}`);
+      throw new Error(`Có lỗi xảy ra`);
     }
 
     try {
@@ -210,7 +210,7 @@ class QueueService {
       console.log(`[QueueService] Message deleted from ${queueType} queue`);
     } catch (error) {
       console.error(
-        `[QueueService] Failed to delete message from ${queueType} queue:`,
+        `[QueueService] Failed để xóa message from ${queueType} queue:`,
         error,
       );
       throw error;

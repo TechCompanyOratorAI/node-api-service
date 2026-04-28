@@ -22,7 +22,7 @@ router.get('/profile',
   // (req, res) => {
   //   userController.getUserProfile
   //   res.json({
-  //     message: 'Get user profile',
+  //     message: 'Có lỗi xảy ra',
   //     user: req.user
   //   });
   // }
@@ -35,7 +35,7 @@ router.put('/profile',
   userController.updateUserProfile.bind(userController),
   // (req, res) => {
   //   userController.updateUserProfile
-  //   res.json({ message: 'Update user profile' });
+  //   res.json({ message: 'Có lỗi xảy ra' });
   // }
 );
 

@@ -9,7 +9,7 @@ class SubjectAreaController {
   async getById(req, res) {
     const subjectAreaId = parseInt(req.params.id, 10);
     if (!Number.isInteger(subjectAreaId) || subjectAreaId <= 0) {
-      return res.status(400).json({ success: false, message: "Invalid subject area ID" });
+      return res.status(400).json({ success: false, message: "Không hợp lệ subject area ID" });
     }
 
     const result = await subjectAreaService.getSubjectAreaById(subjectAreaId);
@@ -24,7 +24,7 @@ class SubjectAreaController {
   async update(req, res) {
     const subjectAreaId = parseInt(req.params.id, 10);
     if (!Number.isInteger(subjectAreaId) || subjectAreaId <= 0) {
-      return res.status(400).json({ success: false, message: "Invalid subject area ID" });
+      return res.status(400).json({ success: false, message: "Không hợp lệ subject area ID" });
     }
 
     const result = await subjectAreaService.updateSubjectArea(subjectAreaId, req.body || {});
@@ -34,7 +34,7 @@ class SubjectAreaController {
   async delete(req, res) {
     const subjectAreaId = parseInt(req.params.id, 10);
     if (!Number.isInteger(subjectAreaId) || subjectAreaId <= 0) {
-      return res.status(400).json({ success: false, message: "Invalid subject area ID" });
+      return res.status(400).json({ success: false, message: "Không hợp lệ subject area ID" });
     }
 
     const result = await subjectAreaService.deleteSubjectArea(subjectAreaId);

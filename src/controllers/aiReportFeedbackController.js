@@ -21,7 +21,7 @@ class CriterionFeedbackController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, message: "Validation failed", errors: errors.array() });
+        return res.status(400).json({ success: false, message: "Validation thất bại", errors: errors.array() });
       }
 
       const { reportId } = req.params;
@@ -48,7 +48,7 @@ class CriterionFeedbackController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, message: "Validation failed", errors: errors.array() });
+        return res.status(400).json({ success: false, message: "Validation thất bại", errors: errors.array() });
       }
 
       const { reportId, classRubricCriteriaId } = req.params;
@@ -76,7 +76,7 @@ class CriterionFeedbackController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, message: "Validation failed", errors: errors.array() });
+        return res.status(400).json({ success: false, message: "Validation thất bại", errors: errors.array() });
       }
 
       const { reportId, classRubricCriteriaId } = req.params;
@@ -100,7 +100,7 @@ class CriterionFeedbackController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, message: "Validation failed", errors: errors.array() });
+        return res.status(400).json({ success: false, message: "Validation thất bại", errors: errors.array() });
       }
 
       const { reportId } = req.params;

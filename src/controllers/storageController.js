@@ -16,7 +16,7 @@ class StorageController {
             if (!key || !contentType) {
                 return res.status(400).json({
                     success: false,
-                    message: 'key and contentType are required'
+                    message: 'Dữ liệu không hợp lệ'
                 });
             }
 
@@ -34,7 +34,7 @@ class StorageController {
             console.error('Get presigned upload URL error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -51,7 +51,7 @@ class StorageController {
             if (!key) {
                 return res.status(400).json({
                     success: false,
-                    message: 'key is required'
+                    message: 'Dữ liệu không hợp lệ'
                 });
             }
 
@@ -70,7 +70,7 @@ class StorageController {
             console.error('Get presigned download URL error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -87,7 +87,7 @@ class StorageController {
             if (!key) {
                 return res.status(400).json({
                     success: false,
-                    message: 'key is required'
+                    message: 'Dữ liệu không hợp lệ'
                 });
             }
 
@@ -95,14 +95,14 @@ class StorageController {
 
             return res.json({
                 success: true,
-                message: 'File deleted successfully',
+                message: 'File đã xóa thành công',
                 ...result
             });
         } catch (error) {
             console.error('Delete file error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -119,7 +119,7 @@ class StorageController {
             if (!Array.isArray(keys) || keys.length === 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'keys must be a non-empty array'
+                    message: 'Có lỗi xảy ra'
                 });
             }
 
@@ -127,14 +127,14 @@ class StorageController {
 
             return res.json({
                 success: true,
-                message: `Deleted ${results.deletedCount} files`,
+                message: `Đã xóa ${results.deletedCount} tệp`,
                 ...results
             });
         } catch (error) {
             console.error('Delete multiple files error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -151,7 +151,7 @@ class StorageController {
             if (!url) {
                 return res.status(400).json({
                     success: false,
-                    message: 'url is required'
+                    message: 'Dữ liệu không hợp lệ'
                 });
             }
 
@@ -160,7 +160,7 @@ class StorageController {
             if (!key) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid S3 URL or unable to extract key'
+                    message: 'Dữ liệu không hợp lệ'
                 });
             }
 
@@ -172,7 +172,7 @@ class StorageController {
             console.error('Extract key from URL error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -189,7 +189,7 @@ class StorageController {
             if (!key) {
                 return res.status(400).json({
                     success: false,
-                    message: 'key is required'
+                    message: 'Dữ liệu không hợp lệ'
                 });
             }
 
@@ -204,7 +204,7 @@ class StorageController {
             console.error('File exists check error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }

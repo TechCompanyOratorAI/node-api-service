@@ -21,7 +21,7 @@ class CompetencyController {
     if (!canManageOthers && actorId !== instructorId) {
       return res.status(403).json({
         success: false,
-        message: "You can only submit competencies for your own instructor profile",
+        message: "Có lỗi xảy ra",
       });
     }
 
@@ -37,7 +37,7 @@ class CompetencyController {
     if (!canManageOthers && actorId !== instructorId) {
       return res.status(403).json({
         success: false,
-        message: "You can only view competencies for your own instructor profile",
+        message: "Có lỗi xảy ra",
       });
     }
 

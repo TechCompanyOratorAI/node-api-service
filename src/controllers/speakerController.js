@@ -18,7 +18,7 @@ class SpeakerController {
             if (Number.isNaN(parsedPresentationId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'presentationId must be a number'
+                    message: 'PresentationId phải là số'
                 });
             }
 
@@ -44,7 +44,7 @@ class SpeakerController {
             console.error('Get speakers by presentation error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -62,7 +62,7 @@ class SpeakerController {
             if (Number.isNaN(parsedSpeakerId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'speakerId must be a number'
+                    message: 'SpeakerId phải là số'
                 });
             }
 
@@ -76,7 +76,7 @@ class SpeakerController {
             console.error('Get speaker by ID error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -97,14 +97,14 @@ class SpeakerController {
             if (Number.isNaN(parsedSpeakerId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'speakerId must be a number'
+                    message: 'SpeakerId phải là số'
                 });
             }
 
             if (Number.isNaN(parsedStudentId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'studentId must be a number'
+                    message: 'StudentId phải là số'
                 });
             }
 
@@ -115,7 +115,7 @@ class SpeakerController {
 
             return res.json({
                 success: true,
-                message: 'Speaker mapped to student successfully',
+                message: 'Thao tác thành công',
                 speaker
             });
         } catch (error) {
@@ -139,7 +139,7 @@ class SpeakerController {
             if (Number.isNaN(parsedSpeakerId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'speakerId must be a number'
+                    message: 'SpeakerId phải là số'
                 });
             }
 
@@ -147,7 +147,7 @@ class SpeakerController {
 
             return res.json({
                 success: true,
-                message: 'Speaker unmapped successfully',
+                message: 'Speaker unmapped thành công',
                 speaker
             });
         } catch (error) {
@@ -170,7 +170,7 @@ class SpeakerController {
             if (!Array.isArray(mappings) || mappings.length === 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'mappings must be a non-empty array'
+                    message: 'Có lỗi xảy ra'
                 });
             }
 
@@ -178,14 +178,14 @@ class SpeakerController {
 
             return res.json({
                 success: true,
-                message: `Mapped ${results.success.length} speakers, ${results.failed.length} failed`,
+                message: `Đã ánh xạ ${results.success.length} diễn giả, ${results.failed.length} thất bại`,
                 results
             });
         } catch (error) {
             console.error('Batch map speakers error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -203,7 +203,7 @@ class SpeakerController {
             if (Number.isNaN(parsedPresentationId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'presentationId must be a number'
+                    message: 'PresentationId phải là số'
                 });
             }
 
@@ -217,7 +217,7 @@ class SpeakerController {
             console.error('Get speaker statistics error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -235,7 +235,7 @@ class SpeakerController {
             if (Number.isNaN(parsedStudentId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'studentId must be a number'
+                    message: 'StudentId phải là số'
                 });
             }
 
@@ -249,7 +249,7 @@ class SpeakerController {
             console.error('Get student speaker summary error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -267,7 +267,7 @@ class SpeakerController {
             if (Number.isNaN(parsedPresentationId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'presentationId must be a number'
+                    message: 'PresentationId phải là số'
                 });
             }
 
@@ -281,7 +281,7 @@ class SpeakerController {
             console.error('Get group members error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -299,7 +299,7 @@ class SpeakerController {
             if (Number.isNaN(parsedPresentationId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'presentationId must be a number'
+                    message: 'PresentationId phải là số'
                 });
             }
 
@@ -314,7 +314,7 @@ class SpeakerController {
             console.error('Auto-map speakers error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -332,7 +332,7 @@ class SpeakerController {
             if (Number.isNaN(parsedPresentationId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'presentationId must be a number'
+                    message: 'PresentationId phải là số'
                 });
             }
 
@@ -346,7 +346,7 @@ class SpeakerController {
             console.error('Suggest student mappings error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -364,7 +364,7 @@ class SpeakerController {
             if (Number.isNaN(parsedSpeakerId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'speakerId must be a number'
+                    message: 'SpeakerId phải là số'
                 });
             }
 
@@ -372,7 +372,7 @@ class SpeakerController {
 
             return res.json({
                 success: true,
-                message: 'Speaker deleted successfully'
+                message: 'Speaker đã xóa thành công'
             });
         } catch (error) {
             console.error('Delete speaker error:', error);
