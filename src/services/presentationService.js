@@ -1661,7 +1661,7 @@ class PresentationService {
       if (!feedbacks || feedbacks.length === 0) {
         return {
           success: true,
-          message: "Có lỗi xảy ra",
+          message: "Chưa có phản hồi AI",
           feedback: null,
         };
       }

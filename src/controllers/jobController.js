@@ -201,7 +201,7 @@ class JobController {
 
             return res.json({
                 success: true,
-                message: 'Có lỗi xảy ra',
+                message: 'Retry job thành công',
                 job
             });
         } catch (error) {
@@ -250,7 +250,7 @@ class JobController {
 
             return res.json({
                 success: true,
-                message: `Có lỗi xảy ra`,
+                message: `Đã reset các job bị treo thành công`,
                 resetCount
             });
         } catch (error) {

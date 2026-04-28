@@ -252,7 +252,7 @@ class CompetencyService {
         },
       });
 
-      return { success: true, message: "Có lỗi xảy ra", data: results };
+      return { success: true, message: "Khai báo năng lực thành công", data: results };
     } catch (error) {
       await transaction.rollback();
       console.error("Declare instructor competencies error:", error);

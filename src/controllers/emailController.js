@@ -12,7 +12,7 @@ class EmailController {
       if (result.success) {
         return res.status(200).json({
           success: true,
-          message: "Có lỗi xảy ra",
+          message: "Kết nối email service thành công",
         });
       } else {
         return res.status(500).json({
@@ -89,7 +89,7 @@ class EmailController {
       if (!user.isEmailVerified) {
         return res.status(400).json({
           success: false,
-          message: "Có lỗi xảy ra",
+          message: "Người dùng chưa xác thực email",
         });
       }
 

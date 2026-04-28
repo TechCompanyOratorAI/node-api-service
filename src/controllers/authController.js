@@ -198,7 +198,7 @@ class AuthController {
       return res.status(200).json({
         success: true,
         message:
-          "Có lỗi xảy ra",
+          "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi",
       });
     } catch (error) {
       console.error("Forgot password controller error:", error);

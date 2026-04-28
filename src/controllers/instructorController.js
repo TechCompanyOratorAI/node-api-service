@@ -580,7 +580,7 @@ class InstructorController {
 
       return res.status(200).json({
         success: true,
-        message: 'Có lỗi xảy ra',
+        message: 'Duyệt bài thuyết trình thành công',
         data: {
           presentationId: parsedPresentationId,
           instructorApproved: true,
@@ -687,7 +687,7 @@ class InstructorController {
 
       return res.status(200).json({
         success: true,
-        message: 'Có lỗi xảy ra',
+        message: 'Hủy duyệt bài thuyết trình thành công',
         data: {
           presentationId: parsedPresentationId,
           instructorApproved: false,

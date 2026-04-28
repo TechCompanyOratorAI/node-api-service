@@ -50,7 +50,7 @@ const verifyWebhookAuth = (req, res, next) => {
   if (!authHeader) {
     return res.status(401).json({
       success: false,
-      message: "Có lỗi xảy ra",
+      message: "Thiếu authorization header",
     });
   }
 
@@ -167,7 +167,7 @@ const asrComplete = async (req, res) => {
 
       return res.json({
         success: true,
-        message: "Có lỗi xảy ra",
+        message: "Đã ghi nhận trạng thái thất bại",
       });
     }
 
@@ -530,7 +530,7 @@ const analysisComplete = async (req, res) => {
       if (e.message && e.message.includes('Job not found')) {
         console.log(`⚠️ Webhook for already-deleted job ${jobId}, ignoring`);
         if (transaction && !transaction.finished) await transaction.rollback();
-        return res.json({ success: true, message: 'Có lỗi xảy ra' });
+        return res.json({ success: true, message: 'Đã bỏ qua webhook cũ' });
       }
       throw e;
     }
@@ -583,7 +583,7 @@ const analysisComplete = async (req, res) => {
 
       return res.json({
         success: true,
-        message: "Có lỗi xảy ra",
+        message: "Đã ghi nhận trạng thái thất bại",
       });
     }
 
@@ -1193,7 +1193,7 @@ const slidesComplete = async (req, res) => {
 
       return res.json({
         success: true,
-        message: "Có lỗi xảy ra",
+        message: "Đã ghi nhận trạng thái thất bại",
       });
     }
 
