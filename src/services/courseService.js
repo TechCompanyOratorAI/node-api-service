@@ -1,6 +1,6 @@
 import db from '../models/index.js';
 
-const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group, AcademicBlock, AcademicYear, CourseAcademicBlock } = db;
+const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group, AcademicBlock, AcademicYear, CourseAcademicBlock, SubjectArea } = db;
 
 class CourseService {
     normalizeAcademicBlockIds(courseData = {}) {
@@ -299,6 +299,12 @@ class CourseService {
                 attributes: ['topicId', 'topicName', 'sequenceNumber'],
                 required: false
             },
+            {
+                model: SubjectArea,
+                as: "subjectArea",
+                attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                required: false,
+            },
             this.buildAcademicBlocksInclude(!!academicBlockId, academicBlockId ? { academicBlockId } : null)
         ],
         limit: parseInt(limit),
@@ -422,6 +428,12 @@ class CourseService {
                         attributes: ['topicId', 'topicName', 'sequenceNumber'],
                         required: false
                     },
+                    {
+                        model: SubjectArea,
+                        as: "subjectArea",
+                        attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                        required: false,
+                    },
                     this.buildAcademicBlocksInclude(!!academicBlockId, academicBlockId ? { academicBlockId } : null)
                 ],
                 limit: parseInt(limit),
@@ -479,6 +491,12 @@ class CourseService {
                     order: [['sequenceNumber', 'ASC']]
                 },
                 {
+                    model: SubjectArea,
+                    as: "subjectArea",
+                    attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                    required: false,
+                },
+                {
                     ...this.buildAcademicBlocksInclude(false)
                 }
             ];
@@ -522,6 +540,8 @@ class CourseService {
                 courseCode: course.courseCode,
                 courseName: course.courseName,
                 description: course.description,
+                subjectAreaId: course.subjectAreaId,
+                subjectArea: course.subjectArea,
                 semester: course.semester,
                 academicYear: course.academicYear,
                 academicBlockId: primaryAcademicBlockId,
