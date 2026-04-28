@@ -3,6 +3,7 @@
 const db = require("../models");
 const {
   Class,
+  ClassAcademicBlock,
   ClassInstructor,
   Course,
   CourseAcademicBlock,
@@ -12,15 +13,26 @@ const {
   Presentation,
   EnrollKey,
   Topic,
+  AcademicBlock,
 } = db;
 const { Op } = require("sequelize");
 const { emitUploadPermissionChanged } = require("../websocket/emitters");
 const auditLogService = require("./auditLogService");
 const competencyService = require("./competencyService");
 const { AUDIT_ACTIONS, AUDIT_STATUSES } = require("../constants/businessConstants");
-const academicCalendarService = require("./academicCalendarService");
 
 class ClassService {
+  normalizeClassBlockIds(payload = {}) {
+    if (Array.isArray(payload.academicBlockIds)) {
+      return [...new Set(payload.academicBlockIds.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))];
+    }
+    if (payload.academicBlockId !== undefined && payload.academicBlockId !== null) {
+      const parsed = parseInt(payload.academicBlockId, 10);
+      return Number.isInteger(parsed) && parsed > 0 ? [parsed] : [];
+    }
+    return [];
+  }
+
   async getAllowedCourseBlockIds(courseId, transaction = null) {
     const mappings = await CourseAcademicBlock.findAll({
       where: { courseId },
@@ -69,6 +81,85 @@ class ClassService {
     };
   }
 
+  resolveClassAcademicBlockIds(requestedBlockIds, allowedBlockIds) {
+    if (!allowedBlockIds.length) {
+      return { success: true, academicBlockIds: requestedBlockIds };
+    }
+
+    if (requestedBlockIds.length > 0) {
+      const invalid = requestedBlockIds.filter((id) => !allowedBlockIds.includes(id));
+      if (invalid.length > 0) {
+        return { success: false, message: "Dữ liệu không hợp lệ" };
+      }
+      return { success: true, academicBlockIds: requestedBlockIds };
+    }
+
+    if (allowedBlockIds.length === 1) {
+      return { success: true, academicBlockIds: [allowedBlockIds[0]] };
+    }
+
+    return { success: false, message: "Dữ liệu không hợp lệ" };
+  }
+
+  async syncClassAcademicBlocks(classId, academicBlockIds, transaction) {
+    await ClassAcademicBlock.destroy({
+      where: { classId },
+      transaction,
+    });
+
+    if (!academicBlockIds.length) return;
+    await ClassAcademicBlock.bulkCreate(
+      academicBlockIds.map((blockId, index) => ({
+        classId,
+        academicBlockId: blockId,
+        isPrimary: index === 0,
+      })),
+      { transaction }
+    );
+  }
+
+  async getClassAcademicBlockIds(classId, transaction = null) {
+    const mappings = await ClassAcademicBlock.findAll({
+      where: { classId },
+      attributes: ["academicBlockId", "isPrimary"],
+      order: [["isPrimary", "DESC"], ["classAcademicBlockId", "ASC"]],
+      transaction,
+    });
+    return mappings.map((mapping) => mapping.academicBlockId);
+  }
+
+  async validateClassDateWithinBlocks(academicBlockIds, startDate, endDate, entityLabel = "Class") {
+    if (!academicBlockIds.length) {
+      return { success: true, startDate, endDate, primaryAcademicBlockId: null };
+    }
+
+    const blocks = await AcademicBlock.findAll({
+      where: { academicBlockId: academicBlockIds, isActive: true },
+    });
+    if (blocks.length !== academicBlockIds.length) {
+      return { success: false, message: "Dữ liệu không hợp lệ" };
+    }
+
+    const minStart = blocks.reduce((acc, block) => (!acc || new Date(block.startDate) < new Date(acc) ? block.startDate : acc), null);
+    const maxEnd = blocks.reduce((acc, block) => (!acc || new Date(block.endDate) > new Date(acc) ? block.endDate : acc), null);
+    const nextStart = startDate || minStart;
+    const nextEnd = endDate || maxEnd;
+
+    if (new Date(nextStart) >= new Date(nextEnd)) {
+      return { success: false, message: `${entityLabel} endDate must be after startDate` };
+    }
+    if (new Date(nextStart) < new Date(minStart) || new Date(nextEnd) > new Date(maxEnd)) {
+      return { success: false, message: `${entityLabel} dates must be inside selected academic blocks range` };
+    }
+
+    return {
+      success: true,
+      startDate: nextStart,
+      endDate: nextEnd,
+      primaryAcademicBlockId: academicBlockIds[0] || null,
+    };
+  }
+
   /**
    * Create new class (Admin only)
    */
@@ -97,37 +188,33 @@ class ClassService {
         };
       }
 
+      const requestedBlockIds = this.normalizeClassBlockIds(classData);
       const allowedBlockIds = await this.getAllowedCourseBlockIds(courseId, transaction);
-      const blockSelection = this.resolveClassAcademicBlockId(classData.academicBlockId, allowedBlockIds);
+      const blockSelection = this.resolveClassAcademicBlockIds(requestedBlockIds, allowedBlockIds);
       if (!blockSelection.success) {
         await transaction.rollback();
         return blockSelection;
       }
-
-      const academicBlockId = blockSelection.academicBlockId;
-      const blockValidation = await academicCalendarService.validateEntityWithinBlock({
-        academicBlockId,
-        startDate,
-        endDate,
-        entityLabel: "Class",
-      });
-      if (!blockValidation.success) {
+      const finalBlockIds = blockSelection.academicBlockIds;
+      const dateValidation = await this.validateClassDateWithinBlocks(finalBlockIds, startDate, endDate, "Class");
+      if (!dateValidation.success) {
         await transaction.rollback();
-        return blockValidation;
+        return dateValidation;
       }
 
       // Create class
       const newClass = await Class.create({
         courseId,
-        academicBlockId: academicBlockId || null,
+        academicBlockId: dateValidation.primaryAcademicBlockId || null,
         classCode,
         status: "active",
-        startDate: startDate || blockValidation.academicBlock?.startDate || null,
-        endDate: endDate || blockValidation.academicBlock?.endDate || null,
+        startDate: dateValidation.startDate || null,
+        endDate: dateValidation.endDate || null,
         maxStudents,
         maxGroupMembers,
         createdBy: userId,
       }, { transaction });
+      await this.syncClassAcademicBlocks(newClass.classId, finalBlockIds, transaction);
 
       const isAdmin = userRoles.includes("Admin");
       const isInstructor = userRoles.includes("Instructor");
@@ -146,7 +233,10 @@ class ClassService {
       return {
         success: true,
         message: "Tạo lớp học thành công",
-        class: newClass,
+        class: {
+          ...newClass.toJSON(),
+          academicBlockIds: finalBlockIds,
+        },
       };
     } catch (error) {
       await transaction.rollback();
@@ -633,40 +723,39 @@ class ClassService {
 
       // Update class info
       const allowedBlockIds = await this.getAllowedCourseBlockIds(classData.courseId, transaction);
-      const requestedBlockId = classUpdates.academicBlockId !== undefined
-        ? classUpdates.academicBlockId
-        : classData.academicBlockId;
-      const blockSelection = this.resolveClassAcademicBlockId(requestedBlockId, allowedBlockIds);
+      const hasBlocksInPayload = Array.isArray(classUpdates.academicBlockIds) || classUpdates.academicBlockId !== undefined;
+      const requestedBlockIds = hasBlocksInPayload
+        ? this.normalizeClassBlockIds(classUpdates)
+        : await this.getClassAcademicBlockIds(classId, transaction);
+      const blockSelection = this.resolveClassAcademicBlockIds(requestedBlockIds, allowedBlockIds);
       if (!blockSelection.success) {
         await transaction.rollback();
         return blockSelection;
       }
-
-      const nextAcademicBlockId = blockSelection.academicBlockId;
+      const nextBlockIds = blockSelection.academicBlockIds;
       const nextStartDate = classUpdates.startDate || classData.startDate;
       const nextEndDate = classUpdates.endDate || classData.endDate;
-      const blockValidation = await academicCalendarService.validateEntityWithinBlock({
-        academicBlockId: nextAcademicBlockId,
-        startDate: nextStartDate,
-        endDate: nextEndDate,
-        entityLabel: "Class",
-      });
-      if (!blockValidation.success) {
+      const dateValidation = await this.validateClassDateWithinBlocks(nextBlockIds, nextStartDate, nextEndDate, "Class");
+      if (!dateValidation.success) {
         await transaction.rollback();
-        return blockValidation;
+        return dateValidation;
       }
 
-      if (classUpdates.academicBlockId !== undefined) {
-        classUpdates.academicBlockId = nextAcademicBlockId || null;
+      if (hasBlocksInPayload) {
+        classUpdates.academicBlockId = dateValidation.primaryAcademicBlockId || null;
       }
-      if (classUpdates.startDate === undefined && classUpdates.academicBlockId !== undefined && !nextStartDate) {
-        classUpdates.startDate = blockValidation.academicBlock?.startDate || null;
+      if (classUpdates.startDate === undefined && hasBlocksInPayload && !nextStartDate) {
+        classUpdates.startDate = dateValidation.startDate || null;
       }
-      if (classUpdates.endDate === undefined && classUpdates.academicBlockId !== undefined && !nextEndDate) {
-        classUpdates.endDate = blockValidation.academicBlock?.endDate || null;
+      if (classUpdates.endDate === undefined && hasBlocksInPayload && !nextEndDate) {
+        classUpdates.endDate = dateValidation.endDate || null;
       }
+      if (classUpdates.academicBlockIds !== undefined) delete classUpdates.academicBlockIds;
 
       await classData.update(classUpdates, { transaction });
+      if (hasBlocksInPayload) {
+        await this.syncClassAcademicBlocks(classId, nextBlockIds, transaction);
+      }
 
       // Update enrollment key if provided
       if (enrollKey !== undefined || keyExpiresAt !== undefined || keyMaxUses !== undefined) {
@@ -721,7 +810,10 @@ class ClassService {
       return {
         success: true,
         message: "Cập nhật lớp học thành công",
-        class: updatedClass,
+        class: {
+          ...updatedClass.toJSON(),
+          academicBlockIds: await this.getClassAcademicBlockIds(classId),
+        },
       };
     } catch (error) {
       await transaction.rollback();
@@ -1324,3 +1416,4 @@ class ClassService {
 }
 
 module.exports = new ClassService();
+

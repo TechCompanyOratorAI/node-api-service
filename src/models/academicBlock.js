@@ -27,6 +27,16 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "academicBlockId",
         as: "classes",
       });
+      AcademicBlock.belongsToMany(models.Class, {
+        through: models.ClassAcademicBlock,
+        foreignKey: "academicBlockId",
+        otherKey: "classId",
+        as: "mappedClasses",
+      });
+      AcademicBlock.hasMany(models.ClassAcademicBlock, {
+        foreignKey: "academicBlockId",
+        as: "classAcademicBlocks",
+      });
     }
   }
 
