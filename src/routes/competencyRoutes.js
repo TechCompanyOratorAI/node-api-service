@@ -37,10 +37,22 @@ router.post(
   competencyController.declareInstructorCompetencies
 );
 
+router.get(
+  "/instructors/:id/competencies",
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
+  competencyController.getInstructorCompetencies
+);
+
 router.patch(
   "/instructor-competencies/:id/approve",
   requireRole(["Admin", "AcademicCoordinator"]),
   competencyController.approveInstructorCompetency
+);
+
+router.delete(
+  "/instructor-competencies/:id",
+  requireRole(["Admin", "AcademicCoordinator"]),
+  competencyController.deleteInstructorCompetency
 );
 
 module.exports = router;

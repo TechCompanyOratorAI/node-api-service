@@ -247,10 +247,53 @@ class CompetencyService {
     }
   }
 
+  async getInstructorCompetencies(instructorId) {
+    try {
+      const normalizedInstructorId = this.normalizePositiveInt(instructorId);
+      if (!normalizedInstructorId) {
+        return { success: false, message: "instructorId is invalid" };
+      }
+
+      const instructor = await User.findByPk(normalizedInstructorId, {
+        attributes: ["userId", "username", "firstName", "lastName", "email", "departmentId", "studyMajor"],
+      });
+      if (!instructor) return { success: false, message: "Instructor not found" };
+
+      const data = await InstructorCompetency.findAll({
+        where: { instructorId: normalizedInstructorId },
+        include: [
+          {
+            model: CompetencyCatalog,
+            as: "competency",
+          },
+          {
+            model: InstructorCompetencyEvidence,
+            as: "evidences",
+            required: false,
+          },
+        ],
+        order: [["updatedAt", "DESC"]],
+      });
+
+      return { success: true, instructor, data };
+    } catch (error) {
+      console.error("Get instructor competencies error:", error);
+      return { success: false, message: "Failed to retrieve instructor competencies", error: error.message };
+    }
+  }
+
   async approveInstructorCompetency(instructorCompetencyId, payload, approverId) {
     try {
       const record = await InstructorCompetency.findByPk(instructorCompetencyId);
       if (!record) return { success: false, message: "Instructor competency not found" };
+
+      if (payload.level !== undefined && payload.level !== null) {
+        const normalizedLevel = this.normalizeLevel(payload.level);
+        if (!normalizedLevel) {
+          return { success: false, message: "level must be an integer between 1 and 5" };
+        }
+        await record.update({ level: normalizedLevel });
+      }
 
       const approved = payload.approved !== undefined ? !!payload.approved : payload.status === "approved";
       if (approved) {
@@ -287,6 +330,40 @@ class CompetencyService {
     } catch (error) {
       console.error("Approve instructor competency error:", error);
       return { success: false, message: "Failed to update instructor competency", error: error.message };
+    }
+  }
+
+  async deleteInstructorCompetency(instructorCompetencyId, actorUserId) {
+    try {
+      const normalizedId = this.normalizePositiveInt(instructorCompetencyId);
+      if (!normalizedId) {
+        return { success: false, message: "instructorCompetencyId is invalid" };
+      }
+
+      const record = await InstructorCompetency.findByPk(normalizedId);
+      if (!record) return { success: false, message: "Instructor competency not found" };
+
+      await InstructorCompetencyEvidence.destroy({
+        where: { instructorCompetencyId: normalizedId },
+      });
+      await record.destroy();
+
+      await auditLogService.log({
+        actorUserId,
+        action: AUDIT_ACTIONS.INSTRUCTOR_COMPETENCY_DELETED,
+        entityType: "InstructorCompetency",
+        entityId: normalizedId,
+        status: AUDIT_STATUSES.SUCCESS,
+        metadata: {
+          instructorId: record.instructorId,
+          competencyId: record.competencyId,
+        },
+      });
+
+      return { success: true, message: "Instructor competency deleted" };
+    } catch (error) {
+      console.error("Delete instructor competency error:", error);
+      return { success: false, message: "Failed to delete instructor competency", error: error.message };
     }
   }
 
