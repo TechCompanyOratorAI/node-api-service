@@ -63,17 +63,17 @@ const validateCreateClassWithoutKey = [
     body('academicBlockIds.*')
         .optional()
         .isInt({ min: 1 })
-        .withMessage('Mỗi academicBlockId phải là số nguyên dương'),
-    body('status')
+        .withMessage('Moi academicBlockId phai la so nguyen duong'),
     body().custom((value) => {
         if (value.academicBlockId !== undefined && value.academicBlockIds !== undefined) {
             throw new Error('Chi truyen academicBlockId hoac academicBlockIds, khong truyen ca hai');
         }
         return true;
     }),
+    body('status')
         .optional()
         .isIn(['active', 'closed', 'archived'])
-        .withMessage('status phải là active, closed hoặc archived'),
+        .withMessage('status phai la active, closed hoac archived'),
 ];
 
 // Apply authentication to all course routes
