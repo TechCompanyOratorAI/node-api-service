@@ -28,8 +28,8 @@ class EmailService {
   async sendEmail(to, subject, html) {
     if (!this.isConfigured) {
       return {
-        success: true,
-        message: "Có lỗi xảy ra",
+        success: false,
+        message: "Email service chưa được cấu hình",
       };
     }
 

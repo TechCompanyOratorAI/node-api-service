@@ -455,7 +455,7 @@ class AuthService {
         return {
           success: true,
           message:
-            "Có lỗi xảy ra",
+            "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi",
         };
       }
 
@@ -485,7 +485,7 @@ class AuthService {
       return {
         success: true,
         message:
-          "Có lỗi xảy ra",
+          "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi",
       };
     } catch (error) {
       console.error("Forgot password error:", error);
