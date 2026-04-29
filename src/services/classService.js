@@ -1460,6 +1460,165 @@ class ClassService {
       };
     }
   }
+
+  /**
+   * Add a single email to the whitelist (Admin/Instructor only)
+   */
+  async addSingleEmail(classId, email, userId, userRole) {
+    try {
+      const classData = await Class.findByPk(classId);
+      if (!classData) return { success: false, message: "Không tìm thấy lớp học" };
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") return { success: false, message: "Bạn không có quyền thực hiện" };
+        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId } });
+        if (!isInstructor) return { success: false, message: "Bạn không có quyền thực hiện" };
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!emailRegex.test(normalizedEmail)) {
+        return { success: false, message: "Email không hợp lệ" };
+      }
+
+      const { ClassEmailWhitelist } = db;
+
+      // Check duplicate
+      const existing = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedEmail } });
+      if (existing) return { success: false, message: "Email này đã có trong danh sách" };
+
+      const record = await ClassEmailWhitelist.create({ classId, email: normalizedEmail });
+
+      return {
+        success: true,
+        message: `Đã thêm ${normalizedEmail} vào danh sách`,
+        entry: { id: record.id, email: record.email },
+      };
+    } catch (error) {
+      console.error("Add single email error:", error);
+      return { success: false, message: "Không thể thêm email", error: error.message };
+    }
+  }
+
+  /**
+   * Update (rename) a single email in the whitelist (Admin/Instructor only)
+   */
+  async updateSingleEmail(classId, oldEmail, newEmail, userId, userRole) {
+    try {
+      const classData = await Class.findByPk(classId);
+      if (!classData) return { success: false, message: "Không tìm thấy lớp học" };
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") return { success: false, message: "Bạn không có quyền thực hiện" };
+        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId } });
+        if (!isInstructor) return { success: false, message: "Bạn không có quyền thực hiện" };
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const normalizedNew = newEmail.trim().toLowerCase();
+      const normalizedOld = oldEmail.trim().toLowerCase();
+
+      if (!emailRegex.test(normalizedNew)) {
+        return { success: false, message: "Email mới không hợp lệ" };
+      }
+
+      const { ClassEmailWhitelist } = db;
+
+      const existing = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedOld } });
+      if (!existing) return { success: false, message: "Email cũ không tồn tại trong danh sách" };
+
+      // Check if new email already exists
+      if (normalizedNew !== normalizedOld) {
+        const duplicate = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedNew } });
+        if (duplicate) return { success: false, message: "Email mới đã tồn tại trong danh sách" };
+      }
+
+      await existing.update({ email: normalizedNew });
+
+      return {
+        success: true,
+        message: `Đã cập nhật email thành ${normalizedNew}`,
+        entry: { id: existing.id, email: normalizedNew },
+      };
+    } catch (error) {
+      console.error("Update single email error:", error);
+      return { success: false, message: "Không thể cập nhật email", error: error.message };
+    }
+  }
+
+  /**
+   * Remove a single email from whitelist and optionally kick the student from class.
+   * Admin/Instructor only.
+   */
+  async removeSingleEmail(classId, email, userId, userRole) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      const classData = await Class.findByPk(classId, { transaction });
+      if (!classData) {
+        await transaction.rollback();
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") {
+          await transaction.rollback();
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId }, transaction });
+        if (!isInstructor) {
+          await transaction.rollback();
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const { ClassEmailWhitelist, User, Enrollment, Presentation } = db;
+
+      // Remove from whitelist
+      const deleted = await ClassEmailWhitelist.destroy({ where: { classId, email: normalizedEmail }, transaction });
+      if (deleted === 0) {
+        await transaction.rollback();
+        return { success: false, message: "Email không tồn tại trong danh sách" };
+      }
+
+      // Find and kick the student if enrolled
+      let kicked = false;
+      let kickDetail = null;
+      const student = await User.findOne({ where: { email: normalizedEmail }, attributes: ["userId", "email"], transaction });
+
+      if (student) {
+        const enrollment = await Enrollment.findOne({ where: { classId, studentId: student.userId }, transaction });
+        if (enrollment) {
+          const presentationCount = await Presentation.count({ where: { studentId: student.userId, classId }, transaction });
+          if (presentationCount > 0) {
+            await enrollment.update({ status: "dropped" }, { transaction });
+          } else {
+            await enrollment.destroy({ transaction });
+          }
+          kicked = true;
+          kickDetail = { studentId: student.userId, email: normalizedEmail, hadPresentations: presentationCount > 0 };
+        }
+      }
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: kicked
+          ? `Đã xóa ${normalizedEmail} khỏi danh sách và kick sinh viên ra khỏi lớp`
+          : `Đã xóa ${normalizedEmail} khỏi danh sách (sinh viên chưa join lớp)`,
+        kicked,
+        kickDetail,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Remove single email error:", error);
+      return { success: false, message: "Không thể xóa email", error: error.message };
+    }
+  }
 }
 
 module.exports = new ClassService();
