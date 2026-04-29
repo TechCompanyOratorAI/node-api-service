@@ -1,5 +1,6 @@
 "use strict";
 
+const NodeCache = require("node-cache");
 const db = require("../models");
 const {
   User,
@@ -16,8 +17,19 @@ const {
   Job,
 } = db;
 
+const dashboardCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+
+const DASHBOARD_CACHE_KEY = "dashboard_metrics";
+
 class AdminDashboardService {
+  invalidateCache() {
+    dashboardCache.del(DASHBOARD_CACHE_KEY);
+  }
+
   async getDashboardMetrics() {
+    const cached = dashboardCache.get(DASHBOARD_CACHE_KEY);
+    if (cached) return cached;
+
     try {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -279,12 +291,19 @@ class AdminDashboardService {
 
       // ── TOP 5 compact lists ──────────────────────────────────────────────
       const topClasses = await Class.findAll({
-        attributes: ["classId", "classCode", "status"],
+        attributes: [
+          "classId",
+          "classCode",
+          "status",
+          [db.Sequelize.fn("COUNT", db.Sequelize.col("enrollments.enrollmentId")), "enrollmentCount"],
+        ],
         include: [
-          { model: Enrollment, as: "enrollments", attributes: ["enrollmentId"], where: { status: "enrolled" }, required: false },
+          { model: Enrollment, as: "enrollments", attributes: [], where: { status: "enrolled" }, required: false },
           { model: Course, as: "course", attributes: ["courseName"] },
         ],
-        order: [[db.Sequelize.literal("(SELECT COUNT(*) FROM Enrollments WHERE Enrollments.classId = Class.classId AND Enrollments.status = 'enrolled')"), "DESC"]],
+        group: ["Class.classId", "course.courseId"],
+        order: [[db.Sequelize.literal("enrollmentCount"), "DESC"]],
+        subQuery: false,
         limit: 5,
       });
 
@@ -316,7 +335,7 @@ class AdminDashboardService {
         limit: 5,
       });
 
-      return {
+      const result = {
         success: true,
         data: {
           // ── STAT CARDS ────────────────────────────────────────────────
@@ -346,7 +365,7 @@ class AdminDashboardService {
               classId: plain.classId,
               classCode: plain.classCode ?? "—",
               courseName: plain.course?.courseName ?? "—",
-              enrollmentCount: plain.enrollments?.length ?? 0,
+              enrollmentCount: parseInt(plain.enrollmentCount, 10) || 0,
             };
           }),
           topInstructors: topInstructors.map((inst) => {
@@ -387,6 +406,9 @@ class AdminDashboardService {
           }),
         },
       };
+
+      dashboardCache.set(DASHBOARD_CACHE_KEY, result);
+      return result;
     } catch (error) {
       console.error("AdminDashboardService error:", error);
       return { success: false, message: "Lỗi khi lấy dashboard metrics", error: error.message };
