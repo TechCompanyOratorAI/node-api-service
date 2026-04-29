@@ -11,6 +11,12 @@ const sequelize = new Sequelize(
         port: process.env.DB_PORT,
         dialect: 'mysql',
         logging: false,
+        pool: {
+            max: parseInt(process.env.DB_POOL_MAX) || 20,
+            min: parseInt(process.env.DB_POOL_MIN) || 5,
+            acquire: 30000,
+            idle: 10000,
+        },
         dialectOptions:
             process.env.DB_SSL === 'true' ?
                 {

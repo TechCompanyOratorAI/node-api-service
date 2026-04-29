@@ -1,4 +1,7 @@
+import NodeCache from 'node-cache';
 import db from '../models/index.js';
+
+const instructorDashboardCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
 const {
   Presentation,
@@ -14,14 +17,23 @@ const {
 } = db;
 
 class InstructorController {
-  async getInstructorScopeIds(instructorId, isAdmin = false) {
+  async getInstructorScopeIds(instructorId, isAdmin = false, { useCache = true } = {}) {
+    const cacheKey = `scope_${instructorId}_${isAdmin}`;
+    if (useCache) {
+      const cached = instructorDashboardCache.get(cacheKey);
+      if (cached) return cached;
+    }
     if (isAdmin) {
-      const allClasses = await Class.findAll({ attributes: ['classId'], raw: true });
-      const allCourses = await Course.findAll({ attributes: ['courseId'], raw: true });
-      return {
+      const [allClasses, allCourses] = await Promise.all([
+        Class.findAll({ attributes: ['classId'], raw: true }),
+        Course.findAll({ attributes: ['courseId'], raw: true }),
+      ]);
+      const result = {
         classIds: allClasses.map((c) => c.classId),
         courseIds: allCourses.map((c) => c.courseId),
       };
+      instructorDashboardCache.set(cacheKey, result, 600);
+      return result;
     }
 
     const classIdSet = new Set();
@@ -54,7 +66,9 @@ class InstructorController {
       });
     }
 
-    return { classIds: [...classIdSet], courseIds: [...courseIdSet] };
+    const result = { classIds: [...classIdSet], courseIds: [...courseIdSet] };
+    instructorDashboardCache.set(`scope_${instructorId}_${isAdmin}`, result, 600);
+    return result;
   }
 
   // Dashboard cho instructor (có biểu đồ cột + quạt)
@@ -62,6 +76,11 @@ class InstructorController {
     try {
       const instructorId = req.user.userId;
       const isAdmin = String(req.user.role || '').toLowerCase() === 'admin';
+
+      const cacheKey = `instructor_dashboard_${instructorId}`;
+      const cached = instructorDashboardCache.get(cacheKey);
+      if (cached) return res.status(200).json(cached);
+
       const { classIds, courseIds } = await this.getInstructorScopeIds(instructorId, isAdmin);
 
       if (classIds.length === 0 && courseIds.length === 0) {
@@ -295,7 +314,7 @@ class InstructorController {
         ],
       });
 
-      return res.status(200).json({
+      const responseData = {
         success: true,
         data: {
           profile: {
@@ -336,7 +355,10 @@ class InstructorController {
             };
           }),
         },
-      });
+      };
+
+      instructorDashboardCache.set(cacheKey, responseData);
+      return res.status(200).json(responseData);
     } catch (error) {
       console.error('Instructor dashboard error:', error);
       return res.status(500).json({

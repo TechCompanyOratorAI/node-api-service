@@ -943,41 +943,56 @@ class PresentationService {
       if (classId) ownWhere.classId = parseInt(classId);
       if (topicId) ownWhere.topicId = parseInt(topicId);
 
-      // ── 2. Tìm presentation của nhóm mình thuộc ──
-      // Lấy tất cả group mà sinh viên là member
+      // ── 2. Tìm presentation của nhóm mình thuộc (batch — 3 queries cố định) ──
+      // Query 1: lấy tất cả group mà sinh viên là member
       const memberships = await GroupStudent.findAll({
         where: { studentId },
         include: [{ model: Group, as: "group", attributes: ["groupId", "classId"] }],
+        raw: true,
+        nest: true,
       });
 
       let groupPresentationIds = [];
       if (memberships.length > 0) {
+        const groupIds = [...new Set(memberships.map((m) => m.group?.groupId).filter(Boolean))];
+
+        // Query 2: lấy tất cả members của tất cả groups trong 1 lần
+        const allGroupMembers = await GroupStudent.findAll({
+          where: { groupId: { [db.Sequelize.Op.in]: groupIds } },
+          attributes: ["groupId", "studentId"],
+          raw: true,
+        });
+
+        // Map groupId → { classId, memberIds[] } trong JS, không cần thêm query
+        const groupMap = new Map();
         for (const m of memberships) {
-          const group = m.group;
-          if (!group) continue;
+          if (m.group?.groupId) {
+            groupMap.set(m.group.groupId, { classId: m.group.classId, memberIds: [] });
+          }
+        }
+        for (const gm of allGroupMembers) {
+          if (gm.studentId !== studentId && groupMap.has(gm.groupId)) {
+            groupMap.get(gm.groupId).memberIds.push(gm.studentId);
+          }
+        }
 
-          // Lấy tất cả studentId trong nhóm này
-          const groupMembers = await GroupStudent.findAll({
-            where: { groupId: group.groupId },
-            attributes: ["studentId"],
-          });
-          const memberIds = groupMembers.map((gm) => gm.studentId).filter((id) => id !== studentId);
-
+        // Query 3: lấy tất cả presentations của tất cả group members trong 1 lần
+        const orConditions = [];
+        for (const { classId: gClassId, memberIds } of groupMap.values()) {
           if (memberIds.length === 0) continue;
+          const cond = { studentId: { [db.Sequelize.Op.in]: memberIds }, classId: gClassId };
+          if (status) cond.status = status;
+          if (topicId) cond.topicId = parseInt(topicId);
+          orConditions.push(cond);
+        }
 
-          // Tìm presentation của các member khác trong cùng group + cùng class
-          const groupPresentationWhere = {
-            studentId: { [db.Sequelize.Op.in]: memberIds },
-            classId: group.classId,
-          };
-          if (status) groupPresentationWhere.status = status;
-          if (topicId) groupPresentationWhere.topicId = parseInt(topicId);
-
+        if (orConditions.length > 0) {
           const gps = await Presentation.findAll({
-            where: groupPresentationWhere,
+            where: { [db.Sequelize.Op.or]: orConditions },
             attributes: ["presentationId"],
+            raw: true,
           });
-          groupPresentationIds.push(...gps.map((p) => p.presentationId));
+          groupPresentationIds = gps.map((p) => p.presentationId);
         }
       }
 
