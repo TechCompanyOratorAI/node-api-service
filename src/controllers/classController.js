@@ -811,6 +811,87 @@ class ClassController {
       });
     }
   }
+
+  /**
+   * POST /api/classes/:classId/email-whitelist/add
+   * Thêm lẻ 1 email vào whitelist
+   */
+  async addSingleEmailToWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({ success: false, message: "ID lớp học không hợp lệ" });
+      }
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ success: false, message: "Vui lòng cung cấp email" });
+      }
+
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin"
+        : req.userRoles?.includes("Instructor") ? "Instructor" : null;
+
+      const result = await classService.addSingleEmail(parseInt(classId), email, userId, userRole);
+      return res.status(result.success ? 201 : 400).json(result);
+    } catch (error) {
+      console.error("Add single email whitelist error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  /**
+   * PATCH /api/classes/:classId/email-whitelist/update
+   * Sửa 1 email trong whitelist
+   */
+  async updateSingleEmailInWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({ success: false, message: "ID lớp học không hợp lệ" });
+      }
+      const { oldEmail, newEmail } = req.body;
+      if (!oldEmail || !newEmail) {
+        return res.status(400).json({ success: false, message: "Vui lòng cung cấp oldEmail và newEmail" });
+      }
+
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin"
+        : req.userRoles?.includes("Instructor") ? "Instructor" : null;
+
+      const result = await classService.updateSingleEmail(parseInt(classId), oldEmail, newEmail, userId, userRole);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Update single email whitelist error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  /**
+   * DELETE /api/classes/:classId/email-whitelist/single
+   * Xóa 1 email khỏi whitelist + kick sinh viên ra khỏi lớp
+   */
+  async removeSingleEmailFromWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({ success: false, message: "ID lớp học không hợp lệ" });
+      }
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ success: false, message: "Vui lòng cung cấp email" });
+      }
+
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin"
+        : req.userRoles?.includes("Instructor") ? "Instructor" : null;
+
+      const result = await classService.removeSingleEmail(parseInt(classId), email, userId, userRole);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Remove single email whitelist error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
 }
 
 module.exports = new ClassController();

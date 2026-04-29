@@ -192,4 +192,25 @@ router.delete(
   classController.deleteClassEmailWhitelist
 );
 
+// POST /api/classes/:classId/email-whitelist/add - Thêm lẻ 1 email
+router.post(
+  "/:classId/email-whitelist/add",
+  requireRole(["Admin", "Instructor"]),
+  classController.addSingleEmailToWhitelist
+);
+
+// PATCH /api/classes/:classId/email-whitelist/update - Sửa 1 email
+router.patch(
+  "/:classId/email-whitelist/update",
+  requireRole(["Admin", "Instructor"]),
+  classController.updateSingleEmailInWhitelist
+);
+
+// DELETE /api/classes/:classId/email-whitelist/single - Xóa 1 email + kick sinh viên
+router.delete(
+  "/:classId/email-whitelist/single",
+  requireRole(["Admin", "Instructor"]),
+  classController.removeSingleEmailFromWhitelist
+);
+
 export default router;
