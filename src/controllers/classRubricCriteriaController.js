@@ -166,8 +166,6 @@ class ClassRubricCriteriaController {
 
       if (result.success) {
         return res.status(200).json(result);
-      } else if (result.code === "CANNOT_DELETE_TEMPLATE_CRITERIA") {
-        return res.status(403).json(result);
       } else {
         return res.status(404).json(result);
       }
@@ -322,8 +320,6 @@ class ClassRubricCriteriaController {
 
       if (result.success) {
         return res.status(200).json(result);
-      } else if (result.code === "CANNOT_DELETE_TEMPLATE_CRITERIA") {
-        return res.status(403).json(result);
       } else {
         return res.status(400).json(result);
       }

@@ -326,13 +326,6 @@ class ClassRubricCriteriaService {
         };
       }
 
-      if (criterion.sourceCriteriaId !== null) {
-        return {
-          success: false,
-          message: "Không thể xóa criteria được copy từ template gốc. Chỉ có thể tắt hoạt động.",
-          code: "CANNOT_DELETE_TEMPLATE_CRITERIA",
-        };
-      }
 
       await criterion.update({ isActive: 0 });
 
@@ -508,27 +501,6 @@ class ClassRubricCriteriaService {
     try {
       const ids = classRubricCriteriaIds.map((id) => parseInt(id));
 
-      // Check if any of the criteria are from template
-      const criteriaToDelete = await ClassRubricCriteria.findAll({
-        where: {
-          classRubricCriteriaId: { [Op.in]: ids },
-        },
-        attributes: ["classRubricCriteriaId", "sourceCriteriaId", "criteriaName"],
-        transaction,
-      });
-
-      const templateCriteria = criteriaToDelete.filter((c) => c.sourceCriteriaId !== null);
-
-      if (templateCriteria.length > 0) {
-        await transaction.rollback();
-        const names = templateCriteria.map((c) => c.criteriaName).join(", ");
-        return {
-          success: false,
-          message: `Không thể xóa criteria được copy từ template: ${names}. Chỉ có thể xóa criteria tùy chỉnh.`,
-          code: "CANNOT_DELETE_TEMPLATE_CRITERIA",
-          templateCriteriaCount: templateCriteria.length,
-        };
-      }
 
       const count = await ClassRubricCriteria.update(
         { isActive: 0 },
