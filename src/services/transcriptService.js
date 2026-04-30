@@ -131,12 +131,12 @@ class TranscriptService {
         });
 
         if (!transcript) {
-            return { success: false, message: 'Transcript not found for this presentation', statusCode: 404 };
+            return { success: false, message: 'Không tìm thấy dữ liệu', statusCode: 404 };
         }
 
         return {
             success: true,
-            message: 'Transcript retrieved successfully',
+            message: 'Lấy transcript thành công',
             data: transcript,
             statusCode: 200
         };
@@ -151,7 +151,7 @@ class TranscriptService {
         });
 
         if (!transcript) {
-            return { success: false, message: 'Transcript not found', statusCode: 404 };
+            return { success: false, message: 'Transcript không tìm thấy', statusCode: 404 };
         }
 
         const { allowed, reason } = await this._checkAccess(transcript.presentationId, user);
@@ -189,7 +189,7 @@ class TranscriptService {
 
         return {
             success: true,
-            message: 'Transcript retrieved successfully',
+            message: 'Lấy transcript chi tiết thành công',
             data: fullTranscript,
             statusCode: 200
         };
@@ -204,7 +204,7 @@ class TranscriptService {
         });
 
         if (!transcript) {
-            return { success: false, message: 'Transcript not found', statusCode: 404 };
+            return { success: false, message: 'Transcript không tìm thấy', statusCode: 404 };
         }
 
         const { allowed, reason } = await this._checkAccess(transcript.presentationId, user);
@@ -236,7 +236,7 @@ class TranscriptService {
 
         return {
             success: true,
-            message: 'Segments retrieved successfully',
+            message: 'Lấy transcript segments thành công',
             data: {
                 transcriptId: transcript.transcriptId,
                 presentationId: transcript.presentationId,

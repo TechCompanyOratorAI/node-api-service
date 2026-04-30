@@ -1,5 +1,9 @@
 import { validationResult } from 'express-validator';
 import roleService from '../services/roleService.js';
+import auditLogService from '../services/auditLogService.js';
+import businessConstants from '../constants/businessConstants.js';
+
+const { AUDIT_ACTIONS, AUDIT_STATUSES } = businessConstants;
 
 class RoleController {
   // Get all roles
@@ -15,7 +19,7 @@ class RoleController {
       } else {
         return res.status(500).json({
           success: false,
-          message: 'Failed to get roles',
+          message: 'Thao tác thất bại',
           error: result.error
         });
       }
@@ -23,7 +27,7 @@ class RoleController {
       console.error('Get all roles controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -43,7 +47,7 @@ class RoleController {
       } else {
         return res.status(500).json({
           success: false,
-          message: 'Failed to get user roles',
+          message: 'Thao tác thất bại',
           error: result.error
         });
       }
@@ -51,7 +55,7 @@ class RoleController {
       console.error('Get user roles controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -71,7 +75,7 @@ class RoleController {
       } else {
         return res.status(500).json({
           success: false,
-          message: 'Failed to get your roles',
+          message: 'Thao tác thất bại',
           error: result.error
         });
       }
@@ -79,7 +83,7 @@ class RoleController {
       console.error('Get my roles controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -91,7 +95,7 @@ class RoleController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
+          message: 'Validation thất bại',
           errors: errors.array()
         });
       }
@@ -101,15 +105,32 @@ class RoleController {
       const result = await roleService.assignRoleToUser(parseInt(userId), roleName);
       
       if (result.success) {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_ASSIGNED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.SUCCESS,
+          metadata: { roleName },
+        });
         return res.status(200).json(result);
       } else {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_ASSIGNED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.FAILURE,
+          reason: result.message || result.error,
+          metadata: { roleName },
+        });
         return res.status(400).json(result);
       }
     } catch (error) {
       console.error('Assign role controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -121,7 +142,7 @@ class RoleController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
+          message: 'Validation thất bại',
           errors: errors.array()
         });
       }
@@ -131,15 +152,32 @@ class RoleController {
       const result = await roleService.removeRoleFromUser(parseInt(userId), roleName);
       
       if (result.success) {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_REMOVED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.SUCCESS,
+          metadata: { roleName },
+        });
         return res.status(200).json(result);
       } else {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_REMOVED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.FAILURE,
+          reason: result.message || result.error,
+          metadata: { roleName },
+        });
         return res.status(400).json(result);
       }
     } catch (error) {
       console.error('Remove role controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -164,7 +202,7 @@ class RoleController {
       console.error('Get users by role controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -176,7 +214,7 @@ class RoleController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
+          message: 'Validation thất bại',
           errors: errors.array()
         });
       }
@@ -186,15 +224,32 @@ class RoleController {
       const result = await roleService.updateUserRole(parseInt(userId), oldRoleName, newRoleName);
       
       if (result.success) {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_UPDATED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.SUCCESS,
+          metadata: { oldRoleName, newRoleName },
+        });
         return res.status(200).json(result);
       } else {
+        await auditLogService.log({
+          ...auditLogService.buildRequestContext(req),
+          action: AUDIT_ACTIONS.ROLE_UPDATED,
+          entityType: 'UserRole',
+          entityId: userId,
+          status: AUDIT_STATUSES.FAILURE,
+          reason: result.message || result.error,
+          metadata: { oldRoleName, newRoleName },
+        });
         return res.status(400).json(result);
       }
     } catch (error) {
       console.error('Update user role controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }
@@ -213,7 +268,7 @@ class RoleController {
       console.error('Initialize roles controller error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Lỗi máy chủ nội bộ'
       });
     }
   }

@@ -37,7 +37,7 @@ class DevBypassService {
   async getAnyPresentation(presentationId) {
     const presentation = await Presentation.findByPk(presentationId);
     if (!presentation) {
-      return { success: false, message: `Presentation ${presentationId} not found` };
+      return { success: false, message: `Presentation ${presentationId} không tìm thấy` };
     }
     return { success: true, presentation };
   }
@@ -118,7 +118,7 @@ class DevBypassService {
     } catch (error) {
       await transaction.rollback();
       console.error("[DevBypass] uploadSlide error:", error);
-      return { success: false, message: "Failed to upload slide", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -170,7 +170,7 @@ class DevBypassService {
       return { success: true, audioRecord };
     } catch (error) {
       console.error("[DevBypass] uploadMedia error:", error);
-      return { success: false, message: "Failed to upload media", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -190,7 +190,7 @@ class DevBypassService {
       if (!audioRecord) {
         return {
           success: false,
-          message: "No audio/media uploaded yet. Please upload media first.",
+          message: "Bài thuyết trình chưa có bản ghi âm",
         };
       }
 
@@ -246,7 +246,7 @@ class DevBypassService {
           slideJobs.push(sj);
           console.log(`📤 [DevBypass] Slide OCR job created for slide ${slide.slideId}`);
         } catch (e) {
-          console.error(`⚠️ [DevBypass] Failed to create slide job: ${e.message}`);
+          console.error(`⚠️ [DevBypass] Failed để tạo slide job: ${e.message}`);
         }
       }
 
@@ -261,7 +261,7 @@ class DevBypassService {
 
       return {
         success: true,
-        message: "Full pipeline triggered successfully (dev bypass)",
+        message: "Đã tạo lại các job xử lý cho bài thuyết trình",
         presentationId,
         asrJob,
         slideJobs,
@@ -269,7 +269,7 @@ class DevBypassService {
       };
     } catch (error) {
       console.error("[DevBypass] triggerFullPipeline error:", error);
-      return { success: false, message: "Failed to trigger pipeline", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -286,7 +286,7 @@ class DevBypassService {
       return { success: true, presentations };
     } catch (error) {
       console.error("[DevBypass] listPresentations error:", error);
-      return { success: false, message: "Failed to list presentations", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 }

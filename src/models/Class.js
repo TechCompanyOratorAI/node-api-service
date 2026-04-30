@@ -14,6 +14,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
+      academicBlockId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
       classCode: {
         type: DataTypes.STRING(50),
         allowNull: false,
@@ -72,6 +76,20 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "courseId",
       as: "course",
     });
+    Class.belongsTo(models.AcademicBlock, {
+      foreignKey: "academicBlockId",
+      as: "academicBlock",
+    });
+    Class.belongsToMany(models.AcademicBlock, {
+      through: models.ClassAcademicBlock,
+      foreignKey: "classId",
+      otherKey: "academicBlockId",
+      as: "academicBlocks",
+    });
+    Class.hasMany(models.ClassAcademicBlock, {
+      foreignKey: "classId",
+      as: "classAcademicBlocks",
+    });
     Class.belongsTo(models.User, {
       foreignKey: "createdBy",
       as: "creator",
@@ -105,6 +123,10 @@ module.exports = (sequelize, DataTypes) => {
     Class.hasMany(models.Topic, {
       foreignKey: "classId",
       as: "topics",
+    });
+    Class.hasMany(models.ClassEmailWhitelist, {
+      foreignKey: "classId",
+      as: "emailWhitelists",
     });
   };
 

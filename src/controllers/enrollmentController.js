@@ -19,17 +19,15 @@ class EnrollmentController {
                 });
             }
 
+            // classId is optional — if omitted, key is looked up globally
             const { enrollKey, classId } = req.body;
             const studentId = req.user.userId;
 
-            if (!classId) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'classId là bắt buộc'
-                });
-            }
-
-            const result = await enrollmentService.joinClass(enrollKey, studentId, parseInt(classId));
+            const result = await enrollmentService.joinClass(
+                enrollKey,
+                studentId,
+                classId ? parseInt(classId) : null
+            );
 
             if (result.success) {
                 return res.status(200).json(result);
@@ -41,6 +39,8 @@ class EnrollmentController {
                 } else if (result.message.includes('đã hết hạn') || result.message.includes('đã hết số lượng') ||
                     result.message.includes('đã đạt giới hạn') || result.message.includes('đã đóng')) {
                     status = 400;
+                } else if (result.message.includes('danh sách sinh viên được phép') || result.message.includes('email')) {
+                    status = 403;
                 }
                 return res.status(status).json(result);
             }

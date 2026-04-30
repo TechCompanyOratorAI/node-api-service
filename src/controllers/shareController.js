@@ -16,7 +16,7 @@ class ShareController {
       const parsedId = parseInt(presentationId);
 
       if (Number.isNaN(parsedId)) {
-        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+        return res.status(400).json({ success: false, message: 'PresentationId phải là số' });
       }
 
       const { expiresAt } = req.body;
@@ -26,7 +26,7 @@ class ShareController {
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error('Create public share controller error:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
     }
   }
 
@@ -40,7 +40,7 @@ class ShareController {
       const parsedId = parseInt(presentationId);
 
       if (Number.isNaN(parsedId)) {
-        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+        return res.status(400).json({ success: false, message: 'PresentationId phải là số' });
       }
 
       const result = await shareService.revokePublicShare(parsedId, req.user);
@@ -48,7 +48,7 @@ class ShareController {
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error('Revoke public share controller error:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
     }
   }
 
@@ -60,14 +60,14 @@ class ShareController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+        return res.status(400).json({ success: false, message: 'Validation thất bại', errors: errors.array() });
       }
 
       const { presentationId } = req.params;
       const parsedId = parseInt(presentationId);
 
       if (Number.isNaN(parsedId)) {
-        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+        return res.status(400).json({ success: false, message: 'PresentationId phải là số' });
       }
 
       const { emails, expiresAt } = req.body;
@@ -77,7 +77,7 @@ class ShareController {
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error('Invite by emails controller error:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
     }
   }
 
@@ -92,7 +92,7 @@ class ShareController {
       const parsedAccessId = parseInt(accessId);
 
       if (Number.isNaN(parsedId) || Number.isNaN(parsedAccessId)) {
-        return res.status(400).json({ success: false, message: 'Invalid IDs provided' });
+        return res.status(400).json({ success: false, message: 'Không hợp lệ IDs provided' });
       }
 
       const result = await shareService.revokePrivateShare(parsedId, req.user, parsedAccessId);
@@ -100,7 +100,7 @@ class ShareController {
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error('Revoke private share controller error:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
     }
   }
 
@@ -114,7 +114,7 @@ class ShareController {
       const parsedId = parseInt(presentationId);
 
       if (Number.isNaN(parsedId)) {
-        return res.status(400).json({ success: false, message: 'presentationId must be a number' });
+        return res.status(400).json({ success: false, message: 'PresentationId phải là số' });
       }
 
       const result = await shareService.getShareList(parsedId, req.user);
@@ -122,7 +122,7 @@ class ShareController {
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error('Get share list controller error:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
     }
   }
 
@@ -136,7 +136,7 @@ class ShareController {
       const { token } = req.params;
 
       if (!token) {
-        return res.status(400).json({ success: false, message: 'Share token is required' });
+        return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ' });
       }
 
       // Validate token
@@ -161,7 +161,7 @@ class ShareController {
       });
     } catch (error) {
       console.error('View shared presentation controller error:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
     }
   }
 }

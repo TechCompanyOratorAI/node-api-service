@@ -19,7 +19,7 @@ class DevBypassController {
       return res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       console.error("[DevBypass] listPresentations controller error:", error);
-      return res.status(500).json({ success: false, message: "Internal server error" });
+      return res.status(500).json({ success: false, message: "Lỗi máy chủ nội bộ" });
     }
   }
 
@@ -31,12 +31,12 @@ class DevBypassController {
   async uploadSlide(req, res) {
     try {
       if (!req.file) {
-        return res.status(400).json({ success: false, message: "Slide file is required (field: file)" });
+        return res.status(400).json({ success: false, message: "Dữ liệu không hợp lệ" });
       }
 
       const presentationId = parseInt(req.params.presentationId);
       if (Number.isNaN(presentationId)) {
-        return res.status(400).json({ success: false, message: "presentationId must be a number" });
+        return res.status(400).json({ success: false, message: "PresentationId phải là số" });
       }
 
       const slideNumber = req.body.slideNumber ? parseInt(req.body.slideNumber) : null;
@@ -50,7 +50,7 @@ class DevBypassController {
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error("[DevBypass] uploadSlide controller error:", error);
-      return res.status(500).json({ success: false, message: "Internal server error" });
+      return res.status(500).json({ success: false, message: "Lỗi máy chủ nội bộ" });
     }
   }
 
@@ -63,12 +63,12 @@ class DevBypassController {
   async uploadMedia(req, res) {
     try {
       if (!req.file) {
-        return res.status(400).json({ success: false, message: "Media file is required (field: file)" });
+        return res.status(400).json({ success: false, message: "Dữ liệu không hợp lệ" });
       }
 
       const presentationId = parseInt(req.params.presentationId);
       if (Number.isNaN(presentationId)) {
-        return res.status(400).json({ success: false, message: "presentationId must be a number" });
+        return res.status(400).json({ success: false, message: "PresentationId phải là số" });
       }
 
       const durationSeconds = req.body.durationSeconds ? parseInt(req.body.durationSeconds) : null;
@@ -86,7 +86,7 @@ class DevBypassController {
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error("[DevBypass] uploadMedia controller error:", error);
-      return res.status(500).json({ success: false, message: "Internal server error" });
+      return res.status(500).json({ success: false, message: "Lỗi máy chủ nội bộ" });
     }
   }
 
@@ -99,14 +99,14 @@ class DevBypassController {
     try {
       const presentationId = parseInt(req.params.presentationId);
       if (Number.isNaN(presentationId)) {
-        return res.status(400).json({ success: false, message: "presentationId must be a number" });
+        return res.status(400).json({ success: false, message: "PresentationId phải là số" });
       }
 
       const result = await devBypassService.triggerFullPipeline(presentationId);
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error("[DevBypass] triggerFullPipeline controller error:", error);
-      return res.status(500).json({ success: false, message: "Internal server error" });
+      return res.status(500).json({ success: false, message: "Lỗi máy chủ nội bộ" });
     }
   }
 }

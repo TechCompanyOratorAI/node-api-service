@@ -1,8 +1,29 @@
 "use strict";
 
 const { validationResult } = require("express-validator");
-const db = require("../models");
 const classService = require("../services/classService");
+const multer = require("multer");
+const XLSX = require("xlsx");
+
+// Multer in-memory storage for Excel uploads
+const excelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ];
+    if (
+      allowed.includes(file.mimetype) ||
+      file.originalname.match(/\.(xlsx|xls)$/i)
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Chỉ chấp nhận file Excel (.xlsx, .xls)"));
+    }
+  },
+}).single("file");
 
 class ClassController {
   async createClass(req, res) {
@@ -27,73 +48,14 @@ class ClassController {
         });
       }
 
-      const { Course, Class, ClassInstructor } = db;
-      const transaction = await db.sequelize.transaction();
+      const result = await classService.createClass(
+        { ...req.body, courseId: parseInt(courseId) },
+        req.user.userId,
+        req.userRoles || []
+      );
 
-      try {
-        const classData = { ...req.body, courseId: parseInt(courseId) };
-        const { classCode, startDate, endDate, maxStudents, maxGroupMembers } =
-          classData;
+      return res.status(result.success ? 201 : 400).json(result);
 
-        const course = await Course.findByPk(classData.courseId, { transaction });
-        if (!course) {
-          await transaction.rollback();
-          return res.status(400).json({
-            success: false,
-            message: "Không tìm thấy khóa học",
-          });
-        }
-
-        const existing = await Class.findOne({
-          where: { courseId: classData.courseId, classCode },
-          transaction,
-        });
-        if (existing) {
-          await transaction.rollback();
-          return res.status(400).json({
-            success: false,
-            message: "Mã lớp đã tồn tại trong khóa học này",
-          });
-        }
-
-        const newClass = await Class.create(
-          {
-            courseId: classData.courseId,
-            classCode,
-            status: "active",
-            startDate,
-            endDate,
-            maxStudents,
-            maxGroupMembers,
-            createdBy: req.user.userId,
-          },
-          { transaction }
-        );
-
-        const isAdmin = (req.userRoles || []).includes("Admin");
-        const isInstructor = (req.userRoles || []).includes("Instructor");
-        if (isInstructor && !isAdmin) {
-          await ClassInstructor.create(
-            {
-              classId: newClass.classId,
-              instructorId: req.user.userId,
-              assignedBy: req.user.userId,
-            },
-            { transaction }
-          );
-        }
-
-        await transaction.commit();
-
-        return res.status(201).json({
-          success: true,
-          message: "Tạo lớp học thành công",
-          class: newClass,
-        });
-      } catch (error) {
-        await transaction.rollback();
-        throw error;
-      }
     } catch (error) {
       console.error("Create class controller error:", error);
       return res.status(500).json({
@@ -126,11 +88,12 @@ class ClassController {
       const search = req.query.search;
       const courseId = req.query.courseId ? parseInt(req.query.courseId) : null;
       const userId = req.user.userId;
-      const userRole = req.userRoles?.includes("Admin")
-        ? "Admin"
-        : req.userRoles?.includes("Instructor")
-        ? "Instructor"
-        : "Student";
+      const userRole =
+        req.userRoles?.includes("Admin") || req.userRoles?.includes("AcademicCoordinator")
+          ? "Admin"
+          : req.userRoles?.includes("Instructor")
+          ? "Instructor"
+          : "Student";
 
       const result = await classService.getAllClasses({
         page,
@@ -191,6 +154,7 @@ class ClassController {
       const userId = req.user.userId;
       // Get primary role from req.userRoles (set by requireRole middleware)
       const userRole = req.userRoles?.includes("Admin")
+        || req.userRoles?.includes("AcademicCoordinator")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
           ? "Instructor"
@@ -237,6 +201,7 @@ class ClassController {
 
       const userId = req.user.userId;
       const userRole = req.userRoles?.includes("Admin")
+        || req.userRoles?.includes("AcademicCoordinator")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
           ? "Instructor"
@@ -290,6 +255,7 @@ class ClassController {
 
       const userId = req.user.userId;
       const userRole = req.userRoles?.includes("Admin")
+        || req.userRoles?.includes("AcademicCoordinator")
         ? "Admin"
         : req.userRoles?.includes("Instructor")
           ? "Instructor"
@@ -393,7 +359,7 @@ class ClassController {
         });
       }
 
-      const { instructorId, instructorIds } = req.body;
+      const { instructorId, instructorIds, overrideReason } = req.body;
       const assignedBy = req.user.userId;
 
       // Handle single instructor
@@ -401,7 +367,11 @@ class ClassController {
         const result = await classService.assignInstructor(
           parseInt(classId),
           parseInt(instructorId),
-          assignedBy
+          assignedBy,
+          {
+            overrideReason,
+            actorRoles: req.userRoles || [],
+          }
         );
 
         if (result.success) {
@@ -423,7 +393,11 @@ class ClassController {
           const result = await classService.assignInstructor(
             parseInt(classId),
             parseInt(id),
-            assignedBy
+            assignedBy,
+            {
+              overrideReason,
+              actorRoles: req.userRoles || [],
+            }
           );
 
           if (result.success) {
@@ -473,7 +447,8 @@ class ClassController {
 
       const result = await classService.removeInstructor(
         parseInt(classId),
-        parseInt(instructorId)
+        parseInt(instructorId),
+        req.user.userId
       );
 
       if (result.success) {
@@ -658,6 +633,263 @@ class ClassController {
         success: false,
         message: "Lỗi server nội bộ",
       });
+    }
+  }
+
+  // ============================================================
+  // EMAIL WHITELIST HANDLERS
+  // ============================================================
+
+  /**
+   * POST /api/classes/:classId/email-whitelist
+   * Upload Excel file và lưu danh sách email (replace toàn bộ)
+   */
+  uploadClassEmailWhitelist(req, res) {
+    excelUpload(req, res, async (uploadErr) => {
+      if (uploadErr) {
+        return res.status(400).json({
+          success: false,
+          message: uploadErr.message || "Lỗi khi upload file",
+        });
+      }
+
+      try {
+        const { classId } = req.params;
+        if (!classId || isNaN(parseInt(classId))) {
+          return res.status(400).json({
+            success: false,
+            message: "ID lớp học không hợp lệ",
+          });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({
+            success: false,
+            message: "Vui lòng chọn file Excel",
+          });
+        }
+
+        // Parse Excel file from buffer
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        // Extract emails: look for header row with "email" then collect values
+        // Also support: first row might already be emails (no header)
+        let emails = [];
+        let emailColIndex = -1;
+
+        // Find email column (case-insensitive header)
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          if (!Array.isArray(row)) continue;
+          for (let j = 0; j < row.length; j++) {
+            if (
+              row[j] &&
+              String(row[j]).toLowerCase().trim() === "email"
+            ) {
+              emailColIndex = j;
+              // Collect emails from rows below header
+              for (let k = i + 1; k < rows.length; k++) {
+                const val = rows[k] && rows[k][emailColIndex];
+                if (val && String(val).trim()) {
+                  emails.push(String(val).trim().toLowerCase());
+                }
+              }
+              break;
+            }
+          }
+          if (emailColIndex !== -1) break;
+        }
+
+        // Fallback: no header found — try first column of all rows
+        if (emailColIndex === -1) {
+          for (const row of rows) {
+            if (!Array.isArray(row)) continue;
+            const val = row[0];
+            if (val && String(val).trim()) {
+              emails.push(String(val).trim().toLowerCase());
+            }
+          }
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        emails = [...new Set(emails)].filter((e) => emailRegex.test(e));
+
+        if (emails.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Không tìm thấy email hợp lệ trong file. Đảm bảo file có cột 'email' hoặc cột đầu tiên chứa địa chỉ email.",
+          });
+        }
+
+        const userId = req.user.userId;
+        const userRole = req.userRoles?.includes("Admin")
+          ? "Admin"
+          : req.userRoles?.includes("Instructor")
+          ? "Instructor"
+          : null;
+
+        const result = await classService.setEmailWhitelist(
+          parseInt(classId),
+          emails,
+          userId,
+          userRole
+        );
+
+        return res.status(result.success ? 200 : 400).json(result);
+      } catch (error) {
+        console.error("Upload email whitelist error:", error);
+        return res.status(500).json({
+          success: false,
+          message: "Lỗi server nội bộ",
+        });
+      }
+    });
+  }
+
+  /**
+   * GET /api/classes/:classId/email-whitelist
+   * Lấy danh sách email whitelist của lớp
+   */
+  async getClassEmailWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const result = await classService.getEmailWhitelist(parseInt(classId));
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Get email whitelist error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * DELETE /api/classes/:classId/email-whitelist
+   * Xóa toàn bộ whitelist (tắt tính năng lọc email)
+   */
+  async deleteClassEmailWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin")
+        ? "Admin"
+        : req.userRoles?.includes("Instructor")
+        ? "Instructor"
+        : null;
+
+      const result = await classService.deleteEmailWhitelist(
+        parseInt(classId),
+        userId,
+        userRole
+      );
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Delete email whitelist error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * POST /api/classes/:classId/email-whitelist/add
+   * Thêm lẻ 1 email vào whitelist
+   */
+  async addSingleEmailToWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({ success: false, message: "ID lớp học không hợp lệ" });
+      }
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ success: false, message: "Vui lòng cung cấp email" });
+      }
+
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin"
+        : req.userRoles?.includes("Instructor") ? "Instructor" : null;
+
+      const result = await classService.addSingleEmail(parseInt(classId), email, userId, userRole);
+      return res.status(result.success ? 201 : 400).json(result);
+    } catch (error) {
+      console.error("Add single email whitelist error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  /**
+   * PATCH /api/classes/:classId/email-whitelist/update
+   * Sửa 1 email trong whitelist
+   */
+  async updateSingleEmailInWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({ success: false, message: "ID lớp học không hợp lệ" });
+      }
+      const { oldEmail, newEmail } = req.body;
+      if (!oldEmail || !newEmail) {
+        return res.status(400).json({ success: false, message: "Vui lòng cung cấp oldEmail và newEmail" });
+      }
+
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin"
+        : req.userRoles?.includes("Instructor") ? "Instructor" : null;
+
+      const result = await classService.updateSingleEmail(parseInt(classId), oldEmail, newEmail, userId, userRole);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Update single email whitelist error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
+    }
+  }
+
+  /**
+   * DELETE /api/classes/:classId/email-whitelist/single
+   * Xóa 1 email khỏi whitelist + kick sinh viên ra khỏi lớp
+   */
+  async removeSingleEmailFromWhitelist(req, res) {
+    try {
+      const { classId } = req.params;
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({ success: false, message: "ID lớp học không hợp lệ" });
+      }
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ success: false, message: "Vui lòng cung cấp email" });
+      }
+
+      const userId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin") ? "Admin"
+        : req.userRoles?.includes("Instructor") ? "Instructor" : null;
+
+      const result = await classService.removeSingleEmail(parseInt(classId), email, userId, userRole);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Remove single email whitelist error:", error);
+      return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
     }
   }
 }

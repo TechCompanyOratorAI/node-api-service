@@ -17,7 +17,7 @@ class JobController {
             if (Number.isNaN(parsedPresentationId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'presentationId must be a number'
+                    message: 'PresentationId phải là số'
                 });
             }
 
@@ -36,7 +36,7 @@ class JobController {
             console.error('Get jobs by presentation error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -54,7 +54,7 @@ class JobController {
             if (Number.isNaN(parsedJobId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'jobId must be a number'
+                    message: 'JobId phải là số'
                 });
             }
 
@@ -85,7 +85,7 @@ class JobController {
             if (Number.isNaN(parsedPresentationId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'presentationId must be a number'
+                    message: 'PresentationId phải là số'
                 });
             }
 
@@ -99,7 +99,7 @@ class JobController {
             console.error('Get job history error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -126,7 +126,7 @@ class JobController {
             console.error('Get pending jobs error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -150,7 +150,7 @@ class JobController {
             console.error('Get running jobs error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -175,7 +175,7 @@ class JobController {
             console.error('Get job statistics error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -193,7 +193,7 @@ class JobController {
             if (Number.isNaN(parsedJobId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'jobId must be a number'
+                    message: 'JobId phải là số'
                 });
             }
 
@@ -201,7 +201,7 @@ class JobController {
 
             return res.json({
                 success: true,
-                message: 'Job retry initiated',
+                message: 'Retry job thành công',
                 job
             });
         } catch (error) {
@@ -225,14 +225,14 @@ class JobController {
 
             return res.json({
                 success: true,
-                message: `Cleaned up ${deletedCount} old jobs`,
+                message: `Đã dọn dẹp ${deletedCount} tác vụ cũ`,
                 deletedCount
             });
         } catch (error) {
             console.error('Cleanup old jobs error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -250,14 +250,14 @@ class JobController {
 
             return res.json({
                 success: true,
-                message: `Reset ${resetCount} stuck jobs`,
+                message: `Đã reset các job bị treo thành công`,
                 resetCount
             });
         } catch (error) {
             console.error('Reset stuck jobs error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }
@@ -275,7 +275,7 @@ class JobController {
             if (Number.isNaN(parsedPresentationId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'presentationId must be a number'
+                    message: 'PresentationId phải là số'
                 });
             }
 
@@ -289,7 +289,7 @@ class JobController {
             console.error('Get analysis progress error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Internal server error',
+                message: 'Lỗi máy chủ nội bộ',
                 error: error.message
             });
         }

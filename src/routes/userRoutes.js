@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import { authenticateToken, requireEmailVerification, requireRole } from '../middleware/authMiddleware.js';
 import { uploadAvatar, uploadErrorHandler } from '../middleware/uploadMiddleware.js';
 import userController from '../controllers/userController.js';
@@ -22,7 +22,7 @@ router.get('/profile',
   // (req, res) => {
   //   userController.getUserProfile
   //   res.json({
-  //     message: 'Get user profile',
+  //     message: 'Thao tác không thành công',
   //     user: req.user
   //   });
   // }
@@ -35,7 +35,7 @@ router.put('/profile',
   userController.updateUserProfile.bind(userController),
   // (req, res) => {
   //   userController.updateUserProfile
-  //   res.json({ message: 'Update user profile' });
+  //   res.json({ message: 'Thao tác không thành công' });
   // }
 );
 

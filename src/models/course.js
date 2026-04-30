@@ -28,6 +28,35 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'departmentId',
                 as: 'department'
             });
+            Course.belongsTo(models.SubjectArea, {
+                foreignKey: 'subjectAreaId',
+                as: 'subjectArea'
+            });
+
+            Course.belongsTo(models.AcademicBlock, {
+                foreignKey: 'academicBlockId',
+                as: 'academicBlock'
+            });
+            Course.belongsToMany(models.AcademicBlock, {
+                through: models.CourseAcademicBlock,
+                foreignKey: 'courseId',
+                otherKey: 'academicBlockId',
+                as: 'academicBlocks'
+            });
+            Course.hasMany(models.CourseAcademicBlock, {
+                foreignKey: 'courseId',
+                as: 'courseAcademicBlocks'
+            });
+            Course.hasMany(models.CourseCompetencyRequirement, {
+                foreignKey: 'courseId',
+                as: 'competencyRequirements'
+            });
+            Course.belongsToMany(models.CompetencyCatalog, {
+                through: models.CourseCompetencyRequirement,
+                foreignKey: 'courseId',
+                otherKey: 'competencyId',
+                as: 'requiredCompetencies'
+            });
 
             // Keep existing associations
             // Enrollment removed - now belongs to Class, not Course
@@ -43,9 +72,12 @@ module.exports = (sequelize, DataTypes) => {
             courseName: { type: DataTypes.STRING(200), allowNull: false },
             majorCode: { type: DataTypes.STRING(20), allowNull: true, comment: 'Major code (e.g., SE, CS, IT)' },
             departmentId: { type: DataTypes.INTEGER, allowNull: true, comment: 'Department ID' },
+            majorId: { type: DataTypes.INTEGER, allowNull: true },
+            subjectAreaId: { type: DataTypes.INTEGER, allowNull: true },
             description: { type: DataTypes.TEXT },
             semester: { type: DataTypes.STRING(30) },
             academicYear: { type: DataTypes.INTEGER },
+            academicBlockId: { type: DataTypes.INTEGER, allowNull: true },
             startDate: { type: DataTypes.DATEONLY },
             endDate: { type: DataTypes.DATEONLY },
             isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },

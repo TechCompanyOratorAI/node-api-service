@@ -15,17 +15,19 @@ const {
 class EnrollmentService {
   /**
    * Join class using enrollment key (Student)
+   * classId is optional — if not provided, key is looked up globally
    */
   async joinClass(keyValue, studentId, classId) {
     const transaction = await db.sequelize.transaction();
 
     try {
-      // Step 1: Validate key with row lock - must match both keyValue AND classId
+      // Step 1: Find key — globally if no classId provided, or scoped to class
+      const whereClause = classId
+        ? { keyValue, classId }
+        : { keyValue };
+
       const key = await EnrollKey.findOne({
-        where: {
-          keyValue,
-          classId, // Key must belong to the specified class
-        },
+        where: whereClause,
         include: [{ model: Class, as: "class" }],
         lock: transaction.LOCK.UPDATE,
         transaction,
@@ -35,7 +37,9 @@ class EnrollmentService {
         await transaction.rollback();
         return {
           success: false,
-          message: "Mã đăng ký không hợp lệ hoặc không thuộc lớp học này",
+          message: classId
+            ? "Mã đăng ký không hợp lệ hoặc không thuộc lớp học này"
+            : "Mã đăng ký không hợp lệ",
         };
       }
 
@@ -76,6 +80,41 @@ class EnrollmentService {
         if (currentCount >= classData.maxStudents) {
           await transaction.rollback();
           return { success: false, message: "Lớp học đã đầy" };
+        }
+      }
+
+      // Step 4.5: Check email whitelist (nếu lớp có cài whitelist)
+      const { ClassEmailWhitelist } = db;
+      const whitelistCount = await ClassEmailWhitelist.count({
+        where: { classId: key.classId },
+        transaction,
+      });
+      if (whitelistCount > 0) {
+        const student = await User.findByPk(studentId, {
+          attributes: ["email"],
+          transaction,
+        });
+        if (!student || !student.email) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message: "Không thể xác thực email tài khoản của bạn",
+          };
+        }
+        const inWhitelist = await ClassEmailWhitelist.findOne({
+          where: {
+            classId: key.classId,
+            email: student.email.toLowerCase().trim(),
+          },
+          transaction,
+        });
+        if (!inWhitelist) {
+          await transaction.rollback();
+          return {
+            success: false,
+            message:
+              "Email của bạn không có trong danh sách sinh viên được phép tham gia lớp học này. Vui lòng liên hệ giảng viên.",
+          };
         }
       }
 
@@ -325,7 +364,7 @@ class EnrollmentService {
     try {
       const topic = await Topic.findByPk(topicId);
       if (!topic) {
-        return { success: false, message: "Topic not found" };
+        return { success: false, message: "Chủ đề không tìm thấy" };
       }
 
       // Check if student enrolled in any class of the course
@@ -343,7 +382,7 @@ class EnrollmentService {
       if (!classEnrollment) {
         return {
           success: false,
-          message: "You must enroll in a class before enrolling in a topic",
+          message: "Bạn chưa đăng ký lớp học của chủ đề này",
         };
       }
 
@@ -353,7 +392,7 @@ class EnrollmentService {
 
       if (existing) {
         if (existing.status === "enrolled") {
-          return { success: false, message: "Already enrolled in this topic" };
+          return { success: false, message: "Bạn đã đăng ký chủ đề này rồi" };
         }
 
         await TopicEnrollment.update(
@@ -363,7 +402,7 @@ class EnrollmentService {
 
         return {
           success: true,
-          message: "Re-enrolled in topic",
+          message: "Re-enrolled in chủ đề",
           topicEnrollmentId: existing.topicEnrollmentId,
         };
       }
@@ -376,14 +415,14 @@ class EnrollmentService {
 
       return {
         success: true,
-        message: "Enrolled in topic",
+        message: "Enrolled in chủ đề",
         topicEnrollmentId: topicEnrollment.topicEnrollmentId,
       };
     } catch (error) {
       console.error("Enroll topic error:", error);
       return {
         success: false,
-        message: "Failed to enroll in topic",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -398,7 +437,7 @@ class EnrollmentService {
       if (!existing || existing.status !== "enrolled") {
         return {
           success: false,
-          message: "You are not enrolled in this topic",
+          message: "Bạn chưa đăng ký chủ đề này hoặc đã hủy trước đó",
         };
       }
 
@@ -407,12 +446,12 @@ class EnrollmentService {
         { where: { topicEnrollmentId: existing.topicEnrollmentId } }
       );
 
-      return { success: true, message: "Dropped topic successfully" };
+      return { success: true, message: "Dropped chủ đề thành công" };
     } catch (error) {
       console.error("Drop topic error:", error);
       return {
         success: false,
-        message: "Failed to drop topic",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -477,7 +516,7 @@ class EnrollmentService {
       console.error("List my topics error:", error);
       return {
         success: false,
-        message: "Failed to retrieve topics",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }

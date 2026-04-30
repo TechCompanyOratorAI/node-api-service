@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 import feedbackService from '../services/feedbackService.js';
 
 class FeedbackController {
@@ -24,7 +24,7 @@ class FeedbackController {
             }
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi tạo feedback'
+                message: 'Không thể tạo feedback'
             });
         }
     }
@@ -47,7 +47,7 @@ class FeedbackController {
             }
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy feedback'
+                message: 'Không thể lấy feedback'
             });
         }
     }
@@ -70,7 +70,7 @@ class FeedbackController {
             }
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy feedback của presentation'
+                message: 'Không thể lấy feedback của presentation'
             });
         }
     }
@@ -92,7 +92,7 @@ class FeedbackController {
             }
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy feedback của bạn'
+                message: 'Không thể lấy feedback của bạn'
             });
         }
     }
@@ -119,7 +119,7 @@ class FeedbackController {
             }
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi cập nhật feedback'
+                message: 'Không thể cập nhật feedback'
             });
         }
     }
@@ -145,7 +145,7 @@ class FeedbackController {
             }
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi xóa feedback'
+                message: 'Không thể xóa feedback'
             });
         }
     }
@@ -167,7 +167,7 @@ class FeedbackController {
             }
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy danh sách feedback'
+                message: 'Không thể lấy danh sách feedback'
             });
         }
     }

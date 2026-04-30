@@ -42,6 +42,18 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'instructorId',
         as: 'classInstructors'
       });
+      User.hasMany(models.InstructorCompetency, {
+        foreignKey: 'instructorId',
+        as: 'instructorCompetencies'
+      });
+      User.hasMany(models.InstructorCompetency, {
+        foreignKey: 'approvedBy',
+        as: 'approvedInstructorCompetencies'
+      });
+      User.hasMany(models.CourseCompetencyRequirement, {
+        foreignKey: 'createdBy',
+        as: 'createdCourseCompetencyRequirements'
+      });
     }
   }
 

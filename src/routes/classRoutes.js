@@ -30,36 +30,36 @@ router.use(requireEmailVerification);
 // Get all classes (Admin and Student)
 router.get(
   "/",
-  requireRole(["Admin", "Student"]),
+  requireRole(["Admin", "AcademicCoordinator", "Student"]),
   classController.getAllClasses
 );
 
 router.get(
   "/:classId",
-  requireRole(["Admin", "Instructor", "Student"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor", "Student"]),
   classController.getClassById
 );
 
 router.put(
   "/:classId",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   requireClassInstructorOrAdmin,
   validateUpdateClass,
   classController.updateClass
 );
 
-router.delete("/:classId", requireRole(["Admin"]), classController.deleteClass);
+router.delete("/:classId", requireRole(["Admin", "AcademicCoordinator"]), classController.deleteClass);
 
 router.post(
   "/:classId/instructors",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   validateAssignInstructor,
   classController.assignInstructor
 );
 
 router.delete(
   "/:classId/instructors/:instructorId",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   classController.removeInstructor
 );
 
@@ -67,14 +67,14 @@ router.get("/:classId/instructors", classController.getClassInstructors);
 
 router.get(
   "/:classId/students",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   enrollmentController.getClassStudents
 );
 
 // Class scores - get all students and their scores (Instructor/Admin)
 router.get(
   "/:classId/scores",
-  requireRole(["Admin", "Instructor"]),
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
   requireClassInstructorOrAdmin,
   classScoreController.getClassScores
 );
@@ -166,6 +166,51 @@ router.post(
   requireRole(["Admin", "Instructor"]),
   requireClassInstructorOrAdmin,
   classController.setUploadPermission
+);
+
+// ============================================================
+// EMAIL WHITELIST ROUTES
+// ============================================================
+// GET  /api/classes/:classId/email-whitelist - Lấy danh sách email
+router.get(
+  "/:classId/email-whitelist",
+  requireRole(["Admin", "Instructor"]),
+  classController.getClassEmailWhitelist
+);
+
+// POST /api/classes/:classId/email-whitelist - Upload Excel, replace whitelist
+router.post(
+  "/:classId/email-whitelist",
+  requireRole(["Admin", "Instructor"]),
+  classController.uploadClassEmailWhitelist
+);
+
+// DELETE /api/classes/:classId/email-whitelist - Xóa toàn bộ whitelist
+router.delete(
+  "/:classId/email-whitelist",
+  requireRole(["Admin", "Instructor"]),
+  classController.deleteClassEmailWhitelist
+);
+
+// POST /api/classes/:classId/email-whitelist/add - Thêm lẻ 1 email
+router.post(
+  "/:classId/email-whitelist/add",
+  requireRole(["Admin", "Instructor"]),
+  classController.addSingleEmailToWhitelist
+);
+
+// PATCH /api/classes/:classId/email-whitelist/update - Sửa 1 email
+router.patch(
+  "/:classId/email-whitelist/update",
+  requireRole(["Admin", "Instructor"]),
+  classController.updateSingleEmailInWhitelist
+);
+
+// DELETE /api/classes/:classId/email-whitelist/single - Xóa 1 email + kick sinh viên
+router.delete(
+  "/:classId/email-whitelist/single",
+  requireRole(["Admin", "Instructor"]),
+  classController.removeSingleEmailFromWhitelist
 );
 
 export default router;

@@ -3,8 +3,10 @@
 const db = require("../models");
 const {
   Class,
+  ClassAcademicBlock,
   ClassInstructor,
   Course,
+  CourseAcademicBlock,
   CourseInstructor,
   User,
   Enrollment,
@@ -12,11 +14,171 @@ const {
   EnrollKey,
   Topic,
   ClassRubricCriteria,
+  AcademicBlock,
 } = db;
 const { Op } = require("sequelize");
 const { emitUploadPermissionChanged } = require("../websocket/emitters");
+const auditLogService = require("./auditLogService");
+const competencyService = require("./competencyService");
+const { AUDIT_ACTIONS, AUDIT_STATUSES } = require("../constants/businessConstants");
 
 class ClassService {
+  normalizeClassBlockIds(payload = {}) {
+    if (Array.isArray(payload.academicBlockIds)) {
+      return [...new Set(payload.academicBlockIds.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))];
+    }
+    if (payload.academicBlockId !== undefined && payload.academicBlockId !== null) {
+      const parsed = parseInt(payload.academicBlockId, 10);
+      return Number.isInteger(parsed) && parsed > 0 ? [parsed] : [];
+    }
+    return [];
+  }
+
+  async getAllowedCourseBlockIds(courseId, transaction = null) {
+    const mappings = await CourseAcademicBlock.findAll({
+      where: { courseId },
+      attributes: ["academicBlockId", "isPrimary"],
+      order: [["isPrimary", "DESC"], ["courseAcademicBlockId", "ASC"]],
+      transaction,
+    });
+    return mappings.map((mapping) => mapping.academicBlockId);
+  }
+
+  resolveClassAcademicBlockId(requestedBlockId, allowedBlockIds) {
+    const normalizedRequestedBlockId = requestedBlockId === undefined || requestedBlockId === null
+      ? requestedBlockId
+      : parseInt(requestedBlockId, 10);
+
+    if (!allowedBlockIds.length) {
+      return {
+        success: true,
+        academicBlockId: normalizedRequestedBlockId || null,
+      };
+    }
+
+    if (normalizedRequestedBlockId !== undefined && normalizedRequestedBlockId !== null) {
+      if (!allowedBlockIds.includes(normalizedRequestedBlockId)) {
+        return {
+          success: false,
+          message: "Academic block không thuộc phạm vi của khóa học",
+        };
+      }
+      return {
+        success: true,
+        academicBlockId: normalizedRequestedBlockId,
+      };
+    }
+
+    if (allowedBlockIds.length === 1) {
+      return {
+        success: true,
+        academicBlockId: allowedBlockIds[0],
+      };
+    }
+
+    return {
+      success: false,
+      message: "Dữ liệu không hợp lệ",
+    };
+  }
+
+  resolveClassAcademicBlockIds(requestedBlockIds, allowedBlockIds) {
+    if (!allowedBlockIds.length) {
+      return { success: true, academicBlockIds: requestedBlockIds };
+    }
+
+    if (requestedBlockIds.length > 0) {
+      const invalid = requestedBlockIds.filter((id) => !allowedBlockIds.includes(id));
+      if (invalid.length > 0) {
+        return { success: false, message: "Dữ liệu không hợp lệ" };
+      }
+      return { success: true, academicBlockIds: requestedBlockIds };
+    }
+
+    if (allowedBlockIds.length === 1) {
+      return { success: true, academicBlockIds: [allowedBlockIds[0]] };
+    }
+
+    return { success: false, message: "Dữ liệu không hợp lệ" };
+  }
+
+  async syncClassAcademicBlocks(classId, academicBlockIds, transaction) {
+    await ClassAcademicBlock.destroy({
+      where: { classId },
+      transaction,
+    });
+
+    if (!academicBlockIds.length) return;
+    await ClassAcademicBlock.bulkCreate(
+      academicBlockIds.map((blockId, index) => ({
+        classId,
+        academicBlockId: blockId,
+        isPrimary: index === 0,
+      })),
+      { transaction }
+    );
+  }
+
+  async getClassAcademicBlockIds(classId, transaction = null) {
+    const mappings = await ClassAcademicBlock.findAll({
+      where: { classId },
+      attributes: ["academicBlockId", "isPrimary"],
+      order: [["isPrimary", "DESC"], ["classAcademicBlockId", "ASC"]],
+      transaction,
+    });
+    return mappings.map((mapping) => mapping.academicBlockId);
+  }
+
+  async validateClassDateWithinBlocks(academicBlockIds, startDate, endDate, entityLabel = "Class") {
+    if (!academicBlockIds.length) {
+      return { success: true, startDate, endDate, primaryAcademicBlockId: null };
+    }
+
+    const blocks = await AcademicBlock.findAll({
+      where: { academicBlockId: academicBlockIds, isActive: true },
+    });
+    if (blocks.length !== academicBlockIds.length) {
+      return { success: false, message: "Dữ liệu không hợp lệ" };
+    }
+
+    // FPT rule: one class must belong to only one term (SPRING or SUMMER or FALL)
+    // Course can span multiple terms, but each class is opened per-term.
+    const distinctTerms = [...new Set(blocks.map((block) => block.term))];
+    if (distinctTerms.length > 1) {
+      return {
+        success: false,
+        message: "Một lớp chỉ được thuộc một kỳ (term). Sang kỳ mới phải tạo lớp mới.",
+      };
+    }
+
+    const distinctAcademicYears = [...new Set(blocks.map((block) => block.academicYearId))];
+    if (distinctAcademicYears.length > 1) {
+      return {
+        success: false,
+        message: "Một lớp chỉ được thuộc một niên khóa.",
+      };
+    }
+
+    const minStart = blocks.reduce((acc, block) => (!acc || new Date(block.startDate) < new Date(acc) ? block.startDate : acc), null);
+    const maxEnd = blocks.reduce((acc, block) => (!acc || new Date(block.endDate) > new Date(acc) ? block.endDate : acc), null);
+    const nextStart = startDate || minStart;
+    const nextEnd = endDate || maxEnd;
+
+    if (new Date(nextStart) >= new Date(nextEnd)) {
+      return { success: false, message: `${entityLabel} endDate must be after startDate` };
+    }
+    if (new Date(nextStart) < new Date(minStart) || new Date(nextEnd) > new Date(maxEnd)) {
+      return { success: false, message: `${entityLabel} dates must be inside selected academic blocks range` };
+    }
+
+    return {
+      success: true,
+      startDate: nextStart,
+      endDate: nextEnd,
+      primaryAcademicBlockId: academicBlockIds[0] || null,
+    };
+  }
+
   /**
    * Create new class (Admin only)
    */
@@ -45,17 +207,33 @@ class ClassService {
         };
       }
 
+      const requestedBlockIds = this.normalizeClassBlockIds(classData);
+      const allowedBlockIds = await this.getAllowedCourseBlockIds(courseId, transaction);
+      const blockSelection = this.resolveClassAcademicBlockIds(requestedBlockIds, allowedBlockIds);
+      if (!blockSelection.success) {
+        await transaction.rollback();
+        return blockSelection;
+      }
+      const finalBlockIds = blockSelection.academicBlockIds;
+      const dateValidation = await this.validateClassDateWithinBlocks(finalBlockIds, startDate, endDate, "Class");
+      if (!dateValidation.success) {
+        await transaction.rollback();
+        return dateValidation;
+      }
+
       // Create class
       const newClass = await Class.create({
         courseId,
+        academicBlockId: dateValidation.primaryAcademicBlockId || null,
         classCode,
         status: "active",
-        startDate,
-        endDate,
+        startDate: dateValidation.startDate || null,
+        endDate: dateValidation.endDate || null,
         maxStudents,
         maxGroupMembers,
         createdBy: userId,
       }, { transaction });
+      await this.syncClassAcademicBlocks(newClass.classId, finalBlockIds, transaction);
 
       const isAdmin = userRoles.includes("Admin");
       const isInstructor = userRoles.includes("Instructor");
@@ -74,7 +252,10 @@ class ClassService {
       return {
         success: true,
         message: "Tạo lớp học thành công",
-        class: newClass,
+        class: {
+          ...newClass.toJSON(),
+          academicBlockIds: finalBlockIds,
+        },
       };
     } catch (error) {
       await transaction.rollback();
@@ -122,9 +303,21 @@ class ClassService {
         where,
         include: [
           {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            through: { attributes: ["isPrimary"] },
+            required: false,
+          },
+          {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName"],
+            attributes: ["courseId", "courseCode", "courseName", "academicBlockId"],
+            include: [{
+              model: db.AcademicBlock,
+              as: "academicBlocks",
+              through: { attributes: ["isPrimary"] },
+              required: false,
+            }],
           },
           {
             model: User,
@@ -154,6 +347,7 @@ class ClassService {
   data: classes.map((c) => {
     const classData = {
       ...c.toJSON(),
+      academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
       enrollmentCount: c.enrollments?.length || 0,
       activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
     };
@@ -215,9 +409,21 @@ class ClassService {
         where,
         include: [
           {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            through: { attributes: ["isPrimary"] },
+            required: false,
+          },
+          {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName"],
+            attributes: ["courseId", "courseCode", "courseName", "academicBlockId"],
+            include: [{
+              model: db.AcademicBlock,
+              as: "academicBlocks",
+              through: { attributes: ["isPrimary"] },
+              required: false,
+            }],
           },
           {
             model: User,
@@ -247,6 +453,7 @@ class ClassService {
         data: classes.map((c) => {
           const classData = {
             ...c.toJSON(),
+            academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
             enrollmentCount: c.enrollments?.length || 0,
             activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
           };
@@ -303,6 +510,12 @@ class ClassService {
         where: { classId: { [Op.in]: classIds } },
         include: [
           {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            through: { attributes: ["isPrimary"] },
+            required: false,
+          },
+          {
             model: Course,
             as: "course",
             attributes: [
@@ -311,7 +524,14 @@ class ClassService {
               "courseName",
               "semester",
               "academicYear",
+              "academicBlockId",
             ],
+            include: [{
+              model: db.AcademicBlock,
+              as: "academicBlocks",
+              through: { attributes: ["isPrimary"] },
+              required: false,
+            }],
           },
           {
             model: User,
@@ -354,6 +574,8 @@ class ClassService {
           endDate: c.endDate,
           maxStudents: c.maxStudents,
           maxGroupMembers: c.maxGroupMembers,
+          academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
+          academicBlocks: c.academicBlocks || [],
           course: c.course,
           instructors: c.instructors,
           enrollmentCount: c.enrollments?.length || 0,
@@ -379,9 +601,21 @@ class ClassService {
       const classData = await Class.findByPk(classId, {
         include: [
           {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            through: { attributes: ["isPrimary"] },
+            required: false,
+          },
+          {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName", "semester", "academicYear"],
+            attributes: ["courseId", "courseCode", "courseName", "semester", "academicYear", "academicBlockId"],
+            include: [{
+              model: db.AcademicBlock,
+              as: "academicBlocks",
+              through: { attributes: ["isPrimary"] },
+              required: false,
+            }],
           },
           {
             model: Topic,
@@ -481,6 +715,7 @@ class ClassService {
         success: true,
         class: {
           ...response,
+          academicBlockIds: (response.academicBlocks || []).map((b) => b.academicBlockId),
           totalStudents: response.enrollments?.length || 0,
           // topics is now directly on the class
         },
@@ -535,7 +770,40 @@ class ClassService {
       }
 
       // Update class info
+      const allowedBlockIds = await this.getAllowedCourseBlockIds(classData.courseId, transaction);
+      const hasBlocksInPayload = Array.isArray(classUpdates.academicBlockIds) || classUpdates.academicBlockId !== undefined;
+      const requestedBlockIds = hasBlocksInPayload
+        ? this.normalizeClassBlockIds(classUpdates)
+        : await this.getClassAcademicBlockIds(classId, transaction);
+      const blockSelection = this.resolveClassAcademicBlockIds(requestedBlockIds, allowedBlockIds);
+      if (!blockSelection.success) {
+        await transaction.rollback();
+        return blockSelection;
+      }
+      const nextBlockIds = blockSelection.academicBlockIds;
+      const nextStartDate = classUpdates.startDate || classData.startDate;
+      const nextEndDate = classUpdates.endDate || classData.endDate;
+      const dateValidation = await this.validateClassDateWithinBlocks(nextBlockIds, nextStartDate, nextEndDate, "Class");
+      if (!dateValidation.success) {
+        await transaction.rollback();
+        return dateValidation;
+      }
+
+      if (hasBlocksInPayload) {
+        classUpdates.academicBlockId = dateValidation.primaryAcademicBlockId || null;
+      }
+      if (classUpdates.startDate === undefined && hasBlocksInPayload && !nextStartDate) {
+        classUpdates.startDate = dateValidation.startDate || null;
+      }
+      if (classUpdates.endDate === undefined && hasBlocksInPayload && !nextEndDate) {
+        classUpdates.endDate = dateValidation.endDate || null;
+      }
+      if (classUpdates.academicBlockIds !== undefined) delete classUpdates.academicBlockIds;
+
       await classData.update(classUpdates, { transaction });
+      if (hasBlocksInPayload) {
+        await this.syncClassAcademicBlocks(classId, nextBlockIds, transaction);
+      }
 
       // Update enrollment key if provided
       if (enrollKey !== undefined || keyExpiresAt !== undefined || keyMaxUses !== undefined) {
@@ -590,7 +858,10 @@ class ClassService {
       return {
         success: true,
         message: "Cập nhật lớp học thành công",
-        class: updatedClass,
+        class: {
+          ...updatedClass.toJSON(),
+          academicBlockIds: await this.getClassAcademicBlockIds(classId),
+        },
       };
     } catch (error) {
       await transaction.rollback();
@@ -646,7 +917,7 @@ class ClassService {
   /**
    * Assign instructor to class
    */
-  async assignInstructor(classId, instructorId, assignedBy) {
+  async assignInstructor(classId, instructorId, assignedBy, options = {}) {
     try {
       const classData = await Class.findByPk(classId);
       if (!classData) {
@@ -677,14 +948,77 @@ class ClassService {
         };
       }
 
+      const actorRoles = Array.isArray(options.actorRoles) ? options.actorRoles : [];
+      const canOverride =
+        actorRoles.includes("Admin") || actorRoles.includes("AcademicCoordinator");
+      const overrideReason =
+        typeof options.overrideReason === "string" ? options.overrideReason.trim() : "";
+
+      const eligibility = await competencyService.evaluateInstructorEligibilityForCourse(
+        classData.courseId,
+        instructorId,
+        {
+          classContext: {
+            classId,
+            startDate: classData.startDate,
+            endDate: classData.endDate,
+          },
+        }
+      );
+
+      if (!eligibility.success) {
+        return {
+          success: false,
+          message: eligibility.message || "Unable to evaluate instructor eligibility",
+          error: eligibility.error,
+        };
+      }
+
+      if (!eligibility.eligible && !(canOverride && overrideReason)) {
+        return {
+          success: false,
+          message: "Giảng viên chưa đủ điều kiện phụ trách lớp (cần overrideReason nếu muốn override)",
+          eligibility,
+        };
+      }
+
+      const isOverrideAssignment = !eligibility.eligible;
+
       // Assign
       await ClassInstructor.create({
         classId,
         instructorId,
         assignedBy,
+        assignmentStatus: isOverrideAssignment ? "override" : "eligible",
+        overrideReason: isOverrideAssignment ? overrideReason : null,
+        overrideBy: isOverrideAssignment ? assignedBy : null,
+        overrideAt: isOverrideAssignment ? new Date() : null,
       });
 
-      return { success: true, message: "Phân công giảng viên thành công" };
+      await auditLogService.log({
+        actorUserId: assignedBy,
+        action: isOverrideAssignment
+          ? AUDIT_ACTIONS.CLASS_INSTRUCTOR_OVERRIDDEN
+          : AUDIT_ACTIONS.CLASS_INSTRUCTOR_ASSIGNED,
+        entityType: "ClassInstructor",
+        entityId: classId,
+        status: AUDIT_STATUSES.SUCCESS,
+        reason: isOverrideAssignment ? overrideReason : null,
+        metadata: {
+          classId,
+          instructorId,
+          assignmentStatus: isOverrideAssignment ? "override" : "eligible",
+          eligibility,
+        },
+      });
+
+      return {
+        success: true,
+        message: isOverrideAssignment
+          ? "Instructor assigned with override"
+          : "Instructor assigned successfully",
+        assignmentStatus: isOverrideAssignment ? "override" : "eligible",
+      };
     } catch (error) {
       console.error("Assign instructor error:", error);
       return {
@@ -698,7 +1032,7 @@ class ClassService {
   /**
    * Remove instructor from class
    */
-  async removeInstructor(classId, instructorId) {
+  async removeInstructor(classId, instructorId, removedBy = null) {
     try {
       const assignment = await ClassInstructor.findOne({
         where: { classId, instructorId },
@@ -712,6 +1046,15 @@ class ClassService {
       }
 
       await assignment.destroy();
+
+      await auditLogService.log({
+        actorUserId: removedBy,
+        action: AUDIT_ACTIONS.CLASS_INSTRUCTOR_REMOVED,
+        entityType: "ClassInstructor",
+        entityId: classId,
+        status: AUDIT_STATUSES.SUCCESS,
+        metadata: { classId, instructorId },
+      });
 
       return { success: true, message: "Gỡ bỏ giảng viên thành công" };
     } catch (error) {
@@ -1007,6 +1350,298 @@ class ClassService {
       };
     }
   }
+
+  // ============================================================
+  // EMAIL WHITELIST MANAGEMENT
+  // ============================================================
+
+  /**
+   * Replace email whitelist for a class (Admin/Instructor only)
+   */
+  async setEmailWhitelist(classId, emails, userId, userRole) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      const classData = await Class.findByPk(classId, { transaction });
+      if (!classData) {
+        await transaction.rollback();
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") {
+          await transaction.rollback();
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId: userId },
+          transaction,
+        });
+        if (!isInstructor) {
+          await transaction.rollback();
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+      }
+
+      const { ClassEmailWhitelist } = db;
+
+      // Replace: xóa cũ rồi insert mới
+      await ClassEmailWhitelist.destroy({ where: { classId }, transaction });
+
+      const records = emails.map((email) => ({ classId, email }));
+      await ClassEmailWhitelist.bulkCreate(records, {
+        ignoreDuplicates: true,
+        transaction,
+      });
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: `Đã cập nhật danh sách ${emails.length} email sinh viên cho lớp học`,
+        total: emails.length,
+        emails,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Set email whitelist error:", error);
+      return {
+        success: false,
+        message: "Không thể cập nhật danh sách email",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get email whitelist for a class
+   */
+  async getEmailWhitelist(classId) {
+    try {
+      const { ClassEmailWhitelist } = db;
+      const records = await ClassEmailWhitelist.findAll({
+        where: { classId },
+        attributes: ["id", "email", "createdAt"],
+        order: [["email", "ASC"]],
+      });
+
+      return {
+        success: true,
+        classId,
+        total: records.length,
+        hasWhitelist: records.length > 0,
+        emails: records.map((r) => r.email),
+      };
+    } catch (error) {
+      console.error("Get email whitelist error:", error);
+      return {
+        success: false,
+        message: "Không thể lấy danh sách email",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Delete all whitelist entries for a class (Admin/Instructor only)
+   */
+  async deleteEmailWhitelist(classId, userId, userRole) {
+    try {
+      const classData = await Class.findByPk(classId);
+      if (!classData) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") {
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId: userId },
+        });
+        if (!isInstructor) {
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+      }
+
+      const { ClassEmailWhitelist } = db;
+      const deleted = await ClassEmailWhitelist.destroy({ where: { classId } });
+
+      return {
+        success: true,
+        message: `Đã xóa danh sách email whitelist (${deleted} email). Lớp học sẽ cho phép tất cả sinh viên tham gia.`,
+        deleted,
+      };
+    } catch (error) {
+      console.error("Delete email whitelist error:", error);
+      return {
+        success: false,
+        message: "Không thể xóa danh sách email",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Add a single email to the whitelist (Admin/Instructor only)
+   */
+  async addSingleEmail(classId, email, userId, userRole) {
+    try {
+      const classData = await Class.findByPk(classId);
+      if (!classData) return { success: false, message: "Không tìm thấy lớp học" };
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") return { success: false, message: "Bạn không có quyền thực hiện" };
+        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId } });
+        if (!isInstructor) return { success: false, message: "Bạn không có quyền thực hiện" };
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!emailRegex.test(normalizedEmail)) {
+        return { success: false, message: "Email không hợp lệ" };
+      }
+
+      const { ClassEmailWhitelist } = db;
+
+      // Check duplicate
+      const existing = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedEmail } });
+      if (existing) return { success: false, message: "Email này đã có trong danh sách" };
+
+      const record = await ClassEmailWhitelist.create({ classId, email: normalizedEmail });
+
+      return {
+        success: true,
+        message: `Đã thêm ${normalizedEmail} vào danh sách`,
+        entry: { id: record.id, email: record.email },
+      };
+    } catch (error) {
+      console.error("Add single email error:", error);
+      return { success: false, message: "Không thể thêm email", error: error.message };
+    }
+  }
+
+  /**
+   * Update (rename) a single email in the whitelist (Admin/Instructor only)
+   */
+  async updateSingleEmail(classId, oldEmail, newEmail, userId, userRole) {
+    try {
+      const classData = await Class.findByPk(classId);
+      if (!classData) return { success: false, message: "Không tìm thấy lớp học" };
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") return { success: false, message: "Bạn không có quyền thực hiện" };
+        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId } });
+        if (!isInstructor) return { success: false, message: "Bạn không có quyền thực hiện" };
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const normalizedNew = newEmail.trim().toLowerCase();
+      const normalizedOld = oldEmail.trim().toLowerCase();
+
+      if (!emailRegex.test(normalizedNew)) {
+        return { success: false, message: "Email mới không hợp lệ" };
+      }
+
+      const { ClassEmailWhitelist } = db;
+
+      const existing = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedOld } });
+      if (!existing) return { success: false, message: "Email cũ không tồn tại trong danh sách" };
+
+      // Check if new email already exists
+      if (normalizedNew !== normalizedOld) {
+        const duplicate = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedNew } });
+        if (duplicate) return { success: false, message: "Email mới đã tồn tại trong danh sách" };
+      }
+
+      await existing.update({ email: normalizedNew });
+
+      return {
+        success: true,
+        message: `Đã cập nhật email thành ${normalizedNew}`,
+        entry: { id: existing.id, email: normalizedNew },
+      };
+    } catch (error) {
+      console.error("Update single email error:", error);
+      return { success: false, message: "Không thể cập nhật email", error: error.message };
+    }
+  }
+
+  /**
+   * Remove a single email from whitelist and optionally kick the student from class.
+   * Admin/Instructor only.
+   */
+  async removeSingleEmail(classId, email, userId, userRole) {
+    const transaction = await db.sequelize.transaction();
+    try {
+      const classData = await Class.findByPk(classId, { transaction });
+      if (!classData) {
+        await transaction.rollback();
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Authorization
+      if (userRole !== "Admin") {
+        if (userRole !== "Instructor") {
+          await transaction.rollback();
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId }, transaction });
+        if (!isInstructor) {
+          await transaction.rollback();
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        }
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const { ClassEmailWhitelist, User, Enrollment, Presentation } = db;
+
+      // Remove from whitelist
+      const deleted = await ClassEmailWhitelist.destroy({ where: { classId, email: normalizedEmail }, transaction });
+      if (deleted === 0) {
+        await transaction.rollback();
+        return { success: false, message: "Email không tồn tại trong danh sách" };
+      }
+
+      // Find and kick the student if enrolled
+      let kicked = false;
+      let kickDetail = null;
+      const student = await User.findOne({ where: { email: normalizedEmail }, attributes: ["userId", "email"], transaction });
+
+      if (student) {
+        const enrollment = await Enrollment.findOne({ where: { classId, studentId: student.userId }, transaction });
+        if (enrollment) {
+          const presentationCount = await Presentation.count({ where: { studentId: student.userId, classId }, transaction });
+          if (presentationCount > 0) {
+            await enrollment.update({ status: "dropped" }, { transaction });
+          } else {
+            await enrollment.destroy({ transaction });
+          }
+          kicked = true;
+          kickDetail = { studentId: student.userId, email: normalizedEmail, hadPresentations: presentationCount > 0 };
+        }
+      }
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: kicked
+          ? `Đã xóa ${normalizedEmail} khỏi danh sách và kick sinh viên ra khỏi lớp`
+          : `Đã xóa ${normalizedEmail} khỏi danh sách (sinh viên chưa join lớp)`,
+        kicked,
+        kickDetail,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Remove single email error:", error);
+      return { success: false, message: "Không thể xóa email", error: error.message };
+    }
+  }
 }
 
 module.exports = new ClassService();
+

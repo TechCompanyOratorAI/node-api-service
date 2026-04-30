@@ -53,7 +53,7 @@ class JobService {
       // Check if presentation exists
       const presentation = await Presentation.findByPk(presentationId);
       if (!presentation) {
-        throw new Error(`Presentation not found: ${presentationId}`);
+        throw new Error(`Không tìm thấy bài thuyết trình: ${presentationId}`);
       }
 
       // Check for existing pending/running job
@@ -179,7 +179,7 @@ class JobService {
           break;
 
         default:
-          throw new Error(`Unknown job type: ${job.jobType}`);
+          throw new Error(`Loại job không được hỗ trợ: ${jobType}`);
       }
 
       // Extract messageId from response object
@@ -209,14 +209,14 @@ class JobService {
    * Cập nhật trạng thái job
    * @param {number} jobId
    * @param {string} status
-   * @param {object} updates - Additional fields to update
+   * @param {object} updates - Additional fields để cập nhật
    * @returns {Promise<Job>}
    */
   async updateJobStatus(jobId, status, updates = {}) {
     try {
       const job = await Job.findByPk(jobId);
       if (!job) {
-        throw new Error(`Job not found: ${jobId}`);
+        throw new Error(`Job không tìm thấy: ${jobId}`);
       }
 
       await job.update({
@@ -242,7 +242,7 @@ class JobService {
     try {
       const job = await Job.findByPk(jobId);
       if (!job) {
-        throw new Error(`Job not found: ${jobId}`);
+        throw new Error(`Job không tìm thấy: ${jobId}`);
       }
 
       await job.markAsRunning(workerName);
@@ -274,7 +274,7 @@ class JobService {
     try {
       const job = await Job.findByPk(jobId);
       if (!job) {
-        throw new Error(`Job not found: ${jobId}`);
+        throw new Error(`Job không tìm thấy: ${jobId}`);
       }
 
       await job.markAsCompleted(result);
@@ -471,7 +471,7 @@ class JobService {
     try {
       const job = await Job.findByPk(jobId);
       if (!job) {
-        throw new Error(`Job not found: ${jobId}`);
+        throw new Error(`Job không tìm thấy: ${jobId}`);
       }
 
       await job.markAsFailed(errorMessage);
@@ -544,11 +544,11 @@ class JobService {
     try {
       const job = await Job.findByPk(jobId);
       if (!job) {
-        throw new Error(`Job not found: ${jobId}`);
+        throw new Error(`Job không tìm thấy: ${jobId}`);
       }
 
       if (job.status !== JOB_STATUS.FAILED) {
-        throw new Error(`Job ${jobId} is not in failed state, cannot retry`);
+        throw new Error(`Job ${jobId} is not in thất bại state, không thể retry`);
       }
 
       if (job.retryCount >= MAX_RETRY_COUNT) {
@@ -849,7 +849,7 @@ class JobService {
       });
 
       if (!job) {
-        throw new Error(`Job not found: ${jobId}`);
+        throw new Error(`Job không tìm thấy: ${jobId}`);
       }
 
       return job;

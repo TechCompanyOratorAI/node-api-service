@@ -12,12 +12,12 @@ class EmailController {
       if (result.success) {
         return res.status(200).json({
           success: true,
-          message: "Email service is working properly",
+          message: "Kết nối email service thành công",
         });
       } else {
         return res.status(500).json({
           success: false,
-          message: "Email service connection failed",
+          message: "Email service connection thất bại",
           error: result.error,
         });
       }
@@ -25,7 +25,7 @@ class EmailController {
       console.error("Email test controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -38,7 +38,7 @@ class EmailController {
       if (!email || !subject || !message) {
         return res.status(400).json({
           success: false,
-          message: "Email, subject, and message are required",
+          message: "Dữ liệu không hợp lệ",
         });
       }
 
@@ -53,12 +53,12 @@ class EmailController {
       if (result.success) {
         return res.status(200).json({
           success: true,
-          message: "Test email sent successfully",
+          message: "Test email sent thành công",
         });
       } else {
         return res.status(500).json({
           success: false,
-          message: "Failed to send test email",
+          message: "Thao tác thất bại",
           error: result.error,
         });
       }
@@ -66,7 +66,7 @@ class EmailController {
       console.error("Send test email controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }
@@ -82,14 +82,14 @@ class EmailController {
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: "User not found",
+          message: "Người dùng không tìm thấy",
         });
       }
 
       if (!user.isEmailVerified) {
         return res.status(400).json({
           success: false,
-          message: "User email is not verified yet",
+          message: "Người dùng chưa xác thực email",
         });
       }
 
@@ -102,12 +102,12 @@ class EmailController {
       if (result.success) {
         return res.status(200).json({
           success: true,
-          message: "Welcome email sent successfully",
+          message: "Welcome email sent thành công",
         });
       } else {
         return res.status(500).json({
           success: false,
-          message: "Failed to send welcome email",
+          message: "Thao tác thất bại",
           error: result.error,
         });
       }
@@ -115,7 +115,7 @@ class EmailController {
       console.error("Resend welcome email controller error:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Lỗi máy chủ nội bộ",
       });
     }
   }

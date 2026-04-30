@@ -103,7 +103,7 @@ class PresentationService {
     try {
       // Step 1: Validate classId is provided
       if (!classId) {
-        return { success: false, message: "Class ID is required" };
+        return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       // Step 2: Validate class exists and get class data
@@ -112,7 +112,7 @@ class PresentationService {
       });
 
       if (!classData) {
-        return { success: false, message: "Class not found" };
+        return { success: false, message: "Lớp không tìm thấy" };
       }
 
       // Step 3: Validate student is enrolled in the class
@@ -127,7 +127,7 @@ class PresentationService {
       if (!classEnrollment) {
         return {
           success: false,
-          message: "You are not enrolled in this class",
+          message: "Bạn chưa đăng ký lớp học này",
         };
       }
 
@@ -135,13 +135,13 @@ class PresentationService {
       const topic = await Topic.findByPk(topicId);
 
       if (!topic) {
-        return { success: false, message: "Topic not found" };
+        return { success: false, message: "Chủ đề không tìm thấy" };
       }
 
       if (topic.classId !== parseInt(classId)) {
         return {
           success: false,
-          message: "Topic does not belong to this class",
+          message: "Chủ đề không thuộc lớp học đã chọn",
         };
       }
 
@@ -174,7 +174,7 @@ class PresentationService {
           return {
             success: false,
             message:
-              "Nh\u00f3m ch\u01b0a ch\u1ecdn topic n\u00e0y. Tr\u01b0\u1edfng nh\u00f3m c\u1ea7n ch\u1ecdn topic tr\u01b0\u1edbc khi t\u1ea1o b\u00e0i thuy\u1ebft tr\u00ecnh",
+              "Nh\u00f3m ch\u01b0a ch\u1ecdn chủ đề n\u00e0y. Tr\u01b0\u1edfng nh\u00f3m c\u1ea7n ch\u1ecdn chủ đề tr\u01b0\u1edbc khi t\u1ea1o b\u00e0i thuy\u1ebft tr\u00ecnh",
           };
         }
       } else {
@@ -186,7 +186,7 @@ class PresentationService {
         if (!topicEnrollment) {
           return {
             success: false,
-            message: "You are not enrolled in this topic",
+            message: "Bạn chưa đăng ký chủ đề này",
           };
         }
       }
@@ -208,7 +208,7 @@ class PresentationService {
       console.error("Create presentation error:", error);
       return {
         success: false,
-        message: "Failed to create presentation",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -244,7 +244,7 @@ class PresentationService {
       }
 
 
-      // Get existing slides to delete their files from storage
+      // Get existing slides để xóa their files from storage
       const existingSlides = await Slide.findAll({
         where: { presentationId },
         transaction,
@@ -262,7 +262,7 @@ class PresentationService {
           }
         } catch (deleteError) {
           console.warn(
-            `⚠️ Failed to delete old slide file ${oldSlide.filePath}:`,
+            `⚠️ Failed để xóa old slide file ${oldSlide.filePath}:`,
             deleteError,
           );
           // Continue even if file deletion fails
@@ -349,7 +349,7 @@ class PresentationService {
       console.error("Upload slide error:", error);
       return {
         success: false,
-        message: "Failed to upload slide",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -442,7 +442,7 @@ class PresentationService {
       console.error("Upload media error:", error);
       return {
         success: false,
-        message: "Failed to upload media",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -457,7 +457,7 @@ class PresentationService {
       if (!presentation) {
         return {
           success: false,
-          message: "Presentation not found or access denied",
+          message: "Bạn không có quyền thực hiện thao tác này",
         };
       }
 
@@ -485,7 +485,7 @@ class PresentationService {
         if (!groupTopicEnrollment) {
           return {
             success: false,
-            message: "Nh\u00f3m ch\u01b0a ch\u1ecdn topic n\u00e0y",
+            message: "Nh\u00f3m ch\u01b0a ch\u1ecdn chủ đề n\u00e0y",
           };
         }
       } else {
@@ -501,7 +501,7 @@ class PresentationService {
         if (!enrollment) {
           return {
             success: false,
-            message: "You are not enrolled in this topic",
+            message: "Bạn không có quyền truy cập bài thuyết trình này",
           };
         }
       }
@@ -511,7 +511,7 @@ class PresentationService {
       console.error("Get presentation access error:", error);
       return {
         success: false,
-        message: "Failed to verify presentation access",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -543,7 +543,7 @@ class PresentationService {
       if (!validationResult.isValid) {
         return {
           success: false,
-          message: "Presentation is not ready for submission",
+          message: "Bài thuyết trình chưa đủ điều kiện để nộp",
           validation: validationResult,
         };
       }
@@ -552,7 +552,7 @@ class PresentationService {
       if (presentation.status === "completed") {
         return {
           success: false,
-          message: "Presentation is already completed",
+          message: "Bài thuyết trình đã hoàn tất, không thể nộp lại",
         };
       }
 
@@ -568,7 +568,7 @@ class PresentationService {
         if (activeJob) {
           return {
             success: false,
-            message: "Presentation is already being processed",
+            message: "Đang có tiến trình xử lý dở dang cho bài thuyết trình này",
             job: activeJob,
           };
         }
@@ -631,7 +631,7 @@ class PresentationService {
           });
           console.log(`📤 [Submit] Slide OCR job created for slide ${slide.slideId}`);
         } catch (slideJobError) {
-          console.error("⚠️ [Submit] Failed to create slide job:", slideJobError);
+          console.error("⚠️ [Submit] Failed để tạo slide job:", slideJobError);
         }
       }
 
@@ -662,7 +662,7 @@ class PresentationService {
       console.error("Submit presentation error:", error);
       return {
         success: false,
-        message: "Failed to submit presentation",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -692,7 +692,7 @@ class PresentationService {
       if (presentation.status !== "failed") {
         return {
           success: false,
-          message: `Cannot resubmit presentation with status "${presentation.status}". Only failed presentations can be resubmitted.`,
+          message: `Không thể nộp lại bài thuyết trình ở trạng thái "${presentation.status}". Chỉ có thể nộp lại khi trạng thái là "failed".`,
         };
       }
 
@@ -703,7 +703,7 @@ class PresentationService {
         return {
           success: false,
           message:
-            "Presentation is not ready for resubmission. " +
+            "Bài thuyết trình chưa đủ điều kiện để xử lý: " +
             validationResult.errors.join(" "),
           validation: validationResult,
         };
@@ -795,7 +795,7 @@ class PresentationService {
       return {
         success: true,
         message:
-          "Presentation resubmitted successfully. It is being processed again.",
+          "Đã gửi lại bài thuyết trình để xử lý",
         presentation: await this.getPresentationById(presentationId, studentId),
         job,
       };
@@ -803,7 +803,7 @@ class PresentationService {
       console.error("Resubmit presentation error:", error);
       return {
         success: false,
-        message: "Failed to resubmit presentation",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -903,7 +903,7 @@ class PresentationService {
       });
 
       if (!presentation) {
-        return { success: false, message: "Presentation not found" };
+        return { success: false, message: "Không tìm thấy bài thuyết trình" };
       }
 
       // Access control
@@ -913,7 +913,7 @@ class PresentationService {
         userRole,
       );
       if (!hasAccess) {
-        return { success: false, message: "Access denied" };
+        return { success: false, message: "Truy cập bị từ chối" };
       }
 
       return { success: true, presentation };
@@ -921,7 +921,7 @@ class PresentationService {
       console.error("Get presentation error:", error);
       return {
         success: false,
-        message: "Failed to get presentation",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -943,41 +943,56 @@ class PresentationService {
       if (classId) ownWhere.classId = parseInt(classId);
       if (topicId) ownWhere.topicId = parseInt(topicId);
 
-      // ── 2. Tìm presentation của nhóm mình thuộc ──
-      // Lấy tất cả group mà sinh viên là member
+      // ── 2. Tìm presentation của nhóm mình thuộc (batch — 3 queries cố định) ──
+      // Query 1: lấy tất cả group mà sinh viên là member
       const memberships = await GroupStudent.findAll({
         where: { studentId },
         include: [{ model: Group, as: "group", attributes: ["groupId", "classId"] }],
+        raw: true,
+        nest: true,
       });
 
       let groupPresentationIds = [];
       if (memberships.length > 0) {
+        const groupIds = [...new Set(memberships.map((m) => m.group?.groupId).filter(Boolean))];
+
+        // Query 2: lấy tất cả members của tất cả groups trong 1 lần
+        const allGroupMembers = await GroupStudent.findAll({
+          where: { groupId: { [db.Sequelize.Op.in]: groupIds } },
+          attributes: ["groupId", "studentId"],
+          raw: true,
+        });
+
+        // Map groupId → { classId, memberIds[] } trong JS, không cần thêm query
+        const groupMap = new Map();
         for (const m of memberships) {
-          const group = m.group;
-          if (!group) continue;
+          if (m.group?.groupId) {
+            groupMap.set(m.group.groupId, { classId: m.group.classId, memberIds: [] });
+          }
+        }
+        for (const gm of allGroupMembers) {
+          if (gm.studentId !== studentId && groupMap.has(gm.groupId)) {
+            groupMap.get(gm.groupId).memberIds.push(gm.studentId);
+          }
+        }
 
-          // Lấy tất cả studentId trong nhóm này
-          const groupMembers = await GroupStudent.findAll({
-            where: { groupId: group.groupId },
-            attributes: ["studentId"],
-          });
-          const memberIds = groupMembers.map((gm) => gm.studentId).filter((id) => id !== studentId);
-
+        // Query 3: lấy tất cả presentations của tất cả group members trong 1 lần
+        const orConditions = [];
+        for (const { classId: gClassId, memberIds } of groupMap.values()) {
           if (memberIds.length === 0) continue;
+          const cond = { studentId: { [db.Sequelize.Op.in]: memberIds }, classId: gClassId };
+          if (status) cond.status = status;
+          if (topicId) cond.topicId = parseInt(topicId);
+          orConditions.push(cond);
+        }
 
-          // Tìm presentation của các member khác trong cùng group + cùng class
-          const groupPresentationWhere = {
-            studentId: { [db.Sequelize.Op.in]: memberIds },
-            classId: group.classId,
-          };
-          if (status) groupPresentationWhere.status = status;
-          if (topicId) groupPresentationWhere.topicId = parseInt(topicId);
-
+        if (orConditions.length > 0) {
           const gps = await Presentation.findAll({
-            where: groupPresentationWhere,
+            where: { [db.Sequelize.Op.or]: orConditions },
             attributes: ["presentationId"],
+            raw: true,
           });
-          groupPresentationIds.push(...gps.map((p) => p.presentationId));
+          groupPresentationIds = gps.map((p) => p.presentationId);
         }
       }
 
@@ -1031,7 +1046,7 @@ class PresentationService {
       console.error("Get all presentations error:", error);
       return {
         success: false,
-        message: "Failed to get presentations",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -1074,7 +1089,7 @@ class PresentationService {
       console.error("Update presentation error:", error);
       return {
         success: false,
-        message: "Failed to update presentation",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -1138,13 +1153,13 @@ class PresentationService {
         });
       }
 
-      return { success: true, message: "Presentation deleted successfully" };
+      return { success: true, message: "Presentation đã xóa thành công" };
     } catch (error) {
       await transaction.rollback();
       console.error("Delete presentation error:", error);
       return {
         success: false,
-        message: "Failed to delete presentation",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -1164,7 +1179,7 @@ class PresentationService {
         userId,
       );
       if (!hasAccess) {
-        return { success: false, message: "Access denied" };
+        return { success: false, message: "Truy cập bị từ chối" };
       }
 
       const presentation = await Presentation.findByPk(presentationId, {
@@ -1172,7 +1187,7 @@ class PresentationService {
       });
 
       if (!presentation) {
-        return { success: false, message: "Presentation not found" };
+        return { success: false, message: "Không tìm thấy bài thuyết trình" };
       }
 
       // Get all jobs for this presentation
@@ -1236,7 +1251,7 @@ class PresentationService {
       console.error("Get processing status error:", error);
       return {
         success: false,
-        message: "Failed to get processing status",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -1256,7 +1271,7 @@ class PresentationService {
         userId,
       );
       if (!hasAccess) {
-        return { success: false, message: "Access denied" };
+        return { success: false, message: "Truy cập bị từ chối" };
       }
 
       const presentation = await Presentation.findByPk(presentationId, {
@@ -1307,7 +1322,7 @@ class PresentationService {
       });
 
       if (!presentation) {
-        return { success: false, message: "Presentation not found" };
+        return { success: false, message: "Không tìm thấy bài thuyết trình" };
       }
 
       // Get speaker statistics
@@ -1340,7 +1355,7 @@ class PresentationService {
       console.error("Get analysis results error:", error);
       return {
         success: false,
-        message: "Failed to get analysis results",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -1473,7 +1488,7 @@ class PresentationService {
       console.error("Get presentations by course error:", error);
       return {
         success: false,
-        message: "Failed to get presentations",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -1598,7 +1613,7 @@ class PresentationService {
       console.error("Get presentations by instructor error:", error);
       return {
         success: false,
-        message: "Failed to get presentations for instructor",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -1618,7 +1633,7 @@ class PresentationService {
         userId,
       );
       if (!hasAccess) {
-        return { success: false, message: "Access denied" };
+        return { success: false, message: "Truy cập bị từ chối" };
       }
 
       const progress = await jobService.getAnalysisProgress(presentationId);
@@ -1631,7 +1646,7 @@ class PresentationService {
       console.error("Get analysis progress error:", error);
       return {
         success: false,
-        message: "Failed to get analysis progress",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -1646,7 +1661,7 @@ class PresentationService {
         userId,
       );
       if (!hasAccess) {
-        return { success: false, message: "Access denied" };
+        return { success: false, message: "Truy cập bị từ chối" };
       }
 
       // Get AI feedback (feedbackType = 'general' from py-report-worker)
@@ -1661,7 +1676,7 @@ class PresentationService {
       if (!feedbacks || feedbacks.length === 0) {
         return {
           success: true,
-          message: "No AI feedback found for this presentation",
+          message: "Chưa có phản hồi AI",
           feedback: null,
         };
       }
@@ -1685,7 +1700,7 @@ class PresentationService {
       console.error("Get AI feedback error:", error);
       return {
         success: false,
-        message: "Failed to get AI feedback",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }

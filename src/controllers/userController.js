@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 import userService from '../services/userService.js';
 
 class UserController {
@@ -30,7 +30,7 @@ class UserController {
             console.error('Upload avatar controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi upload avatar'
+                message: 'Không thể upload avatar'
             });
         }
     }
@@ -49,7 +49,7 @@ class UserController {
             console.error('Get user profile controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy thông tin người dùng'
+                message: 'Không thể lấy thông tin người dùng'
             });
         }
     }
@@ -68,7 +68,7 @@ class UserController {
             console.error('Update user profile controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi cập nhật thông tin'
+                message: 'Không thể cập nhật thông tin'
             });
         }
     }
@@ -87,7 +87,7 @@ class UserController {
             console.error('Get all users controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy danh sách người dùng'
+                message: 'Không thể lấy danh sách người dùng'
             });
         }
     }
@@ -107,7 +107,7 @@ class UserController {
             console.error('Delete user controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi xóa người dùng'
+                message: 'Không thể xóa người dùng'
             });
         }
     }
@@ -131,7 +131,7 @@ class UserController {
             console.error('Get instructors by major controller error:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy danh sách giảng viên'
+                message: 'Không thể lấy danh sách giảng viên'
             });
         }
     }

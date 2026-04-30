@@ -79,7 +79,7 @@ class ShareService {
       const presentation = await this._getAuthorizedPresentation(presentationId, actor);
 
       if (!presentation) {
-        return { success: false, message: 'Presentation not found or access denied' };
+        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
       }
 
       const { expiresAt } = options;
@@ -112,7 +112,7 @@ class ShareService {
       };
     } catch (error) {
       console.error('Create public share error:', error);
-      return { success: false, message: 'Failed to create public share', error: error.message };
+      return { success: false, message: 'Thao tác thất bại', error: error.message };
     }
   }
 
@@ -134,7 +134,7 @@ class ShareService {
       const presentation = await this._getAuthorizedPresentation(presentationId, actor);
 
       if (!presentation) {
-        return { success: false, message: 'Presentation not found or access denied' };
+        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
       }
 
       const { expiresAt } = options;
@@ -153,7 +153,7 @@ class ShareService {
           results.push({
             email: normalizedEmail,
             success: false,
-            message: 'User with this email not found in the system',
+            message: 'Không tìm thấy dữ liệu',
           });
           continue;
         }
@@ -163,7 +163,7 @@ class ShareService {
           results.push({
             email: normalizedEmail,
             success: false,
-            message: 'Cannot share with yourself',
+            message: 'Thao tác thất bại',
           });
           continue;
         }
@@ -225,12 +225,12 @@ class ShareService {
       const successCount = results.filter((r) => r.success).length;
       return {
         success: true,
-        message: `${successCount}/${emails.length} invite(s) processed`,
+        message: `Đã gửi lời mời chia sẻ cho ${successCount}/${results.length} email`,
         results,
       };
     } catch (error) {
       console.error('Invite by emails error:', error);
-      return { success: false, message: 'Failed to invite', error: error.message };
+      return { success: false, message: 'Thao tác thất bại', error: error.message };
     }
   }
 
@@ -245,7 +245,7 @@ class ShareService {
     try {
       const presentation = await this._getAuthorizedPresentation(presentationId, actor);
       if (!presentation) {
-        return { success: false, message: 'Presentation not found or access denied' };
+        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
       }
 
       const deleted = await PresentationAccess.destroy({
@@ -259,7 +259,7 @@ class ShareService {
       };
     } catch (error) {
       console.error('Revoke public share error:', error);
-      return { success: false, message: 'Failed to revoke share', error: error.message };
+      return { success: false, message: 'Thao tác thất bại', error: error.message };
     }
   }
 
@@ -270,7 +270,7 @@ class ShareService {
     try {
       const presentation = await this._getAuthorizedPresentation(presentationId, actor);
       if (!presentation) {
-        return { success: false, message: 'Presentation not found or access denied' };
+        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
       }
 
       const deleted = await PresentationAccess.destroy({
@@ -284,7 +284,7 @@ class ShareService {
       };
     } catch (error) {
       console.error('Revoke private share error:', error);
-      return { success: false, message: 'Failed to revoke access', error: error.message };
+      return { success: false, message: 'Thao tác thất bại', error: error.message };
     }
   }
 
@@ -299,7 +299,7 @@ class ShareService {
     try {
       const presentation = await this._getAuthorizedPresentation(presentationId, actor);
       if (!presentation) {
-        return { success: false, message: 'Presentation not found or access denied' };
+        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
       }
 
       const accessList = await PresentationAccess.findAll({
@@ -329,7 +329,7 @@ class ShareService {
       return { success: true, presentationId, shares };
     } catch (error) {
       console.error('Get share list error:', error);
-      return { success: false, message: 'Failed to get share list', error: error.message };
+      return { success: false, message: 'Thao tác thất bại', error: error.message };
     }
   }
 
@@ -474,7 +474,7 @@ class ShareService {
       });
 
       if (!presentation) {
-        return { success: false, message: 'Presentation not found' };
+        return { success: false, message: 'Không tìm thấy bài thuyết trình' };
       }
 
       // AI report (nếu có)
@@ -515,7 +515,7 @@ class ShareService {
       };
     } catch (error) {
       console.error('Get shared presentation data error:', error);
-      return { success: false, message: 'Failed to load presentation data', error: error.message };
+      return { success: false, message: 'Thao tác thất bại', error: error.message };
     }
   }
 

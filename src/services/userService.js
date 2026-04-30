@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 import db from '../models/index.js';
 import storageService from '../services/storageService.js';
 import path from 'path';
@@ -79,7 +79,7 @@ class UserService {
             console.error('Upload avatar service error:', error);
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi upload avatar'
+                message: 'Không thể upload avatar'
             };
         }
     }
@@ -108,7 +108,7 @@ class UserService {
             }
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy thông tin người dùng'
+                message: 'Không thể lấy thông tin người dùng'
             };
         }
     }
@@ -148,7 +148,7 @@ class UserService {
             console.error('Update user profile service error:', error);
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi cập nhật thông tin'
+                message: 'Không thể cập nhật thông tin'
             };
         }
     }
@@ -172,7 +172,7 @@ class UserService {
             console.error('Get all users service error:', error);
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy danh sách người dùng'
+                message: 'Không thể lấy danh sách người dùng'
             };
         }
     }
@@ -198,7 +198,7 @@ class UserService {
             console.error('Delete user service error:', error);
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi xóa người dùng'
+                message: 'Không thể xóa người dùng'
             };
         }
     }
@@ -253,7 +253,7 @@ class UserService {
             console.error('Get instructors by major error:', error);
             return {
                 success: false,
-                message: 'Có lỗi xảy ra khi lấy danh sách giảng viên',
+                message: 'Không thể lấy danh sách giảng viên',
                 error: error.message
             };
         }

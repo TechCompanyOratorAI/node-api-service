@@ -29,10 +29,6 @@ class EnrollKeyController {
             const userRole = req.userRoles?.includes('Admin') ? 'Admin' :
                 req.userRoles?.includes('Instructor') ? 'Instructor' : 'Student';
 
-            // Debug log
-            console.log('Create key - req.body:', req.body);
-            console.log('Create key - classId:', classId);
-
             const result = await enrollKeyService.createKey(
                 parseInt(classId),
                 req.body,

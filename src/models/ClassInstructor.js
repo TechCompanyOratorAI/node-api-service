@@ -23,6 +23,23 @@ module.exports = (sequelize, DataTypes) => {
         },
         assignedBy: {
             type: DataTypes.INTEGER
+        },
+        assignmentStatus: {
+            type: DataTypes.ENUM('eligible', 'override'),
+            allowNull: false,
+            defaultValue: 'eligible'
+        },
+        overrideReason: {
+            type: DataTypes.TEXT,
+            allowNull: true
+        },
+        overrideBy: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
+        overrideAt: {
+            type: DataTypes.DATE,
+            allowNull: true
         }
     }, {
         tableName: 'class_instructors',
@@ -46,6 +63,10 @@ module.exports = (sequelize, DataTypes) => {
         ClassInstructor.belongsTo(models.User, {
             foreignKey: 'assignedBy',
             as: 'assigner'
+        });
+        ClassInstructor.belongsTo(models.User, {
+            foreignKey: 'overrideBy',
+            as: 'overrideActor'
         });
     };
 

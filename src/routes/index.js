@@ -29,6 +29,10 @@ import adminDashboardController from "../controllers/adminDashboardController.js
 import devBypassRoutes from "./devBypassRoutes.js";
 import notificationRoutes from "./notificationRoutes.js";
 import transcriptRoutes from "./transcriptRoutes.js";
+import auditLogRoutes from "./auditLogRoutes.js";
+import academicCalendarRoutes from "./academicCalendarRoutes.js";
+import competencyRoutes from "./competencyRoutes.js";
+import subjectAreaRoutes from "./subjectAreaRoutes.js";
 import enrollmentController from "../controllers/enrollmentController.js";
 import classController from "../controllers/classController.js";
 import {
@@ -66,6 +70,10 @@ router.use("/ai-reports", aiReportRoutes);
 router.use("/ai-reports", aiReportFeedbackRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/transcripts", transcriptRoutes);
+router.use("/audit-logs", auditLogRoutes);
+router.use("/academic-calendar", academicCalendarRoutes);
+router.use("/", competencyRoutes);
+router.use("/subject-areas", subjectAreaRoutes);
 
 // ─── Share routes ───────────────────────────────────────────────
 // Public view: GET /share/:token (no authentication needed)
@@ -107,7 +115,7 @@ router.get(
 router.use("*", (req, res) => {
   res.status(404).json({
     success: false,
-    message: "API endpoint not found",
+    message: "API endpoint không tìm thấy",
   });
 });
 

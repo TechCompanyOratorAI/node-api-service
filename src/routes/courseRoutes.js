@@ -17,29 +17,29 @@ const router = express.Router();
 const validateCreateClassWithoutKey = [
     param('courseId')
         .isInt({ min: 1 })
-        .withMessage('courseId must be a positive integer'),
+        .withMessage('courseId phải là số nguyên dương'),
     body('classCode')
         .trim()
         .notEmpty()
-        .withMessage('classCode is required')
+        .withMessage('classCode là bắt buộc')
         .isLength({ min: 1, max: 50 })
-        .withMessage('classCode must be between 1 and 50 characters')
+        .withMessage('classCode phải từ 1 đến 50 ký tự')
         .matches(/^[a-zA-Z0-9_-]+$/)
-        .withMessage('classCode can only contain letters, numbers, hyphens, and underscores'),
+        .withMessage('classCode chỉ được chứa chữ cái, số, dấu gạch ngang và gạch dưới'),
     body('startDate')
         .optional()
         .isISO8601()
-        .withMessage('startDate must be a valid ISO date'),
+        .withMessage('startDate phải là ngày ISO hợp lệ'),
     body('endDate')
         .optional()
         .isISO8601()
-        .withMessage('endDate must be a valid ISO date')
+        .withMessage('endDate phải là ngày ISO hợp lệ')
         .custom((value, { req }) => {
             if (req.body.startDate && value) {
                 const start = new Date(req.body.startDate);
                 const end = new Date(value);
                 if (end <= start) {
-                    throw new Error('endDate must be after startDate');
+                    throw new Error('Ngày kết thúc phải sau ngày bắt đầu');
                 }
             }
             return true;
@@ -47,15 +47,33 @@ const validateCreateClassWithoutKey = [
     body('maxStudents')
         .optional()
         .isInt({ min: 1 })
-        .withMessage('maxStudents must be a positive integer'),
+        .withMessage('maxStudents phải là số nguyên dương'),
     body('maxGroupMembers')
         .optional()
         .isInt({ min: 1 })
-        .withMessage('maxGroupMembers must be a positive integer'),
+        .withMessage('maxGroupMembers phải là số nguyên dương'),
+    body('academicBlockId')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('academicBlockId phải là số nguyên dương'),
+    body('academicBlockIds')
+        .optional()
+        .isArray({ min: 1 })
+        .withMessage('academicBlockIds phải là mảng và có ít nhất 1 phần tử'),
+    body('academicBlockIds.*')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('Moi academicBlockId phai la so nguyen duong'),
+    body().custom((value) => {
+        if (value.academicBlockId !== undefined && value.academicBlockIds !== undefined) {
+            throw new Error('Chi truyen academicBlockId hoac academicBlockIds, khong truyen ca hai');
+        }
+        return true;
+    }),
     body('status')
         .optional()
         .isIn(['active', 'closed', 'archived'])
-        .withMessage('status must be active, closed, or archived'),
+        .withMessage('status phai la active, closed hoac archived'),
 ];
 
 // Apply authentication to all course routes
@@ -64,7 +82,7 @@ router.use(requireEmailVerification);
 
 
 router.post('/',
-    requireRole(['Admin']),
+    requireRole(['Admin', 'AcademicCoordinator']),
     generalRateLimit,
     validateCourse,
     courseController.createCourse
@@ -83,19 +101,19 @@ router.get('/:courseId',
 );
 
 router.patch('/:courseId',
-    requireRole(['Admin']),
+    requireRole(['Admin', 'AcademicCoordinator']),
     validateCourseUpdate,
     courseController.updateCourse
 );
 
 router.delete('/:courseId',
-    requireRole(['Admin']),
+    requireRole(['Admin', 'AcademicCoordinator']),
     courseController.deleteCourse
 );
 
 // Class management routes for course
 router.post('/:courseId/classes',
-    requireRole(['Admin']),
+    requireRole(['Admin', 'AcademicCoordinator']),
     validateCreateClassWithoutKey,
     classController.createClass
 );

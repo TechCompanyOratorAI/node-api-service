@@ -109,7 +109,7 @@ class AuthService {
       return {
         success: true,
         message:
-          "Registration successful. Please check your email to verify your account.",
+          "Đăng ký tài khoản thành công, vui lòng kiểm tra email để xác thực",
         user: {
           userId: user.userId,
           username: user.username,
@@ -123,7 +123,7 @@ class AuthService {
       console.error("Registration error:", error);
       return {
         success: false,
-        message: "Registration failed. Please try again.",
+        message: "Registration thất bại. vui lòng try again.",
         error: error.message,
       };
     }
@@ -197,7 +197,7 @@ class AuthService {
       return {
         success: true,
         message:
-          "Instructor registration successful. Please check your email to verify your account.",
+          "Đăng ký tài khoản giảng viên thành công, vui lòng kiểm tra email để xác thực",
         user: {
           userId: user.userId,
           username: user.username,
@@ -212,7 +212,7 @@ class AuthService {
       console.error("Instructor registration error:", error);
       return {
         success: false,
-        message: "Instructor registration failed. Please try again.",
+        message: "Instructor registration thất bại. vui lòng try again.",
         error: error.message,
       };
     }
@@ -236,7 +236,7 @@ class AuthService {
       if (!user) {
         return {
           success: false,
-          message: "Invalid credentials",
+          message: "Sai tài khoản hoặc mật khẩu",
         };
       }
 
@@ -245,7 +245,7 @@ class AuthService {
         return {
           success: false,
           message:
-            "Account is temporarily locked due to too many failed login attempts. Please try again later.",
+            "Thao tác thất bại",
         };
       }
 
@@ -253,7 +253,7 @@ class AuthService {
       if (!user.isActive) {
         return {
           success: false,
-          message: "Account is deactivated. Please contact support.",
+          message: "Tài khoản đã bị vô hiệu hóa",
         };
       }
 
@@ -277,7 +277,7 @@ class AuthService {
 
         return {
           success: false,
-          message: "Invalid credentials",
+          message: "Sai tài khoản hoặc mật khẩu",
         };
       }
 
@@ -311,7 +311,7 @@ class AuthService {
 
       return {
         success: true,
-        message: "Login successful",
+        message: "đăng nhập thành công",
         user: {
           userId: user.userId,
           username: user.username,
@@ -333,7 +333,7 @@ class AuthService {
       console.error("Login error:", error);
       return {
         success: false,
-        message: "Login failed. Please try again.",
+        message: "đăng nhập thất bại. vui lòng try again.",
         error: error.message,
       };
     }
@@ -354,7 +354,7 @@ class AuthService {
       if (!user) {
         return {
           success: false,
-          message: "Invalid or expired verification token",
+          message: "Dữ liệu không hợp lệ",
         };
       }
 
@@ -376,13 +376,13 @@ class AuthService {
 
       return {
         success: true,
-        message: "Email verified successfully",
+        message: "Email verified thành công",
       };
     } catch (error) {
       console.error("Email verification error:", error);
       return {
         success: false,
-        message: "Email verification failed. Please try again.",
+        message: "Email verification thất bại. vui lòng try again.",
         error: error.message,
       };
     }
@@ -396,14 +396,14 @@ class AuthService {
       if (!user) {
         return {
           success: false,
-          message: "User not found",
+          message: "Người dùng không tìm thấy",
         };
       }
 
       if (user.isEmailVerified) {
         return {
           success: false,
-          message: "Email is already verified",
+          message: "Email đã được xác thực",
         };
       }
 
@@ -433,13 +433,13 @@ class AuthService {
 
       return {
         success: true,
-        message: "Verification email sent successfully",
+        message: "Verification email sent thành công",
       };
     } catch (error) {
       console.error("Resend verification error:", error);
       return {
         success: false,
-        message: "Failed to resend verification email. Please try again.",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -455,7 +455,7 @@ class AuthService {
         return {
           success: true,
           message:
-            "If an account with that email exists, a password reset link has been sent.",
+            "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi",
         };
       }
 
@@ -485,13 +485,13 @@ class AuthService {
       return {
         success: true,
         message:
-          "If an account with that email exists, a password reset link has been sent.",
+          "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi",
       };
     } catch (error) {
       console.error("Forgot password error:", error);
       return {
         success: false,
-        message: "Failed to process password reset request. Please try again.",
+        message: "Thao tác thất bại",
         error: error.message,
       };
     }
@@ -512,7 +512,7 @@ class AuthService {
       if (!user) {
         return {
           success: false,
-          message: "Invalid or expired password reset token",
+          message: "Dữ liệu không hợp lệ",
         };
       }
 
@@ -532,13 +532,13 @@ class AuthService {
 
       return {
         success: true,
-        message: "Password reset successfully",
+        message: "Mật khẩu reset thành công",
       };
     } catch (error) {
       console.error("Reset password error:", error);
       return {
         success: false,
-        message: "Password reset failed. Please try again.",
+        message: "Mật khẩu reset thất bại. vui lòng try again.",
         error: error.message,
       };
     }
@@ -552,7 +552,7 @@ class AuthService {
       if (!user) {
         return {
           success: false,
-          message: "User not found",
+          message: "Người dùng không tìm thấy",
         };
       }
 
@@ -565,7 +565,7 @@ class AuthService {
       if (!isCurrentPasswordValid) {
         return {
           success: false,
-          message: "Current password is incorrect",
+          message: "Mật khẩu hiện tại không chính xác",
         };
       }
 
@@ -581,13 +581,13 @@ class AuthService {
 
       return {
         success: true,
-        message: "Password changed successfully",
+        message: "Mật khẩu changed thành công",
       };
     } catch (error) {
       console.error("Change password error:", error);
       return {
         success: false,
-        message: "Password change failed. Please try again.",
+        message: "Mật khẩu change thất bại. vui lòng try again.",
         error: error.message,
       };
     }
@@ -602,7 +602,7 @@ class AuthService {
       if (!user || !user.isActive) {
         return {
           success: false,
-          message: "Invalid refresh token",
+          message: "Không hợp lệ làm mới token",
         };
       }
 
@@ -616,7 +616,7 @@ class AuthService {
       console.error("Refresh token error:", error);
       return {
         success: false,
-        message: "Invalid refresh token",
+        message: "Không hợp lệ làm mới token",
       };
     }
   }

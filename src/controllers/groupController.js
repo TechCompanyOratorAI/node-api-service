@@ -327,6 +327,45 @@ const removeGroupTopic = async (req, res) => {
     }
 };
 
+// [POST] /api/groups/classes/:classId/auto-assign - Phân nhóm tự động (Instructor/Admin)
+const autoAssignGroups = async (req, res) => {
+    try {
+        const { classId } = req.params;
+        const { strategy, value, namePrefix, resetExisting } = req.body;
+        const currentUser = getCurrentUser(req);
+        const userRole = req.userRoles?.includes('Admin') ? 'Admin'
+            : req.userRoles?.includes('Instructor') ? 'Instructor' : 'Student';
+
+        if (!strategy || !value) {
+            return res.status(400).json({
+                success: false,
+                message: 'strategy và value là bắt buộc'
+            });
+        }
+
+        const result = await groupService.autoAssignGroups(
+            parseInt(classId),
+            { strategy, value: parseInt(value), namePrefix, resetExisting: Boolean(resetExisting) },
+            currentUser.userId,
+            userRole
+        );
+
+        if (!result.success) {
+            return res.status(400).json({ success: false, message: result.message });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result.data
+        });
+
+    } catch (error) {
+        console.error('Auto-assign groups error:', error);
+        res.status(500).json({ success: false, message: 'Lỗi server: ' + error.message });
+    }
+};
+
 module.exports = {
     createGroup,
     joinGroup,
@@ -341,5 +380,6 @@ module.exports = {
     getMyGroups,
     selectGroupTopic,
     getGroupTopic,
-    removeGroupTopic
+    removeGroupTopic,
+    autoAssignGroups,
 };

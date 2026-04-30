@@ -1,8 +1,127 @@
 import db from '../models/index.js';
 
-const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group } = db;
+const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group, AcademicBlock, AcademicYear, CourseAcademicBlock, SubjectArea } = db;
 
 class CourseService {
+    normalizeAcademicBlockIds(courseData = {}) {
+        const { academicBlockIds, academicBlockId } = courseData;
+        if (Array.isArray(academicBlockIds)) {
+            return [...new Set(academicBlockIds.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))];
+        }
+        if (academicBlockId !== undefined && academicBlockId !== null) {
+            const parsed = parseInt(academicBlockId, 10);
+            return Number.isInteger(parsed) && parsed > 0 ? [parsed] : [];
+        }
+        return [];
+    }
+
+    async resolveCourseBlocks(academicBlockIds, transaction) {
+        if (!academicBlockIds.length) {
+            return { success: true, blocks: [] };
+        }
+
+        const blocks = await AcademicBlock.findAll({
+            where: {
+                academicBlockId: academicBlockIds,
+                isActive: true,
+            },
+            include: [{ model: AcademicYear, as: "academicYear" }],
+            transaction,
+        });
+
+        if (blocks.length !== academicBlockIds.length) {
+            return {
+                success: false,
+                message: "Dữ liệu không hợp lệ",
+            };
+        }
+
+        return { success: true, blocks };
+    }
+
+    validateCourseDateWithinBlocks(startDate, endDate, blocks) {
+        if (!blocks.length) {
+            return { success: true };
+        }
+
+        const minStart = blocks.reduce((acc, block) => {
+            if (!acc) return block.startDate;
+            return new Date(block.startDate) < new Date(acc) ? block.startDate : acc;
+        }, null);
+        const maxEnd = blocks.reduce((acc, block) => {
+            if (!acc) return block.endDate;
+            return new Date(block.endDate) > new Date(acc) ? block.endDate : acc;
+        }, null);
+
+        const actualStart = startDate || minStart;
+        const actualEnd = endDate || maxEnd;
+
+        if (new Date(actualStart) >= new Date(actualEnd)) {
+            return { success: false, message: "Ngày kết thúc phải sau ngày bắt đầu" };
+        }
+        if (new Date(actualStart) < new Date(minStart) || new Date(actualEnd) > new Date(maxEnd)) {
+            return {
+                success: false,
+                message: "Ngày bắt đầu/kết thúc phải nằm trong phạm vi kỳ học đã chọn",
+            };
+        }
+
+        return {
+            success: true,
+            startDate: actualStart,
+            endDate: actualEnd,
+            primaryAcademicBlockId: blocks[0]?.academicBlockId || null,
+        };
+    }
+
+    async syncCourseAcademicBlocks(courseId, academicBlockIds, transaction) {
+        await CourseAcademicBlock.destroy({
+            where: { courseId },
+            transaction,
+        });
+
+        if (!academicBlockIds.length) return;
+
+        await CourseAcademicBlock.bulkCreate(
+            academicBlockIds.map((blockId, index) => ({
+                courseId,
+                academicBlockId: blockId,
+                isPrimary: index === 0,
+            })),
+            { transaction }
+        );
+    }
+
+    buildAcademicBlocksInclude(required = false, where = null) {
+        return {
+            model: AcademicBlock,
+            as: "academicBlocks",
+            attributes: [
+                "academicBlockId",
+                "blockCode",
+                "term",
+                "half",
+                "blockType",
+                "startDate",
+                "endDate",
+                "isActive",
+            ],
+            through: { attributes: ["isPrimary"] },
+            include: [{ model: AcademicYear, as: "academicYear" }],
+            required,
+            ...(where ? { where } : {}),
+        };
+    }
+
+    formatCourseBlocks(course) {
+        const blocks = course.academicBlocks || [];
+        const primary = blocks.find((b) => b.CourseAcademicBlock?.isPrimary) || blocks[0] || null;
+        return {
+            academicBlocks: blocks,
+            primaryAcademicBlockId: primary?.academicBlockId || null,
+        };
+    }
+
     // Create new course (with multi-instructor support)
     async createCourse(courseData, createdBy) {
         const transaction = await db.sequelize.transaction();
@@ -12,6 +131,7 @@ class CourseService {
                 courseCode,
                 courseName,
                 departmentId,
+                subjectAreaId,
                 description,
                 semester,
                 academicYear,
@@ -19,6 +139,7 @@ class CourseService {
                 endDate,
                 instructorIds = [] // Array of instructor IDs
             } = courseData;
+            const academicBlockIds = this.normalizeAcademicBlockIds(courseData);
 
             // Check if course code already exists
             const existingCourse = await Course.findOne({
@@ -32,8 +153,20 @@ class CourseService {
                 await transaction.rollback();
                 return {
                     success: false,
-                    message: 'Course code already exists'
+                    message: 'Mã môn học đã tồn tại'
                 };
+            }
+
+            const resolvedBlocks = await this.resolveCourseBlocks(academicBlockIds, transaction);
+            if (!resolvedBlocks.success) {
+                await transaction.rollback();
+                return resolvedBlocks;
+            }
+
+            const dateValidation = this.validateCourseDateWithinBlocks(startDate, endDate, resolvedBlocks.blocks);
+            if (!dateValidation.success) {
+                await transaction.rollback();
+                return dateValidation;
             }
 
             // Create course (no single instructorId FK)
@@ -41,13 +174,17 @@ class CourseService {
                 courseCode,
                 courseName,
                 departmentId,
+                subjectAreaId: subjectAreaId || null,
                 description,
+                academicBlockId: dateValidation.primaryAcademicBlockId,
                 semester,
                 academicYear,
-                startDate,
-                endDate,
+                startDate: dateValidation.startDate || null,
+                endDate: dateValidation.endDate || null,
                 isActive: true
             }, { transaction });
+
+            await this.syncCourseAcademicBlocks(course.courseId, academicBlockIds, transaction);
 
             // Assign instructors via course_instructors M:N table
             if (instructorIds && instructorIds.length > 0) {
@@ -70,13 +207,16 @@ class CourseService {
                         as: 'instructors',
                         attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
                         through: { attributes: ['assignedAt'] }
+                    },
+                    {
+                        ...this.buildAcademicBlocksInclude(false)
                     }
                 ]
             });
 
             return {
                 success: true,
-                message: 'Course created successfully',
+                message: 'Môn học đã tạo thành công',
                 course: courseWithInstructors
             };
         } catch (error) {
@@ -84,7 +224,7 @@ class CourseService {
             console.error('Create course error:', error);
             return {
                 success: false,
-                message: 'Failed to create course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -96,7 +236,8 @@ class CourseService {
             const {
                 instructorId,
                 departmentId,
-                majorCode,
+                subjectAreaId,
+                academicBlockId,
                 semester,
                 academicYear,
                 isActive,
@@ -117,7 +258,7 @@ class CourseService {
     if (semester) where.semester = semester;
     if (academicYear) where.academicYear = academicYear;
     if (departmentId) where.departmentId = departmentId;
-    if (majorCode) where.majorCode = majorCode;
+    if (subjectAreaId) where.subjectAreaId = subjectAreaId;
     // Default to active courses only if not specified (for student access)
     if (isActive !== undefined) {
         where.isActive = isActive;
@@ -157,7 +298,14 @@ class CourseService {
                 as: 'topics',
                 attributes: ['topicId', 'topicName', 'sequenceNumber'],
                 required: false
-            }
+            },
+            {
+                model: SubjectArea,
+                as: "subjectArea",
+                attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                required: false,
+            },
+            this.buildAcademicBlocksInclude(!!academicBlockId, academicBlockId ? { academicBlockId } : null)
         ],
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -189,6 +337,8 @@ class CourseService {
 
     const coursesWithStats = courses.map(course => {
         const json = course.toJSON();
+        const primary = json.academicBlocks?.find((b) => b.CourseAcademicBlock?.isPrimary) || json.academicBlocks?.[0] || null;
+        json.academicBlockId = primary?.academicBlockId || null;
         json.totalActiveClasses = activeClassCounts[course.courseId] || 0;
         return json;
     });
@@ -207,7 +357,7 @@ class CourseService {
             console.error('Get all courses error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve courses',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -221,13 +371,14 @@ class CourseService {
             if (!instructor) {
                 return {
                     success: false,
-                    message: 'Instructor not found'
+                    message: 'Không tìm thấy giảng viên'
                 };
             }
 
             const {
                 semester,
                 academicYear,
+                academicBlockId,
                 isActive,
                 search
             } = filters;
@@ -276,7 +427,14 @@ class CourseService {
                         as: 'topics',
                         attributes: ['topicId', 'topicName', 'sequenceNumber'],
                         required: false
-                    }
+                    },
+                    {
+                        model: SubjectArea,
+                        as: "subjectArea",
+                        attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                        required: false,
+                    },
+                    this.buildAcademicBlocksInclude(!!academicBlockId, academicBlockId ? { academicBlockId } : null)
                 ],
                 limit: parseInt(limit),
                 offset: parseInt(offset),
@@ -293,7 +451,12 @@ class CourseService {
                     lastName: instructor.lastName,
                     email: instructor.email
                 },
-                data: courses.map(course => course.toJSON()),
+                data: courses.map(course => {
+                    const json = course.toJSON();
+                    const primary = json.academicBlocks?.find((b) => b.CourseAcademicBlock?.isPrimary) || json.academicBlocks?.[0] || null;
+                    json.academicBlockId = primary?.academicBlockId || null;
+                    return json;
+                }),
                 pagination: {
                     total: count,
                     page: parseInt(page),
@@ -305,7 +468,7 @@ class CourseService {
             console.error('Get courses by instructor error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve courses by instructor',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -326,6 +489,15 @@ class CourseService {
                     as: 'topics',
                     attributes: ['topicId', 'topicName', 'description', 'sequenceNumber', 'dueDate', 'maxDurationMinutes'],
                     order: [['sequenceNumber', 'ASC']]
+                },
+                {
+                    model: SubjectArea,
+                    as: "subjectArea",
+                    attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                    required: false,
+                },
+                {
+                    ...this.buildAcademicBlocksInclude(false)
                 }
             ];
 
@@ -358,17 +530,22 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
+            const { academicBlocks, primaryAcademicBlockId } = this.formatCourseBlocks(course);
             const courseData = {
                 courseId: course.courseId,
                 courseCode: course.courseCode,
                 courseName: course.courseName,
                 description: course.description,
+                subjectAreaId: course.subjectAreaId,
+                subjectArea: course.subjectArea,
                 semester: course.semester,
                 academicYear: course.academicYear,
+                academicBlockId: primaryAcademicBlockId,
+                academicBlocks,
                 startDate: course.startDate,
                 endDate: course.endDate,
                 isActive: course.isActive,
@@ -394,7 +571,7 @@ class CourseService {
             console.error('Get course by ID error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -411,7 +588,7 @@ class CourseService {
                 await transaction.rollback();
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -426,7 +603,7 @@ class CourseService {
                     await transaction.rollback();
                     return {
                         success: false,
-                        message: 'You do not have permission to update this course'
+                        message: 'Bạn không có quyền cập nhật môn học này'
                     };
                 }
             }
@@ -435,14 +612,18 @@ class CourseService {
                 courseCode,
                 courseName,
                 description,
+                academicBlockId,
+                academicBlockIds,
                 semester,
                 academicYear,
                 startDate,
                 endDate,
                 isActive,
                 departmentId,
-                instructorIds // Array of instructor IDs to update
+                subjectAreaId,
+                instructorIds // Array of instructor IDs để cập nhật
             } = courseData;
+            const hasAcademicBlocksInPayload = Array.isArray(academicBlockIds) || academicBlockId !== undefined;
 
             // If updating course code, check for duplicates
             if (courseCode && courseCode !== course.courseCode) {
@@ -459,23 +640,62 @@ class CourseService {
                     await transaction.rollback();
                     return {
                         success: false,
-                        message: 'Course code already exists'
+                        message: 'Mã môn học đã tồn tại'
                     };
                 }
             }
 
-            // Update course basic info
+            const existingMappings = await CourseAcademicBlock.findAll({
+                where: { courseId },
+                attributes: ["academicBlockId", "isPrimary"],
+                order: [["isPrimary", "DESC"], ["courseAcademicBlockId", "ASC"]],
+                transaction,
+            });
+
+            const nextAcademicBlockIds = hasAcademicBlocksInPayload
+                ? this.normalizeAcademicBlockIds({ academicBlockIds, academicBlockId })
+                : existingMappings.map((mapping) => mapping.academicBlockId);
+            const resolvedBlocks = await this.resolveCourseBlocks(nextAcademicBlockIds, transaction);
+            if (!resolvedBlocks.success) {
+                await transaction.rollback();
+                return resolvedBlocks;
+            }
+
+            const nextStartDate =
+                startDate !== undefined
+                    ? startDate
+                    : hasAcademicBlocksInPayload
+                        ? null
+                        : course.startDate;
+            const nextEndDate =
+                endDate !== undefined
+                    ? endDate
+                    : hasAcademicBlocksInPayload
+                        ? null
+                        : course.endDate;
+            const dateValidation = this.validateCourseDateWithinBlocks(nextStartDate, nextEndDate, resolvedBlocks.blocks);
+            if (!dateValidation.success) {
+                await transaction.rollback();
+                return dateValidation;
+            }
+
             await course.update({
                 courseCode: courseCode || course.courseCode,
                 courseName: courseName || course.courseName,
                 description: description !== undefined ? description : course.description,
+                academicBlockId: dateValidation.primaryAcademicBlockId,
                 semester: semester || course.semester,
                 academicYear: academicYear || course.academicYear,
-                startDate: startDate || course.startDate,
-                endDate: endDate || course.endDate,
+                startDate: dateValidation.startDate || null,
+                endDate: dateValidation.endDate || null,
                 isActive: isActive !== undefined ? isActive : course.isActive,
-                departmentId: departmentId !== undefined ? departmentId : course.departmentId
+                departmentId: departmentId !== undefined ? departmentId : course.departmentId,
+                subjectAreaId: subjectAreaId !== undefined ? subjectAreaId : course.subjectAreaId,
             }, { transaction });
+
+            if (hasAcademicBlocksInPayload) {
+                await this.syncCourseAcademicBlocks(courseId, nextAcademicBlockIds, transaction);
+            }
 
             // Update instructors if instructorIds provided
             if (instructorIds !== undefined && Array.isArray(instructorIds)) {
@@ -484,7 +704,7 @@ class CourseService {
                     await transaction.rollback();
                     return {
                         success: false,
-                        message: 'Cannot remove all instructors from an active course'
+                        message: 'Thao tác thất bại'
                     };
                 }
 
@@ -516,13 +736,16 @@ class CourseService {
                         as: 'instructors',
                         attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
                         through: { attributes: ['assignedAt'] }
+                    },
+                    {
+                        ...this.buildAcademicBlocksInclude(false)
                     }
                 ]
             });
 
             return {
                 success: true,
-                message: 'Course updated successfully',
+                message: 'Môn học đã cập nhật thành công',
                 course: updatedCourse
             };
         } catch (error) {
@@ -530,7 +753,7 @@ class CourseService {
             console.error('Update course error:', error);
             return {
                 success: false,
-                message: 'Failed to update course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -544,7 +767,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -557,7 +780,7 @@ class CourseService {
                 if (!isInstructor) {
                     return {
                         success: false,
-                        message: 'You do not have permission to delete this course'
+                        message: 'Bạn không có quyền xóa môn học này'
                     };
                 }
             }
@@ -572,7 +795,7 @@ class CourseService {
                 await course.update({ isActive: false });
                 return {
                     success: true,
-                    message: 'Course deactivated successfully (has existing presentations)',
+                    message: 'Môn học đã được lưu trữ do đã có dữ liệu trình bày',
                     softDeleted: true
                 };
             } else {
@@ -580,7 +803,7 @@ class CourseService {
                 await course.destroy();
                 return {
                     success: true,
-                    message: 'Course deleted successfully',
+                    message: 'Môn học đã xóa thành công',
                     softDeleted: false
                 };
             }
@@ -588,7 +811,7 @@ class CourseService {
             console.error('Delete course error:', error);
             return {
                 success: false,
-                message: 'Failed to delete course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -602,7 +825,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -614,7 +837,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'You do not have permission to create topics for this course'
+                    message: 'Bạn không có quyền tạo topic cho môn học này'
                 };
             }
 
@@ -632,7 +855,7 @@ class CourseService {
                 if (existingTopic) {
                     return {
                         success: false,
-                        message: 'Sequence number already exists for this course'
+                        message: 'Số thứ tự topic đã tồn tại trong môn học'
                     };
                 }
             }
@@ -652,7 +875,7 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Topic created successfully',
+                message: 'Chủ đề đã tạo thành công',
                 topic: {
                     topicId: topic.topicId,
                     courseId: topic.courseId,
@@ -669,7 +892,7 @@ class CourseService {
             console.error('Create topic error:', error);
             return {
                 success: false,
-                message: 'Failed to create topic',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -683,7 +906,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -724,7 +947,7 @@ class CourseService {
             console.error('Get topics by course error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve topics',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -766,7 +989,7 @@ class CourseService {
             if (!topic) {
                 return {
                     success: false,
-                    message: 'Topic not found'
+                    message: 'Chủ đề không tìm thấy'
                 };
             }
 
@@ -830,7 +1053,7 @@ class CourseService {
             console.error('Get topic by ID error:', error);
             return {
                 success: false,
-                message: 'Failed to retrieve topic',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -853,7 +1076,7 @@ class CourseService {
             if (!topic) {
                 return {
                     success: false,
-                    message: 'Topic not found'
+                    message: 'Chủ đề không tìm thấy'
                 };
             }
 
@@ -865,7 +1088,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'You do not have permission to update this topic'
+                    message: 'Bạn không có quyền cập nhật topic của môn học này'
                 };
             }
 
@@ -884,7 +1107,7 @@ class CourseService {
                 if (existingTopic) {
                     return {
                         success: false,
-                        message: 'Sequence number already exists for this course'
+                        message: 'Số thứ tự topic đã tồn tại trong môn học'
                     };
                 }
             }
@@ -900,7 +1123,7 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Topic updated successfully',
+                message: 'Chủ đề đã cập nhật thành công',
                 topic: {
                     topicId: topic.topicId,
                     courseId: topic.courseId,
@@ -917,7 +1140,7 @@ class CourseService {
             console.error('Update topic error:', error);
             return {
                 success: false,
-                message: 'Failed to update topic',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -940,7 +1163,7 @@ class CourseService {
             if (!topic) {
                 return {
                     success: false,
-                    message: 'Topic not found'
+                    message: 'Chủ đề không tìm thấy'
                 };
             }
 
@@ -952,7 +1175,7 @@ class CourseService {
             if (!isInstructor) {
                 return {
                     success: false,
-                    message: 'You do not have permission to delete this topic'
+                    message: 'Bạn không có quyền xóa topic của môn học này'
                 };
             }
 
@@ -964,7 +1187,7 @@ class CourseService {
             if (presentationCount > 0) {
                 return {
                     success: false,
-                    message: 'Cannot delete topic with existing presentations'
+                    message: 'Thao tác thất bại'
                 };
             }
 
@@ -972,13 +1195,13 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Topic deleted successfully'
+                message: 'Chủ đề đã xóa thành công'
             };
         } catch (error) {
             console.error('Delete topic error:', error);
             return {
                 success: false,
-                message: 'Failed to delete topic',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1002,7 +1225,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -1011,7 +1234,7 @@ class CourseService {
             if (!instructor) {
                 return {
                     success: false,
-                    message: 'Instructor not found'
+                    message: 'Không tìm thấy giảng viên'
                 };
             }
 
@@ -1023,7 +1246,7 @@ class CourseService {
             if (existing) {
                 return {
                     success: false,
-                    message: 'Instructor already assigned to this course'
+                    message: 'Giảng viên đã được phân công vào môn học này'
                 };
             }
 
@@ -1036,13 +1259,13 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Instructor assigned to course successfully'
+                message: 'Đã phân công giảng viên vào môn học thành công'
             };
         } catch (error) {
             console.error('Add course instructor error:', error);
             return {
                 success: false,
-                message: 'Failed to assign instructor to course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1063,7 +1286,7 @@ class CourseService {
             if (!assignment) {
                 return {
                     success: false,
-                    message: 'Instructor not assigned to this course'
+                    message: 'Không tìm thấy phân công giảng viên trong môn học'
                 };
             }
 
@@ -1071,13 +1294,13 @@ class CourseService {
 
             return {
                 success: true,
-                message: 'Instructor removed from course successfully'
+                message: 'Đã gỡ giảng viên khỏi môn học thành công'
             };
         } catch (error) {
             console.error('Remove course instructor error:', error);
             return {
                 success: false,
-                message: 'Failed to remove instructor from course',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
@@ -1106,7 +1329,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -1118,14 +1341,14 @@ class CourseService {
             console.error('Get course instructors error:', error);
             return {
                 success: false,
-                message: 'Failed to get course instructors',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
     }
 
     /**
-     * Get available instructors for a course (same major)
+     * Get available instructors for a course (same department)
      * @param {number} courseId - Course ID
      * @param {object} filters - Filter options { search }
      * @returns {Promise<object>} - Result with instructors list
@@ -1137,7 +1360,7 @@ class CourseService {
             if (!course) {
                 return {
                     success: false,
-                    message: 'Course not found'
+                    message: 'Môn học không tìm thấy'
                 };
             }
 
@@ -1149,13 +1372,8 @@ class CourseService {
             };
 
             // Filter by course department if exists
-            // If course has departmentId, only show instructors with same departmentId
             if (course.departmentId) {
                 where.departmentId = course.departmentId;
-            }
-            // If course has no departmentId but has majorCode, fallback to majorCode matching
-            else if (course.majorCode) {
-                where.studyMajor = { [db.Sequelize.Op.like]: `%${course.majorCode}%` };
             }
 
             // Search filter
@@ -1210,7 +1428,6 @@ class CourseService {
                 data: instructorsList,
                 count: instructorsList.length,
                 departmentId: course.departmentId,
-                majorCode: course.majorCode,
                 totalInstructors: instructors.length,
                 alreadyAssigned: assignedIds.length
             };
@@ -1219,7 +1436,7 @@ class CourseService {
             console.error('Get available instructors error:', error);
             return {
                 success: false,
-                message: 'Failed to get available instructors',
+                message: 'Thao tác thất bại',
                 error: error.message
             };
         }
