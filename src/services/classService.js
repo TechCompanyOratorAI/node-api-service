@@ -13,6 +13,7 @@ const {
   Presentation,
   EnrollKey,
   Topic,
+  ClassRubricCriteria,
   AcademicBlock,
 } = db;
 const { Op } = require("sequelize");
@@ -1232,7 +1233,7 @@ class ClassService {
    */
   async setUploadPermission(classId, data, instructorId, userRole) {
     try {
-      const { Class, ClassInstructor } = require("../models");
+
 
       // Find the class
       const classRecord = await Class.findByPk(classId);
@@ -1258,6 +1259,27 @@ class ClassService {
           success: false,
           message: "Bạn không có quyền thay đổi cài đặt của lớp học này",
         };
+      }
+
+      // Check if opening upload, total rubric weight must be 100%
+      if (data.isUploadEnabled) {
+        const criteria = await ClassRubricCriteria.findAll({
+          where: { classId, isActive: true },
+          attributes: ["weight"],
+        });
+
+        const totalWeight = criteria.reduce(
+          (sum, item) => sum + parseFloat(item.weight || 0),
+          0
+        );
+
+        // Using a small epsilon for float comparison
+        if (Math.abs(totalWeight - 100) > 0.001) {
+          return {
+            success: false,
+            message: `Không thể mở quyền upload vì tổng trọng số tiêu chí chấm điểm hiện tại là ${totalWeight}%. Vui lòng thiết lập đủ 100% trước khi mở.`,
+          };
+        }
       }
 
       // Update class

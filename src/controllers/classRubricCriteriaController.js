@@ -95,22 +95,6 @@ class ClassRubricCriteriaController {
         });
       }
 
-      // Check if bulk update (array)
-      if (Array.isArray(req.body)) {
-        const userId = req.user?.userId;
-        const result = await classRubricCriteriaService.bulkUpdateCriteria(
-          parseInt(classRubricCriteriaId),
-          req.body,
-          userId
-        );
-
-        if (result.success) {
-          return res.status(200).json(result);
-        } else {
-          return res.status(400).json(result);
-        }
-      }
-
       // Single update logic
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
