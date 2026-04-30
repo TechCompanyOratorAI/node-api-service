@@ -13,7 +13,6 @@ const {
   Presentation,
   EnrollKey,
   Topic,
-  ClassRubricCriteria,
   AcademicBlock,
 } = db;
 const { Op } = require("sequelize");
@@ -342,32 +341,32 @@ class ClassService {
         distinct: true,
       });
 
-     return {
-  success: true,
-  data: classes.map((c) => {
-    const classData = {
-      ...c.toJSON(),
-      academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
-      enrollmentCount: c.enrollments?.length || 0,
-      activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
-    };
+      return {
+        success: true,
+        data: classes.map((c) => {
+          const classData = {
+            ...c.toJSON(),
+            academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
+            enrollmentCount: c.enrollments?.length || 0,
+            activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
+          };
 
-    // Admin / Instructor mới thấy enroll key
-    if (userRole === "Admin" || userRole === "Instructor") {
-      const activeKey = c.enrollKeys?.find((k) => k.isActive);
-      classData.enrollkey = activeKey?.keyValue || null;
-    }
+          // Admin / Instructor mới thấy enroll key
+          if (userRole === "Admin" || userRole === "Instructor") {
+            const activeKey = c.enrollKeys?.find((k) => k.isActive);
+            classData.enrollkey = activeKey?.keyValue || null;
+          }
 
-    return classData;
-  }),
+          return classData;
+        }),
 
-  pagination: {
-    total: count,
-    page: parseInt(page),
-    limit: parseInt(limit),
-    totalPages: Math.ceil(count / limit),
-  },
-};
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      };
     } catch (error) {
       console.error("Get classes by course error:", error);
       return {
@@ -1233,8 +1232,7 @@ class ClassService {
    */
   async setUploadPermission(classId, data, instructorId, userRole) {
     try {
-
-
+      const { Class, ClassInstructor } = require("../models");
       // Find the class
       const classRecord = await Class.findByPk(classId);
       if (!classRecord) {
@@ -1259,27 +1257,6 @@ class ClassService {
           success: false,
           message: "Bạn không có quyền thay đổi cài đặt của lớp học này",
         };
-      }
-
-      // Check if opening upload, total rubric weight must be 100%
-      if (data.isUploadEnabled) {
-        const criteria = await ClassRubricCriteria.findAll({
-          where: { classId, isActive: true },
-          attributes: ["weight"],
-        });
-
-        const totalWeight = criteria.reduce(
-          (sum, item) => sum + parseFloat(item.weight || 0),
-          0
-        );
-
-        // Using a small epsilon for float comparison
-        if (Math.abs(totalWeight - 100) > 0.001) {
-          return {
-            success: false,
-            message: `Không thể mở quyền upload vì tổng trọng số tiêu chí chấm điểm hiện tại là ${totalWeight}%. Vui lòng thiết lập đủ 100% trước khi mở.`,
-          };
-        }
       }
 
       // Update class
