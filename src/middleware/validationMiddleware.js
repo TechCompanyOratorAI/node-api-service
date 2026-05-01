@@ -167,6 +167,16 @@ export const validateCourse = [
     .isInt({ min: 1 })
     .withMessage("subjectAreaId phải là số nguyên dương"),
 
+  body("subjectAreaIds")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage("subjectAreaIds phải là mảng không rỗng"),
+
+  body("subjectAreaIds.*")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Each subjectAreaId phải là số nguyên dương"),
+
   body("description")
     .optional()
     .isLength({ max: 5000 })
@@ -208,6 +218,16 @@ export const validateCourse = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("Each academic block ID phải là số nguyên dương"),
+
+  body("subjectAreaIds")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage("subjectAreaIds phải là mảng không rỗng"),
+
+  body("subjectAreaIds.*")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Each subjectAreaId phải là số nguyên dương"),
 
   body("startDate")
     .optional()

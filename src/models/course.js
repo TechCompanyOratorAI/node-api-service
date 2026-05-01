@@ -32,6 +32,16 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'subjectAreaId',
                 as: 'subjectArea'
             });
+            Course.belongsToMany(models.SubjectArea, {
+                through: models.CourseSubjectArea,
+                foreignKey: 'courseId',
+                otherKey: 'subjectAreaId',
+                as: 'subjectAreas'
+            });
+            Course.hasMany(models.CourseSubjectArea, {
+                foreignKey: 'courseId',
+                as: 'courseSubjectAreas'
+            });
 
             Course.belongsTo(models.AcademicBlock, {
                 foreignKey: 'academicBlockId',

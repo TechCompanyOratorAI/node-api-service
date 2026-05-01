@@ -12,6 +12,16 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'subjectAreaId',
                 as: 'courses'
             });
+            SubjectArea.belongsToMany(models.Course, {
+                through: models.CourseSubjectArea,
+                foreignKey: 'subjectAreaId',
+                otherKey: 'courseId',
+                as: 'mappedCourses'
+            });
+            SubjectArea.hasMany(models.CourseSubjectArea, {
+                foreignKey: 'subjectAreaId',
+                as: 'courseSubjectAreas'
+            });
             SubjectArea.hasMany(models.CompetencyCatalog, {
                 foreignKey: 'subjectAreaId',
                 as: 'competencies'
