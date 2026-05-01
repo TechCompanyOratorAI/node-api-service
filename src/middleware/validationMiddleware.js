@@ -340,15 +340,39 @@ export const validateTopic = [
     .withMessage("Mô tả không được vượt quá 5000 ký tự")
     .trim(),
 
-  body("sequenceNumber")
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage("Sequence number phải là số nguyên dương"),
-
-  body("dueDate")
+  body("submissionStartDate")
     .optional()
     .isISO8601()
-    .withMessage("Due date phải là ngày hợp lệ"),
+    .withMessage("submissionStartDate phải là ngày hợp lệ"),
+
+  body("submissionDeadline")
+    .optional()
+    .isISO8601()
+    .withMessage("submissionDeadline phải là ngày hợp lệ")
+    .custom((value, { req }) => {
+      const start = req.body.submissionStartDate;
+      if (start && value && new Date(value) <= new Date(start)) {
+        throw new Error("submissionDeadline phải sau submissionStartDate");
+      }
+      return true;
+    }),
+
+  body("minGroups")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("minGroups phải là số nguyên dương"),
+
+  body("maxGroups")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("maxGroups phải là số nguyên dương")
+    .custom((value, { req }) => {
+      const min = req.body.minGroups;
+      if (min !== undefined && value !== undefined && parseInt(value, 10) < parseInt(min, 10)) {
+        throw new Error("maxGroups phải lớn hơn hoặc bằng minGroups");
+      }
+      return true;
+    }),
 
   body("maxDurationMinutes")
     .optional()
@@ -376,15 +400,39 @@ export const validateTopicUpdate = [
     .withMessage("Mô tả không được vượt quá 5000 ký tự")
     .trim(),
 
-  body("sequenceNumber")
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage("Sequence number phải là số nguyên dương"),
-
-  body("dueDate")
+  body("submissionStartDate")
     .optional()
     .isISO8601()
-    .withMessage("Due date phải là ngày hợp lệ"),
+    .withMessage("submissionStartDate phải là ngày hợp lệ"),
+
+  body("submissionDeadline")
+    .optional()
+    .isISO8601()
+    .withMessage("submissionDeadline phải là ngày hợp lệ")
+    .custom((value, { req }) => {
+      const start = req.body.submissionStartDate;
+      if (start && value && new Date(value) <= new Date(start)) {
+        throw new Error("submissionDeadline phải sau submissionStartDate");
+      }
+      return true;
+    }),
+
+  body("minGroups")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("minGroups phải là số nguyên dương"),
+
+  body("maxGroups")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("maxGroups phải là số nguyên dương")
+    .custom((value, { req }) => {
+      const min = req.body.minGroups;
+      if (min !== undefined && value !== undefined && parseInt(value, 10) < parseInt(min, 10)) {
+        throw new Error("maxGroups phải lớn hơn hoặc bằng minGroups");
+      }
+      return true;
+    }),
 
   body("maxDurationMinutes")
     .optional()
@@ -1068,5 +1116,6 @@ export default {
   validateDeleteCriterionFeedback,
   validateShareInvite,
 };
+
 
 

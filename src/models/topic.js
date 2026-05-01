@@ -20,8 +20,12 @@ module.exports = (sequelize, DataTypes) => {
             courseId: { type: DataTypes.INTEGER, allowNull: true },   // nullable (legacy)
             topicName: { type: DataTypes.STRING(200), allowNull: false },
             description: { type: DataTypes.TEXT },
-            sequenceNumber: { type: DataTypes.INTEGER, allowNull: false },
+            sequenceNumber: { type: DataTypes.INTEGER, allowNull: true },
             dueDate: { type: DataTypes.DATE },
+            submissionStartDate: { type: DataTypes.DATE, allowNull: true },
+            submissionDeadline: { type: DataTypes.DATE, allowNull: true },
+            minGroups: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+            maxGroups: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
             maxDurationMinutes: { type: DataTypes.INTEGER },
             requirements: { type: DataTypes.TEXT },
         },
