@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const db = require("../models");
 const {
@@ -59,7 +59,7 @@ class ClassService {
       if (!allowedBlockIds.includes(normalizedRequestedBlockId)) {
         return {
           success: false,
-          message: "Academic block không thuộc phạm vi của khóa học",
+          message: "Academic block không phạm vi của khóa học",
         };
       }
       return {
@@ -277,7 +277,6 @@ class ClassService {
 
       const where = { courseId };
 
-      // Student chỉ thấy lớp active và chưa hết hạn
       if (userRole === "Student") {
         where.status = "active";
         where.endDate = { [Op.gte]: new Date() };
@@ -351,7 +350,6 @@ class ClassService {
             activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
           };
 
-          // Admin / Instructor mới thấy enroll key
           if (userRole === "Admin" || userRole === "Instructor") {
             const activeKey = c.enrollKeys?.find((k) => k.isActive);
             classData.enrollkey = activeKey?.keyValue || null;
@@ -623,13 +621,15 @@ class ClassService {
               "topicId",
               "topicName",
               "description",
-              "sequenceNumber",
-              "dueDate",
+              "submissionStartDate",
+              "submissionDeadline",
+              "minGroups",
+              "maxGroups",
               "maxDurationMinutes",
               "requirements",
             ],
             required: false,
-            order: [["sequenceNumber", "ASC"]],
+            order: [["topicId", "ASC"]],
           },
           {
             model: User,
@@ -826,7 +826,6 @@ class ClassService {
 
           await activeKey.update(keyUpdates, { transaction });
         } else if (enrollKey !== undefined) {
-          // No active key exists → create a new one
           await EnrollKey.create({
             classId,
             keyValue: enrollKey,
@@ -867,7 +866,7 @@ class ClassService {
       console.error("Update class error:", error);
       return {
         success: false,
-        message: "Không thể cập nhật lớp học",
+        message: "KhÃ´ng thá»ƒ cáº­p nháº­t lá»›p há»c",
         error: error.message,
       };
     }
@@ -1022,7 +1021,7 @@ class ClassService {
       console.error("Assign instructor error:", error);
       return {
         success: false,
-        message: "Không thể phân công giảng viên",
+        message: "KhÃ´ng thá»ƒ phÃ¢n cÃ´ng giáº£ng viÃªn",
         error: error.message,
       };
     }
@@ -1090,18 +1089,23 @@ class ClassService {
         }
       }
 
-      const { topicName, description, sequenceNumber, dueDate, maxDurationMinutes, requirements } = topicData;
+      const { topicName, description, submissionStartDate, submissionDeadline, dueDate, minGroups, maxGroups, maxDurationMinutes, requirements } = topicData;
 
-      // Auto sequence if not provided
-      const nextSeq = sequenceNumber ||
-        ((await Topic.max("sequenceNumber", { where: { classId } })) || 0) + 1;
+      const normalizedSubmissionStartDate = submissionStartDate !== undefined ? submissionStartDate : null;
+      const normalizedSubmissionDeadline = submissionDeadline !== undefined ? submissionDeadline : (dueDate !== undefined ? dueDate : null);
+      const normalizedMinGroups = minGroups !== undefined ? parseInt(minGroups, 10) : 1;
+      const normalizedMaxGroups = maxGroups !== undefined ? parseInt(maxGroups, 10) : normalizedMinGroups;
 
-      // Check duplicate sequence
-      if (sequenceNumber) {
-        const existing = await Topic.findOne({ where: { classId, sequenceNumber } });
-        if (existing) {
-          return { success: false, message: "Số thứ tự đã tồn tại trong lớp này" };
-        }
+      if (normalizedMinGroups < 1 || normalizedMaxGroups < normalizedMinGroups) {
+        return { success: false, message: "Dữ liệu không hợp lệ" };
+      }
+
+      if (
+        normalizedSubmissionStartDate &&
+        normalizedSubmissionDeadline &&
+        new Date(normalizedSubmissionDeadline) <= new Date(normalizedSubmissionStartDate)
+      ) {
+        return { success: false, message: "submissionDeadline phải sau submissionStartDate" };
       }
 
       const topic = await Topic.create({
@@ -1109,8 +1113,12 @@ class ClassService {
         courseId: classData.courseId, // keep for reference
         topicName,
         description,
-        sequenceNumber: nextSeq,
-        dueDate,
+        sequenceNumber: null,
+        dueDate: normalizedSubmissionDeadline,
+        submissionStartDate: normalizedSubmissionStartDate,
+        submissionDeadline: normalizedSubmissionDeadline,
+        minGroups: normalizedMinGroups,
+        maxGroups: normalizedMaxGroups,
         maxDurationMinutes,
         requirements,
       });
@@ -1134,7 +1142,7 @@ class ClassService {
 
       const topics = await Topic.findAll({
         where: { classId },
-        order: [["sequenceNumber", "ASC"]],
+        order: [["topicId", "ASC"]],
       });
 
       return { success: true, topics };
@@ -1163,22 +1171,34 @@ class ClassService {
         }
       }
 
-      const { topicName, description, sequenceNumber, dueDate, maxDurationMinutes, requirements } = topicData;
+      const { topicName, description, submissionStartDate, submissionDeadline, dueDate, minGroups, maxGroups, maxDurationMinutes, requirements } = topicData;
 
-      if (sequenceNumber && sequenceNumber !== topic.sequenceNumber) {
-        const existing = await Topic.findOne({
-          where: { classId: topic.classId, sequenceNumber, topicId: { [Op.ne]: topicId } },
-        });
-        if (existing) {
-          return { success: false, message: "Số thứ tự đã tồn tại trong lớp này" };
-        }
+      const nextSubmissionStartDate = submissionStartDate !== undefined ? submissionStartDate : topic.submissionStartDate;
+      const nextSubmissionDeadline = submissionDeadline !== undefined ? submissionDeadline : (dueDate !== undefined ? dueDate : topic.submissionDeadline);
+      const nextMinGroups = minGroups !== undefined ? parseInt(minGroups, 10) : topic.minGroups;
+      const nextMaxGroups = maxGroups !== undefined ? parseInt(maxGroups, 10) : topic.maxGroups;
+
+      if (nextMinGroups < 1 || nextMaxGroups < nextMinGroups) {
+        return { success: false, message: "Dữ liệu không hợp lệ" };
+      }
+
+      if (
+        nextSubmissionStartDate &&
+        nextSubmissionDeadline &&
+        new Date(nextSubmissionDeadline) <= new Date(nextSubmissionStartDate)
+      ) {
+        return { success: false, message: "submissionDeadline phải sau submissionStartDate" };
       }
 
       await topic.update({
         topicName: topicName || topic.topicName,
         description: description !== undefined ? description : topic.description,
-        sequenceNumber: sequenceNumber || topic.sequenceNumber,
-        dueDate: dueDate !== undefined ? dueDate : topic.dueDate,
+        sequenceNumber: null,
+        dueDate: nextSubmissionDeadline,
+        submissionStartDate: nextSubmissionStartDate,
+        submissionDeadline: nextSubmissionDeadline,
+        minGroups: nextMinGroups,
+        maxGroups: nextMaxGroups,
         maxDurationMinutes: maxDurationMinutes !== undefined ? maxDurationMinutes : topic.maxDurationMinutes,
         requirements: requirements !== undefined ? requirements : topic.requirements,
       });
@@ -1362,7 +1382,7 @@ class ClassService {
 
       const { ClassEmailWhitelist } = db;
 
-      // Replace: xóa cũ rồi insert mới
+      // Replace: xóa cũ và insert mới
       await ClassEmailWhitelist.destroy({ where: { classId }, transaction });
 
       const records = emails.map((email) => ({ classId, email }));
@@ -1621,4 +1641,8 @@ class ClassService {
 }
 
 module.exports = new ClassService();
+
+
+
+
 

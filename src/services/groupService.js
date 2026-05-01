@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const db = require("../models");
 const { Group, GroupStudent, Class, User, Enrollment, TopicEnrollment, Topic, Course, Presentation, GroupGradeDistribution } = db;
@@ -720,6 +720,21 @@ class GroupService {
         return {
           success: false,
           message: "Topic không thuộc lớp học này",
+        };
+      }
+      // Enforce topic group capacity
+      const currentGroupCount = await TopicEnrollment.count({
+        where: { topicId, status: "enrolled" },
+        distinct: true,
+        col: "groupId",
+        transaction,
+      });
+      const topicMaxGroups = topic.maxGroups || 1;
+      if (currentGroupCount >= topicMaxGroups) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Topic đã đủ số lượng nhóm tối đa",
         };
       }
 
