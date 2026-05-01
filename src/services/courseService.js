@@ -1,6 +1,6 @@
 import db from '../models/index.js';
 
-const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group, AcademicBlock, AcademicYear, CourseAcademicBlock, SubjectArea } = db;
+const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group, AcademicBlock, AcademicYear, CourseAcademicBlock, SubjectArea, CourseSubjectArea } = db;
 
 class CourseService {
     normalizeAcademicBlockIds(courseData = {}) {
@@ -13,6 +13,49 @@ class CourseService {
             return Number.isInteger(parsed) && parsed > 0 ? [parsed] : [];
         }
         return [];
+    }
+
+    normalizeSubjectAreaIds(courseData = {}) {
+        const { subjectAreaIds, subjectAreaId } = courseData;
+        if (Array.isArray(subjectAreaIds)) {
+            return [...new Set(subjectAreaIds.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))];
+        }
+        if (subjectAreaId !== undefined && subjectAreaId !== null) {
+            const parsed = parseInt(subjectAreaId, 10);
+            return Number.isInteger(parsed) && parsed > 0 ? [parsed] : [];
+        }
+        return [];
+    }
+
+    async resolveSubjectAreas(subjectAreaIds, transaction) {
+        if (!subjectAreaIds.length) return { success: true, subjectAreas: [] };
+        const subjectAreas = await SubjectArea.findAll({
+            where: {
+                subjectAreaId: subjectAreaIds,
+                isActive: true,
+            },
+            transaction,
+        });
+        if (subjectAreas.length !== subjectAreaIds.length) {
+            return { success: false, message: "Dữ liệu không hợp lệ" };
+        }
+        return { success: true, subjectAreas };
+    }
+
+    async syncCourseSubjectAreas(courseId, subjectAreaIds, transaction) {
+        await CourseSubjectArea.destroy({
+            where: { courseId },
+            transaction,
+        });
+        if (!subjectAreaIds.length) return;
+        await CourseSubjectArea.bulkCreate(
+            subjectAreaIds.map((id, index) => ({
+                courseId,
+                subjectAreaId: id,
+                isPrimary: index === 0,
+            })),
+            { transaction }
+        );
     }
 
     async resolveCourseBlocks(academicBlockIds, transaction) {
@@ -140,6 +183,7 @@ class CourseService {
                 instructorIds = [] // Array of instructor IDs
             } = courseData;
             const academicBlockIds = this.normalizeAcademicBlockIds(courseData);
+            const subjectAreaIds = this.normalizeSubjectAreaIds(courseData);
 
             // Check if course code already exists
             const existingCourse = await Course.findOne({
@@ -169,12 +213,20 @@ class CourseService {
                 return dateValidation;
             }
 
+            const resolvedSubjectAreas = await this.resolveSubjectAreas(subjectAreaIds, transaction);
+            if (!resolvedSubjectAreas.success) {
+                await transaction.rollback();
+                return resolvedSubjectAreas;
+            }
+            const primarySubjectAreaId =
+                subjectAreaIds[0] || (subjectAreaId ? parseInt(subjectAreaId, 10) : null) || null;
+
             // Create course (no single instructorId FK)
             const course = await Course.create({
                 courseCode,
                 courseName,
                 departmentId,
-                subjectAreaId: subjectAreaId || null,
+                subjectAreaId: primarySubjectAreaId,
                 description,
                 academicBlockId: dateValidation.primaryAcademicBlockId,
                 semester,
@@ -185,6 +237,7 @@ class CourseService {
             }, { transaction });
 
             await this.syncCourseAcademicBlocks(course.courseId, academicBlockIds, transaction);
+            await this.syncCourseSubjectAreas(course.courseId, subjectAreaIds, transaction);
 
             // Assign instructors via course_instructors M:N table
             if (instructorIds && instructorIds.length > 0) {
@@ -207,6 +260,12 @@ class CourseService {
                         as: 'instructors',
                         attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
                         through: { attributes: ['assignedAt'] }
+                    },
+                    {
+                        model: SubjectArea,
+                        as: 'subjectAreas',
+                        through: { attributes: ['isPrimary'] },
+                        required: false
                     },
                     {
                         ...this.buildAcademicBlocksInclude(false)
@@ -303,6 +362,13 @@ class CourseService {
                 model: SubjectArea,
                 as: "subjectArea",
                 attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                required: false,
+            },
+            {
+                model: SubjectArea,
+                as: "subjectAreas",
+                attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                through: { attributes: ["isPrimary"] },
                 required: false,
             },
             this.buildAcademicBlocksInclude(!!academicBlockId, academicBlockId ? { academicBlockId } : null)
@@ -434,6 +500,13 @@ class CourseService {
                         attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
                         required: false,
                     },
+                    {
+                        model: SubjectArea,
+                        as: "subjectAreas",
+                        attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                        through: { attributes: ["isPrimary"] },
+                        required: false,
+                    },
                     this.buildAcademicBlocksInclude(!!academicBlockId, academicBlockId ? { academicBlockId } : null)
                 ],
                 limit: parseInt(limit),
@@ -497,6 +570,13 @@ class CourseService {
                     required: false,
                 },
                 {
+                    model: SubjectArea,
+                    as: "subjectAreas",
+                    attributes: ["subjectAreaId", "subjectCode", "subjectName", "departmentId", "majorId"],
+                    through: { attributes: ["isPrimary"] },
+                    required: false,
+                },
+                {
                     ...this.buildAcademicBlocksInclude(false)
                 }
             ];
@@ -542,6 +622,8 @@ class CourseService {
                 description: course.description,
                 subjectAreaId: course.subjectAreaId,
                 subjectArea: course.subjectArea,
+                subjectAreaIds: (course.subjectAreas || []).map((item) => item.subjectAreaId),
+                subjectAreas: course.subjectAreas || [],
                 semester: course.semester,
                 academicYear: course.academicYear,
                 academicBlockId: primaryAcademicBlockId,
@@ -621,6 +703,7 @@ class CourseService {
                 isActive,
                 departmentId,
                 subjectAreaId,
+                subjectAreaIds,
                 instructorIds // Array of instructor IDs để cập nhật
             } = courseData;
             const hasAcademicBlocksInPayload = Array.isArray(academicBlockIds) || academicBlockId !== undefined;
@@ -655,6 +738,16 @@ class CourseService {
             const nextAcademicBlockIds = hasAcademicBlocksInPayload
                 ? this.normalizeAcademicBlockIds({ academicBlockIds, academicBlockId })
                 : existingMappings.map((mapping) => mapping.academicBlockId);
+            const hasSubjectAreasInPayload = Array.isArray(subjectAreaIds) || subjectAreaId !== undefined;
+            const existingSubjectAreaMappings = await CourseSubjectArea.findAll({
+                where: { courseId },
+                attributes: ["subjectAreaId", "isPrimary"],
+                order: [["isPrimary", "DESC"], ["courseSubjectAreaId", "ASC"]],
+                transaction,
+            });
+            const nextSubjectAreaIds = hasSubjectAreasInPayload
+                ? this.normalizeSubjectAreaIds({ subjectAreaIds, subjectAreaId })
+                : existingSubjectAreaMappings.map((mapping) => mapping.subjectAreaId);
             const resolvedBlocks = await this.resolveCourseBlocks(nextAcademicBlockIds, transaction);
             if (!resolvedBlocks.success) {
                 await transaction.rollback();
@@ -678,6 +771,12 @@ class CourseService {
                 await transaction.rollback();
                 return dateValidation;
             }
+            const resolvedSubjectAreas = await this.resolveSubjectAreas(nextSubjectAreaIds, transaction);
+            if (!resolvedSubjectAreas.success) {
+                await transaction.rollback();
+                return resolvedSubjectAreas;
+            }
+            const nextPrimarySubjectAreaId = nextSubjectAreaIds[0] || null;
 
             await course.update({
                 courseCode: courseCode || course.courseCode,
@@ -690,11 +789,14 @@ class CourseService {
                 endDate: dateValidation.endDate || null,
                 isActive: isActive !== undefined ? isActive : course.isActive,
                 departmentId: departmentId !== undefined ? departmentId : course.departmentId,
-                subjectAreaId: subjectAreaId !== undefined ? subjectAreaId : course.subjectAreaId,
+                subjectAreaId: hasSubjectAreasInPayload ? nextPrimarySubjectAreaId : course.subjectAreaId,
             }, { transaction });
 
             if (hasAcademicBlocksInPayload) {
                 await this.syncCourseAcademicBlocks(courseId, nextAcademicBlockIds, transaction);
+            }
+            if (hasSubjectAreasInPayload) {
+                await this.syncCourseSubjectAreas(courseId, nextSubjectAreaIds, transaction);
             }
 
             // Update instructors if instructorIds provided
@@ -736,6 +838,12 @@ class CourseService {
                         as: 'instructors',
                         attributes: ['userId', 'username', 'firstName', 'lastName', 'email'],
                         through: { attributes: ['assignedAt'] }
+                    },
+                    {
+                        model: SubjectArea,
+                        as: 'subjectAreas',
+                        through: { attributes: ['isPrimary'] },
+                        required: false
                     },
                     {
                         ...this.buildAcademicBlocksInclude(false)

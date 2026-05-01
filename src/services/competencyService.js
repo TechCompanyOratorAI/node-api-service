@@ -452,56 +452,12 @@ class CompetencyService {
         }
       }
 
-      const today = new Date();
-      const activeClassCount = await ClassInstructor.count({
-        where: { instructorId: normalizedInstructorId },
-        include: [
-          {
-            model: Class,
-            as: "class",
-            required: true,
-            where: {
-              status: "active",
-              [db.Sequelize.Op.or]: [{ endDate: null }, { endDate: { [db.Sequelize.Op.gte]: today } }],
-            },
-          },
-        ],
-      });
-      const maxActiveLoad = parseInt(process.env.MAX_INSTRUCTOR_ACTIVE_CLASS_LOAD || "4", 10);
-      if (activeClassCount >= maxActiveLoad) reasons.push("Instructor workload exceeded");
+      // Workload limit check intentionally disabled per business decision.
+      const activeClassCount = null;
+      const maxActiveLoad = null;
 
-      let scheduleOverlap = [];
-      if (options.classContext?.startDate && options.classContext?.endDate) {
-        const ctxStart = new Date(options.classContext.startDate);
-        const ctxEnd = new Date(options.classContext.endDate);
-        if (ctxStart < ctxEnd) {
-          const assignedClasses = await Class.findAll({
-            attributes: ["classId", "classCode", "startDate", "endDate", "status"],
-            include: [
-              {
-                model: ClassInstructor,
-                as: "classInstructors",
-                where: { instructorId: normalizedInstructorId },
-                attributes: [],
-                required: true,
-              },
-            ],
-            where: {
-              classId: { [db.Sequelize.Op.ne]: options.classContext.classId || 0 },
-              status: "active",
-              startDate: { [db.Sequelize.Op.lte]: options.classContext.endDate },
-              endDate: { [db.Sequelize.Op.gte]: options.classContext.startDate },
-            },
-          });
-          scheduleOverlap = assignedClasses.map((item) => ({
-            classId: item.classId,
-            classCode: item.classCode,
-            startDate: item.startDate,
-            endDate: item.endDate,
-          }));
-          if (scheduleOverlap.length) reasons.push("Schedule overlap");
-        }
-      }
+      // Schedule overlap check intentionally disabled per business decision.
+      const scheduleOverlap = [];
 
       return {
         success: true,
