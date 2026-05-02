@@ -780,8 +780,14 @@ class ClassService {
         return blockSelection;
       }
       const nextBlockIds = blockSelection.academicBlockIds;
-      const nextStartDate = classUpdates.startDate || classData.startDate;
-      const nextEndDate = classUpdates.endDate || classData.endDate;
+      const hasStartDateInPayload = classUpdates.startDate !== undefined;
+      const hasEndDateInPayload = classUpdates.endDate !== undefined;
+      const nextStartDate = hasStartDateInPayload
+        ? classUpdates.startDate
+        : (hasBlocksInPayload ? null : classData.startDate);
+      const nextEndDate = hasEndDateInPayload
+        ? classUpdates.endDate
+        : (hasBlocksInPayload ? null : classData.endDate);
       const dateValidation = await this.validateClassDateWithinBlocks(nextBlockIds, nextStartDate, nextEndDate, "Class");
       if (!dateValidation.success) {
         await transaction.rollback();
@@ -791,10 +797,10 @@ class ClassService {
       if (hasBlocksInPayload) {
         classUpdates.academicBlockId = dateValidation.primaryAcademicBlockId || null;
       }
-      if (classUpdates.startDate === undefined && hasBlocksInPayload && !nextStartDate) {
+      if (!hasStartDateInPayload && hasBlocksInPayload) {
         classUpdates.startDate = dateValidation.startDate || null;
       }
-      if (classUpdates.endDate === undefined && hasBlocksInPayload && !nextEndDate) {
+      if (!hasEndDateInPayload && hasBlocksInPayload) {
         classUpdates.endDate = dateValidation.endDate || null;
       }
       if (classUpdates.academicBlockIds !== undefined) delete classUpdates.academicBlockIds;
