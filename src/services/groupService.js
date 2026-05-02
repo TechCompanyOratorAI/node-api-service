@@ -327,6 +327,13 @@ class GroupService {
         };
       }
 
+      const studentUser = await User.findByPk(studentId, {
+        attributes: ["firstName", "lastName"],
+      });
+      const studentName = studentUser
+        ? `${studentUser.firstName || ""} ${studentUser.lastName || ""}`.trim()
+        : studentId;
+
       const transaction = await db.sequelize.transaction();
       try {
         // 1. Demote existing leader if exists
@@ -341,7 +348,7 @@ class GroupService {
 
         return {
           success: true,
-          message: `Đã chuyển quyền trưởng nhóm sang cho sinh viên ID ${studentId}`,
+          message: `Đã chuyển quyền trưởng nhóm sang cho sinh viên ${studentName}`,
           newLeaderId: studentId,
         };
       } catch (error) {
