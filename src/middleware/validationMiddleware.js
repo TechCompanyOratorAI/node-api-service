@@ -826,8 +826,8 @@ export const validateClassAISetting = [
 
   body("reportFormat")
     .optional()
-    .isIn(["brief", "detailed", "comprehensive"])
-    .withMessage("reportFormat phải là brief, detailed hoặc comprehensive"),
+    .isIn(["summary", "detailed"])
+    .withMessage("reportFormat phải là summary hoặc detailed"),
 
   body("includeCriterionComments")
     .optional()
