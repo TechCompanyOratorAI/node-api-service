@@ -201,9 +201,9 @@ class ClassScoreService {
         let overallAverageScore = null;
         let instructorAverageScore = null;
         if (studentConfirmedReports.length > 0) {
-          // Diem trung binh AI (overallScore)
+          // Diem trung binh AI (overallScore stored as 0-1 scale, convert to 0-10)
           const totalScore = studentConfirmedReports.reduce(
-            (sum, r) => sum + parseFloat(r.overallScore || 0),
+            (sum, r) => sum + parseFloat(r.overallScore || 0) * 10,
             0
           );
           overallAverageScore = parseFloat((totalScore / studentConfirmedReports.length).toFixed(2));
@@ -223,6 +223,28 @@ class ClassScoreService {
           if (gradeEntries.length > 0) {
             const totalInstructorScore = gradeEntries.reduce((sum, g) => sum + g, 0);
             instructorAverageScore = parseFloat((totalInstructorScore / gradeEntries.length).toFixed(2));
+          }
+        }
+
+        // Fallback: student in group but not the presentation owner —
+        // derive scores from the group's confirmed reports via groupGradeMembersMap
+        const studentGradeEntries = groupGradeMembersMap.get(student.userId);
+        if (studentGradeEntries && studentGradeEntries.size > 0) {
+          const groupReportIds = Array.from(studentGradeEntries.keys());
+
+          if (overallAverageScore === null) {
+            const groupReports = confirmedReports.filter((r) => groupReportIds.includes(r.reportId));
+            if (groupReports.length > 0) {
+              const total = groupReports.reduce((sum, r) => sum + parseFloat(r.overallScore || 0) * 10, 0);
+              overallAverageScore = parseFloat((total / groupReports.length).toFixed(2));
+            }
+          }
+
+          if (instructorAverageScore === null) {
+            const grades = Array.from(studentGradeEntries.values()).map((e) => e.receivedGrade);
+            instructorAverageScore = parseFloat(
+              (grades.reduce((a, b) => a + b, 0) / grades.length).toFixed(2)
+            );
           }
         }
 
@@ -263,7 +285,7 @@ class ClassScoreService {
             submittedAt: p.submissionDate,
             status: p.status,
             hasReport: !!report,
-            overallScore: report ? parseFloat(report.overallScore) : null,
+            overallScore: report ? parseFloat((parseFloat(report.overallScore) * 10).toFixed(2)) : null,
             gradeForInstructor: report && report.gradeForInstructor !== null
               ? parseFloat(report.gradeForInstructor)
               : null,
