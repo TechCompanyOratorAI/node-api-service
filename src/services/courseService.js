@@ -3,6 +3,45 @@ import db from '../models/index.js';
 const { Course, Topic, User, Presentation, Enrollment, CourseInstructor, Class, TopicEnrollment, Group, AcademicBlock, AcademicYear, CourseAcademicBlock, SubjectArea, CourseSubjectArea } = db;
 
 class CourseService {
+    async getOccupiedTopicGroupCount(topicId) {
+        const enrolledGroups = await TopicEnrollment.findAll({
+            where: {
+                topicId,
+                status: 'enrolled',
+                groupId: { [db.Sequelize.Op.ne]: null }
+            },
+            attributes: ['groupId'],
+            group: ['groupId'],
+            raw: true
+        });
+
+        const presentationGroups = await Presentation.findAll({
+            where: {
+                topicId,
+                groupCode: { [db.Sequelize.Op.ne]: null }
+            },
+            attributes: ['groupCode'],
+            group: ['groupCode'],
+            raw: true
+        });
+
+        const occupiedGroups = new Set();
+
+        enrolledGroups.forEach((row) => {
+            if (row.groupId !== null && row.groupId !== undefined) {
+                occupiedGroups.add(String(row.groupId));
+            }
+        });
+
+        presentationGroups.forEach((row) => {
+            if (row.groupCode !== null && row.groupCode !== undefined && String(row.groupCode).trim()) {
+                occupiedGroups.add(String(row.groupCode).trim());
+            }
+        });
+
+        return occupiedGroups.size;
+    }
+
     normalizeAcademicBlockIds(courseData = {}) {
         const { academicBlockIds, academicBlockId } = courseData;
         if (Array.isArray(academicBlockIds)) {
@@ -1234,6 +1273,14 @@ class CourseService {
                 return {
                     success: false,
                     message: 'Dữ liệu minGroups/maxGroups không hợp lệ'
+                };
+            }
+
+            const occupiedGroupCount = await this.getOccupiedTopicGroupCount(topic.topicId);
+            if (nextMaxGroups < occupiedGroupCount) {
+                return {
+                    success: false,
+                    message: `Không thể giảm maxGroups xuống ${nextMaxGroups} vì topic đang có ${occupiedGroupCount} nhóm đã chọn hoặc đã nộp bài`
                 };
             }
 
