@@ -14,6 +14,7 @@ const {
   EnrollKey,
   Topic,
   AcademicBlock,
+  TopicEnrollment,
 } = db;
 const { Op } = require("sequelize");
 const { emitUploadPermissionChanged } = require("../websocket/emitters");
@@ -22,6 +23,45 @@ const competencyService = require("./competencyService");
 const { AUDIT_ACTIONS, AUDIT_STATUSES } = require("../constants/businessConstants");
 
 class ClassService {
+  async getOccupiedTopicGroupCount(topicId) {
+    const enrolledGroups = await TopicEnrollment.findAll({
+      where: {
+        topicId,
+        status: "enrolled",
+        groupId: { [Op.ne]: null },
+      },
+      attributes: ["groupId"],
+      group: ["groupId"],
+      raw: true,
+    });
+
+    const presentationGroups = await Presentation.findAll({
+      where: {
+        topicId,
+        groupCode: { [Op.ne]: null },
+      },
+      attributes: ["groupCode"],
+      group: ["groupCode"],
+      raw: true,
+    });
+
+    const occupiedGroups = new Set();
+
+    enrolledGroups.forEach((row) => {
+      if (row.groupId !== null && row.groupId !== undefined) {
+        occupiedGroups.add(String(row.groupId));
+      }
+    });
+
+    presentationGroups.forEach((row) => {
+      if (row.groupCode !== null && row.groupCode !== undefined && String(row.groupCode).trim()) {
+        occupiedGroups.add(String(row.groupCode).trim());
+      }
+    });
+
+    return occupiedGroups.size;
+  }
+
   normalizeClassBlockIds(payload = {}) {
     if (Array.isArray(payload.academicBlockIds)) {
       return [...new Set(payload.academicBlockIds.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))];
@@ -1186,6 +1226,14 @@ class ClassService {
 
       if (nextMinGroups < 1 || nextMaxGroups < nextMinGroups) {
         return { success: false, message: "Dữ liệu không hợp lệ" };
+      }
+
+      const occupiedGroupCount = await this.getOccupiedTopicGroupCount(topic.topicId);
+      if (nextMaxGroups < occupiedGroupCount) {
+        return {
+          success: false,
+          message: `Không thể giảm maxGroups xuống ${nextMaxGroups} vì topic đang có ${occupiedGroupCount} nhóm đã chọn hoặc đã nộp bài`,
+        };
       }
 
       if (
