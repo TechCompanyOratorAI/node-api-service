@@ -19,6 +19,8 @@ import {
   validateUpdateClass,
   validateAssignInstructor,
   validateCreateKey,
+  validateTopic,
+  validateTopicUpdate,
 } from "../middleware/validationMiddleware.js";
 
 const router = express.Router();
@@ -125,6 +127,7 @@ router.post(
   "/:classId/topics",
   requireRole(["Admin", "Instructor"]),
   requireClassInstructor,
+  validateTopic,
   classController.createTopic
 );
 
@@ -139,6 +142,7 @@ router.get(
 router.patch(
   "/topics/:topicId",
   requireRole(["Admin", "Instructor"]),
+  validateTopicUpdate,
   classController.updateTopic
 );
 
