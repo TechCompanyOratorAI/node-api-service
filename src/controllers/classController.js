@@ -4,6 +4,10 @@ const { validationResult } = require("express-validator");
 const classService = require("../services/classService");
 const multer = require("multer");
 const XLSX = require("xlsx");
+const {
+  emitClassEvent,
+  emitClassInstructorEvent,
+} = require("../websocket/emitters");
 
 // Multer in-memory storage for Excel uploads
 const excelUpload = multer({
@@ -53,6 +57,15 @@ class ClassController {
         req.user.userId,
         req.userRoles || []
       );
+
+      if (result.success) {
+        emitClassEvent("created", {
+          actorUserId: req.user?.userId || null,
+          classId: result.class?.classId,
+          classData: result.class,
+          courseId: parseInt(courseId),
+        });
+      }
 
       return res.status(result.success ? 201 : 400).json(result);
 
@@ -289,6 +302,14 @@ class ClassController {
       );
 
       if (result.success) {
+        emitClassEvent("updated", {
+          actorUserId: req.user?.userId || null,
+          classId: parseInt(classId),
+          classData: result.class,
+        });
+      }
+
+      if (result.success) {
         return res.status(200).json(result);
       } else {
         const status =
@@ -322,6 +343,14 @@ class ClassController {
       const userId = req.user.userId;
 
       const result = await classService.deleteClass(parseInt(classId), userId);
+
+      if (result.success) {
+        emitClassEvent("deleted", {
+          actorUserId: req.user?.userId || null,
+          classId: parseInt(classId),
+          archived: !!result.archived,
+        });
+      }
 
       if (result.success) {
         return res.status(200).json(result);
@@ -375,6 +404,12 @@ class ClassController {
         );
 
         if (result.success) {
+          emitClassInstructorEvent("assigned", {
+            actorUserId: req.user?.userId || null,
+            classId: parseInt(classId),
+            instructorId: parseInt(instructorId),
+            assignmentStatus: result.assignmentStatus || null,
+          });
           return res.status(200).json(result);
         } else {
           return res.status(400).json(result);
@@ -401,6 +436,12 @@ class ClassController {
           );
 
           if (result.success) {
+            emitClassInstructorEvent("assigned", {
+              actorUserId: req.user?.userId || null,
+              classId: parseInt(classId),
+              instructorId: parseInt(id),
+              assignmentStatus: result.assignmentStatus || null,
+            });
             results.added.push({ instructorId: id, message: result.message });
           } else {
             results.failed.push({ instructorId: id, error: result.message });
@@ -452,6 +493,11 @@ class ClassController {
       );
 
       if (result.success) {
+        emitClassInstructorEvent("removed", {
+          actorUserId: req.user?.userId || null,
+          classId: parseInt(classId),
+          instructorId: parseInt(instructorId),
+        });
         return res.status(200).json(result);
       } else {
         return res.status(404).json(result);

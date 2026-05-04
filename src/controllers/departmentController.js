@@ -1,4 +1,5 @@
 import departmentService from '../services/departmentService.js';
+import { emitDepartmentEvent } from '../websocket/emitters.js';
 
 class DepartmentController {
     /**
@@ -22,6 +23,14 @@ class DepartmentController {
                 departmentName,
                 description
             });
+
+            if (result.success) {
+                emitDepartmentEvent("created", {
+                    actorUserId: req.user?.userId || null,
+                    departmentId: result.data?.departmentId,
+                    department: result.data,
+                });
+            }
 
             if (result.success) {
                 return res.status(201).json(result);
@@ -117,6 +126,14 @@ class DepartmentController {
             const result = await departmentService.updateDepartment(parseInt(id), updateData);
 
             if (result.success) {
+                emitDepartmentEvent("updated", {
+                    actorUserId: req.user?.userId || null,
+                    departmentId: parseInt(id),
+                    department: result.data,
+                });
+            }
+
+            if (result.success) {
                 return res.status(200).json(result);
             } else {
                 return res.status(400).json(result);
@@ -146,6 +163,13 @@ class DepartmentController {
             }
 
             const result = await departmentService.deleteDepartment(parseInt(id));
+
+            if (result.success) {
+                emitDepartmentEvent("deleted", {
+                    actorUserId: req.user?.userId || null,
+                    departmentId: parseInt(id),
+                });
+            }
 
             if (result.success) {
                 return res.status(200).json(result);

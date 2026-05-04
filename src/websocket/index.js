@@ -25,12 +25,20 @@ export const initSocketIO = (httpServer) => {
   /* ── Connection handler ── */
   io.on("connection", (socket) => {
     const userId = socket.user?.userId;
+    const userRole = socket.user?.role;
     console.log(`[Socket.IO] Client connected: userId=${userId} (socket=${socket.id})`);
 
     // Auto-join personal user room
     if (userId) {
       socket.join(`user:${userId}`);
       socket.join(`instructor:${userId}`);
+    }
+
+    if (userRole) {
+      socket.join(`role:${userRole}`);
+      if (["Admin", "AcademicCoordinator"].includes(userRole)) {
+        socket.join("management:admin");
+      }
     }
 
     // Register request handlers

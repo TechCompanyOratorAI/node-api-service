@@ -2,6 +2,10 @@
 
 const competencyService = require("../services/competencyService");
 const db = require("../models");
+const {
+  emitCompetencyCatalogEvent,
+  emitInstructorCompetencyEvent,
+} = require("../websocket/emitters");
 
 class CompetencyController {
   async listCompetencies(req, res) {
@@ -24,6 +28,13 @@ class CompetencyController {
 
   async createCompetency(req, res) {
     const result = await competencyService.createCompetency(req.body, req.user.userId);
+    if (result.success) {
+      emitCompetencyCatalogEvent("created", {
+        actorUserId: req.user?.userId || null,
+        competencyId: result.competency?.competencyId,
+        competency: result.competency,
+      });
+    }
     return res.status(result.success ? 201 : 400).json(result);
   }
 
@@ -40,6 +51,19 @@ class CompetencyController {
     }
 
     const result = await competencyService.declareInstructorCompetencies(instructorId, req.body, actorId);
+    if (result.success) {
+      const items = Array.isArray(result.data) ? result.data : [];
+      for (const item of items) {
+        await emitInstructorCompetencyEvent("submitted", {
+          actorUserId: actorId,
+          instructorId,
+          instructorCompetencyId: item.instructorCompetencyId,
+          competencyId: item.competencyId,
+          status: item.status,
+          data: item,
+        });
+      }
+    }
     return res.status(result.success ? 200 : 400).json(result);
   }
 
@@ -65,14 +89,38 @@ class CompetencyController {
       req.body,
       req.user.userId
     );
+    if (result.success) {
+      await emitInstructorCompetencyEvent("reviewed", {
+        actorUserId: req.user?.userId || null,
+        instructorCompetencyId: result.data?.instructorCompetencyId,
+        instructorId: result.data?.instructorId,
+        competencyId: result.data?.competencyId,
+        status: result.data?.status,
+        rejectionReason: result.data?.rejectionReason || null,
+        data: result.data,
+      });
+    }
     return res.status(result.success ? 200 : 400).json(result);
   }
 
   async deleteInstructorCompetency(req, res) {
+    const instructorCompetencyId = parseInt(req.params.id, 10);
+    const existing = await db.InstructorCompetency.findByPk(instructorCompetencyId, {
+      attributes: ["instructorCompetencyId", "instructorId", "competencyId", "status"],
+    });
     const result = await competencyService.deleteInstructorCompetency(
-      parseInt(req.params.id, 10),
+      instructorCompetencyId,
       req.user.userId
     );
+    if (result.success && existing) {
+      await emitInstructorCompetencyEvent("deleted", {
+        actorUserId: req.user?.userId || null,
+        instructorCompetencyId: existing.instructorCompetencyId,
+        instructorId: existing.instructorId,
+        competencyId: existing.competencyId,
+        status: existing.status,
+      });
+    }
     return res.status(result.success ? 200 : 400).json(result);
   }
 
