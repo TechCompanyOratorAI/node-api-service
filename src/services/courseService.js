@@ -1145,10 +1145,15 @@ class CourseService {
                 topic: {
                     topicId: topic.topicId,
                     courseId: topic.courseId,
+                    classId: topic.classId,
                     topicName: topic.topicName,
                     description: topic.description,
                     sequenceNumber: topic.sequenceNumber,
-                    dueDate: topic.dueDate,
+                    dueDate: topic.submissionDeadline || topic.dueDate,
+                    submissionStartDate: topic.submissionStartDate,
+                    submissionDeadline: topic.submissionDeadline || topic.dueDate,
+                    minGroups: topic.minGroups,
+                    maxGroups: topic.maxGroups,
                     maxDurationMinutes: topic.maxDurationMinutes,
                     requirements: topic.requirements,
                     course: topic.course,
@@ -1200,31 +1205,58 @@ class CourseService {
                 };
             }
 
-            const { topicName, description, sequenceNumber, dueDate, maxDurationMinutes, requirements } = topicData;
+            const {
+                topicName,
+                description,
+                dueDate,
+                submissionStartDate,
+                submissionDeadline,
+                minGroups,
+                maxGroups,
+                maxDurationMinutes,
+                requirements
+            } = topicData;
 
-            // If updating sequence number, check for duplicates
-            if (sequenceNumber && sequenceNumber !== topic.sequenceNumber) {
-                const existingTopic = await Topic.findOne({
-                    where: {
-                        courseId: topic.courseId,
-                        sequenceNumber,
-                        topicId: { [db.Sequelize.Op.ne]: topicId }
-                    }
-                });
+            const nextSubmissionStartDate =
+                submissionStartDate !== undefined
+                    ? submissionStartDate
+                    : topic.submissionStartDate;
+            const nextSubmissionDeadline =
+                submissionDeadline !== undefined
+                    ? submissionDeadline
+                    : (dueDate !== undefined ? dueDate : (topic.submissionDeadline || topic.dueDate));
+            const nextMinGroups =
+                minGroups !== undefined ? parseInt(minGroups, 10) : (topic.minGroups || 1);
+            const nextMaxGroups =
+                maxGroups !== undefined ? parseInt(maxGroups, 10) : (topic.maxGroups || nextMinGroups);
 
-                if (existingTopic) {
-                    return {
-                        success: false,
-                        message: 'Số thứ tự topic đã tồn tại trong môn học'
-                    };
-                }
+            if (Number.isNaN(nextMinGroups) || Number.isNaN(nextMaxGroups) || nextMinGroups < 1 || nextMaxGroups < nextMinGroups) {
+                return {
+                    success: false,
+                    message: 'Dữ liệu minGroups/maxGroups không hợp lệ'
+                };
+            }
+
+            if (
+                nextSubmissionStartDate &&
+                nextSubmissionDeadline &&
+                new Date(nextSubmissionDeadline) <= new Date(nextSubmissionStartDate)
+            ) {
+                return {
+                    success: false,
+                    message: 'submissionDeadline phải sau submissionStartDate'
+                };
             }
 
             await topic.update({
                 topicName: topicName || topic.topicName,
                 description: description !== undefined ? description : topic.description,
-                sequenceNumber: sequenceNumber || topic.sequenceNumber,
-                dueDate: dueDate !== undefined ? dueDate : topic.dueDate,
+                sequenceNumber: null,
+                dueDate: nextSubmissionDeadline,
+                submissionStartDate: nextSubmissionStartDate,
+                submissionDeadline: nextSubmissionDeadline,
+                minGroups: nextMinGroups,
+                maxGroups: nextMaxGroups,
                 maxDurationMinutes: maxDurationMinutes !== undefined ? maxDurationMinutes : topic.maxDurationMinutes,
                 requirements: requirements !== undefined ? requirements : topic.requirements
             });
@@ -1235,10 +1267,15 @@ class CourseService {
                 topic: {
                     topicId: topic.topicId,
                     courseId: topic.courseId,
+                    classId: topic.classId,
                     topicName: topic.topicName,
                     description: topic.description,
                     sequenceNumber: topic.sequenceNumber,
-                    dueDate: topic.dueDate,
+                    dueDate: topic.submissionDeadline || topic.dueDate,
+                    submissionStartDate: topic.submissionStartDate,
+                    submissionDeadline: topic.submissionDeadline || topic.dueDate,
+                    minGroups: topic.minGroups,
+                    maxGroups: topic.maxGroups,
                     maxDurationMinutes: topic.maxDurationMinutes,
                     requirements: topic.requirements,
                     updatedAt: topic.updatedAt
