@@ -1,6 +1,10 @@
 import { validationResult } from 'express-validator';
 import courseService from '../services/courseService.js';
 import roleService from '../services/roleService.js';
+import {
+    emitCourseEvent,
+    emitCourseInstructorEvent,
+} from '../websocket/emitters.js';
 
 class CourseController {
     // Create new course
@@ -16,6 +20,14 @@ class CourseController {
             }
 
             const result = await courseService.createCourse(req.body, req.user.userId);
+
+            if (result.success) {
+                emitCourseEvent('created', {
+                    actorUserId: req.user?.userId || null,
+                    courseId: result.course?.courseId,
+                    course: result.course,
+                });
+            }
 
             if (result.success) {
                 return res.status(201).json(result);
@@ -155,6 +167,14 @@ class CourseController {
             const result = await courseService.updateCourse(courseId, req.body, req.user.userId, userRole);
 
             if (result.success) {
+                emitCourseEvent('updated', {
+                    actorUserId: req.user?.userId || null,
+                    courseId: parseInt(courseId),
+                    course: result.course || result.data || null,
+                });
+            }
+
+            if (result.success) {
                 return res.status(200).json(result);
             } else {
                 return res.status(400).json(result);
@@ -175,6 +195,14 @@ class CourseController {
             // Get user role (Admin has priority)
             const userRole = req.userRoles && (req.userRoles.includes('Admin') || req.userRoles.includes('AcademicCoordinator')) ? 'Admin' : 'Instructor';
             const result = await courseService.deleteCourse(courseId, req.user.userId, userRole);
+
+            if (result.success) {
+                emitCourseEvent('deleted', {
+                    actorUserId: req.user?.userId || null,
+                    courseId: parseInt(courseId),
+                    softDeleted: !!result.softDeleted,
+                });
+            }
 
             if (result.success) {
                 return res.status(200).json(result);
@@ -337,6 +365,11 @@ class CourseController {
                 );
 
                 if (result.success) {
+                    emitCourseInstructorEvent('assigned', {
+                        actorUserId: req.user?.userId || null,
+                        courseId: parseInt(courseId),
+                        instructorId,
+                    });
                     return res.status(201).json(result);
                 } else {
                     return res.status(400).json(result);
@@ -356,6 +389,11 @@ class CourseController {
                     );
 
                     if (result.success) {
+                        emitCourseInstructorEvent('assigned', {
+                            actorUserId: req.user?.userId || null,
+                            courseId: parseInt(courseId),
+                            instructorId: instrId,
+                        });
                         results.push({ instructorId: instrId, ...result });
                     } else {
                         errors.push({ instructorId: instrId, error: result.message });
@@ -389,6 +427,11 @@ class CourseController {
             );
 
             if (result.success) {
+                emitCourseInstructorEvent('removed', {
+                    actorUserId: req.user?.userId || null,
+                    courseId: parseInt(courseId),
+                    instructorId: parseInt(instructorId),
+                });
                 return res.status(200).json(result);
             } else {
                 return res.status(400).json(result);

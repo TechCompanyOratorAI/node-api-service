@@ -1,4 +1,5 @@
 import subjectAreaService from "../services/subjectAreaService.js";
+import { emitSubjectAreaEvent } from "../websocket/emitters.js";
 
 class SubjectAreaController {
   async list(req, res) {
@@ -18,6 +19,13 @@ class SubjectAreaController {
 
   async create(req, res) {
     const result = await subjectAreaService.createSubjectArea(req.body || {});
+    if (result.success) {
+      emitSubjectAreaEvent("created", {
+        actorUserId: req.user?.userId || null,
+        subjectAreaId: result.data?.subjectAreaId,
+        subjectArea: result.data,
+      });
+    }
     return res.status(result.success ? 201 : 400).json(result);
   }
 
@@ -28,6 +36,13 @@ class SubjectAreaController {
     }
 
     const result = await subjectAreaService.updateSubjectArea(subjectAreaId, req.body || {});
+    if (result.success) {
+      emitSubjectAreaEvent("updated", {
+        actorUserId: req.user?.userId || null,
+        subjectAreaId,
+        subjectArea: result.data,
+      });
+    }
     return res.status(result.success ? 200 : 400).json(result);
   }
 
@@ -38,6 +53,12 @@ class SubjectAreaController {
     }
 
     const result = await subjectAreaService.deleteSubjectArea(subjectAreaId);
+    if (result.success) {
+      emitSubjectAreaEvent("deleted", {
+        actorUserId: req.user?.userId || null,
+        subjectAreaId,
+      });
+    }
     return res.status(result.success ? 200 : 400).json(result);
   }
 }

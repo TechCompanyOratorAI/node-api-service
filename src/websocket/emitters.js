@@ -15,7 +15,103 @@ import {
   saveForPresentation,
   saveForGroup,
   saveForClass,
+  saveForUser,
 } from "../services/notificationService.js";
+
+const withTimestamp = (payload = {}) => ({
+  ...payload,
+  _ts: Date.now(),
+});
+
+const emitToRoom = (room, event, payload = {}) => {
+  try {
+    const io = getIO();
+    io.to(room).emit(event, withTimestamp(payload));
+  } catch (err) {
+    console.error(`[SocketEmitter] Failed to emit ${event} to room ${room}: ${err.message}`);
+  }
+};
+
+export const emitManagementEvent = (event, payload = {}) => {
+  emitToRoom("management:admin", event, payload);
+};
+
+export const emitUserScopedEvent = (userId, event, payload = {}) => {
+  if (!userId) return;
+  emitToRoom(`user:${userId}`, event, payload);
+};
+
+export const emitInstructorScopedEvent = (userId, event, payload = {}) => {
+  if (!userId) return;
+  emitToRoom(`instructor:${userId}`, event, payload);
+};
+
+export const emitAcademicYearEvent = (subEvent, payload = {}) => {
+  emitManagementEvent(`academic-year:${subEvent}`, payload);
+};
+
+export const emitAcademicBlockEvent = (subEvent, payload = {}) => {
+  emitManagementEvent(`academic-block:${subEvent}`, payload);
+};
+
+export const emitDepartmentEvent = (subEvent, payload = {}) => {
+  emitManagementEvent(`department:${subEvent}`, payload);
+};
+
+export const emitSubjectAreaEvent = (subEvent, payload = {}) => {
+  emitManagementEvent(`subject-area:${subEvent}`, payload);
+};
+
+export const emitCompetencyCatalogEvent = (subEvent, payload = {}) => {
+  emitManagementEvent(`competency:${subEvent}`, payload);
+};
+
+export const emitInstructorCompetencyEvent = async (subEvent, payload = {}) => {
+  const event = `instructor-competency:${subEvent}`;
+  emitManagementEvent(event, payload);
+  if (payload.instructorId) {
+    emitUserScopedEvent(payload.instructorId, event, payload);
+    emitInstructorScopedEvent(payload.instructorId, event, payload);
+  }
+
+  if (subEvent === "reviewed" && payload.instructorId) {
+    const title =
+      payload.status === "approved"
+        ? "Nang luc da duoc duyet"
+        : "Nang luc bi tu choi";
+    const message =
+      payload.status === "approved"
+        ? "Khai bao nang luc cua ban da duoc phe duyet."
+        : payload.rejectionReason || "Khai bao nang luc cua ban da bi tu choi.";
+    await saveForUser(payload.instructorId, event, title, message, payload);
+  }
+};
+
+export const emitCourseEvent = (subEvent, payload = {}) => {
+  emitManagementEvent(`course:${subEvent}`, payload);
+};
+
+export const emitCourseInstructorEvent = (subEvent, payload = {}) => {
+  const event = `course-instructor:${subEvent}`;
+  emitManagementEvent(event, payload);
+  if (payload.instructorId) {
+    emitUserScopedEvent(payload.instructorId, event, payload);
+    emitInstructorScopedEvent(payload.instructorId, event, payload);
+  }
+};
+
+export const emitClassEvent = (subEvent, payload = {}) => {
+  emitManagementEvent(`class:${subEvent}`, payload);
+};
+
+export const emitClassInstructorEvent = (subEvent, payload = {}) => {
+  const event = `class-instructor:${subEvent}`;
+  emitManagementEvent(event, payload);
+  if (payload.instructorId) {
+    emitUserScopedEvent(payload.instructorId, event, payload);
+    emitInstructorScopedEvent(payload.instructorId, event, payload);
+  }
+};
 
 /**
  * Emit an event to the presentation room.
