@@ -237,12 +237,12 @@ class PresentationService {
           await transaction.rollback();
           return {
             success: false,
-            message: "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
+            message:
+              "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
             uploadLocked: true,
           };
         }
       }
-
 
       // Get existing slides để xóa their files from storage
       const existingSlides = await Slide.findAll({
@@ -301,14 +301,12 @@ class PresentationService {
         transaction,
       });
 
-
       // Detect number of pages in the file
       const pageCount = await detectPageCount(file.buffer, file.mimetype);
 
       // Use pageCount as slideNumber (or use provided slideNumber if specified)
       // slideNumber represents the number of pages in this slide file
       const finalSlideNumber = slideNumber || pageCount;
-
 
       const extension = path.extname(file.originalname || "");
       const uniqueSuffix = crypto.randomBytes(6).toString("hex");
@@ -381,7 +379,8 @@ class PresentationService {
         if (classRecord && !classRecord.isUploadEnabled) {
           return {
             success: false,
-            message: "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
+            message:
+              "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
             uploadLocked: true,
           };
         }
@@ -568,7 +567,8 @@ class PresentationService {
         if (activeJob) {
           return {
             success: false,
-            message: "Đang có tiến trình xử lý dở dang cho bài thuyết trình này",
+            message:
+              "Đang có tiến trình xử lý dở dang cho bài thuyết trình này",
             job: activeJob,
           };
         }
@@ -580,7 +580,9 @@ class PresentationService {
       // receive "job not found" and safely acknowledge without side effects.
       if (presentation.status !== "draft") {
         await Job.destroy({ where: { presentationId } });
-        console.log(`🧹 [Submit] Cleared old jobs for presentation ${presentationId}`);
+        console.log(
+          `🧹 [Submit] Cleared old jobs for presentation ${presentationId}`,
+        );
 
         const transcripts = await Transcript.findAll({
           where: { presentationId },
@@ -629,7 +631,9 @@ class PresentationService {
             fileName: slide.fileName,
             fileFormat: slide.fileFormat,
           });
-          console.log(`📤 [Submit] Slide OCR job created for slide ${slide.slideId}`);
+          console.log(
+            `📤 [Submit] Slide OCR job created for slide ${slide.slideId}`,
+          );
         } catch (slideJobError) {
           console.error("⚠️ [Submit] Failed để tạo slide job:", slideJobError);
         }
@@ -653,8 +657,8 @@ class PresentationService {
       return {
         success: true,
         message: isResubmit
-          ? "Presentation resubmitted successfully. It is being processed again."
-          : "Presentation submitted successfully",
+          ? "Bài thuyết trình đã được gửi lại để xử lý lại."
+          : "Bài thuyết trình đã được gửi thành công.",
         presentation: await this.getPresentationById(presentationId, studentId),
         job,
       };
@@ -718,7 +722,9 @@ class PresentationService {
       await Job.destroy({
         where: { presentationId },
       });
-      console.log(`🧹 Cleared all jobs for presentation ${presentationId} before resubmit`);
+      console.log(
+        `🧹 Cleared all jobs for presentation ${presentationId} before resubmit`,
+      );
 
       // 2. Clear old analysis data
       const transcripts = await Transcript.findAll({
@@ -794,8 +800,7 @@ class PresentationService {
 
       return {
         success: true,
-        message:
-          "Đã gửi lại bài thuyết trình để xử lý",
+        message: "Đã gửi lại bài thuyết trình để xử lý",
         presentation: await this.getPresentationById(presentationId, studentId),
         job,
       };
@@ -947,14 +952,18 @@ class PresentationService {
       // Query 1: lấy tất cả group mà sinh viên là member
       const memberships = await GroupStudent.findAll({
         where: { studentId },
-        include: [{ model: Group, as: "group", attributes: ["groupId", "classId"] }],
+        include: [
+          { model: Group, as: "group", attributes: ["groupId", "classId"] },
+        ],
         raw: true,
         nest: true,
       });
 
       let groupPresentationIds = [];
       if (memberships.length > 0) {
-        const groupIds = [...new Set(memberships.map((m) => m.group?.groupId).filter(Boolean))];
+        const groupIds = [
+          ...new Set(memberships.map((m) => m.group?.groupId).filter(Boolean)),
+        ];
 
         // Query 2: lấy tất cả members của tất cả groups trong 1 lần
         const allGroupMembers = await GroupStudent.findAll({
@@ -967,7 +976,10 @@ class PresentationService {
         const groupMap = new Map();
         for (const m of memberships) {
           if (m.group?.groupId) {
-            groupMap.set(m.group.groupId, { classId: m.group.classId, memberIds: [] });
+            groupMap.set(m.group.groupId, {
+              classId: m.group.classId,
+              memberIds: [],
+            });
           }
         }
         for (const gm of allGroupMembers) {
@@ -980,7 +992,10 @@ class PresentationService {
         const orConditions = [];
         for (const { classId: gClassId, memberIds } of groupMap.values()) {
           if (memberIds.length === 0) continue;
-          const cond = { studentId: { [db.Sequelize.Op.in]: memberIds }, classId: gClassId };
+          const cond = {
+            studentId: { [db.Sequelize.Op.in]: memberIds },
+            classId: gClassId,
+          };
           if (status) cond.status = status;
           if (topicId) cond.topicId = parseInt(topicId);
           orConditions.push(cond);
@@ -997,14 +1012,19 @@ class PresentationService {
       }
 
       // ── 3. Merge: own presentations OR group presentations ──
-      const mergedWhere = groupPresentationIds.length > 0
-        ? {
-            [db.Sequelize.Op.or]: [
-              ownWhere,
-              { presentationId: { [db.Sequelize.Op.in]: groupPresentationIds } },
-            ],
-          }
-        : ownWhere;
+      const mergedWhere =
+        groupPresentationIds.length > 0
+          ? {
+              [db.Sequelize.Op.or]: [
+                ownWhere,
+                {
+                  presentationId: {
+                    [db.Sequelize.Op.in]: groupPresentationIds,
+                  },
+                },
+              ],
+            }
+          : ownWhere;
 
       const presentations = await Presentation.findAndCountAll({
         where: mergedWhere,
@@ -1332,11 +1352,21 @@ class PresentationService {
           : null;
 
       const sortedSpeakers = [...presentation.speakers].sort((a, b) => {
-        const aNum = parseInt(String(a.aiSpeakerLabel || "").match(/(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER, 10);
-        const bNum = parseInt(String(b.aiSpeakerLabel || "").match(/(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER, 10);
+        const aNum = parseInt(
+          String(a.aiSpeakerLabel || "").match(/(\d+)/)?.[1] ??
+            Number.MAX_SAFE_INTEGER,
+          10,
+        );
+        const bNum = parseInt(
+          String(b.aiSpeakerLabel || "").match(/(\d+)/)?.[1] ??
+            Number.MAX_SAFE_INTEGER,
+          10,
+        );
 
         if (aNum !== bNum) return aNum - bNum;
-        return String(a.aiSpeakerLabel || "").localeCompare(String(b.aiSpeakerLabel || ""));
+        return String(a.aiSpeakerLabel || "").localeCompare(
+          String(b.aiSpeakerLabel || ""),
+        );
       });
 
       return {
@@ -1395,12 +1425,14 @@ class PresentationService {
         // Lấy group của owner trong class này
         const ownerGroup = await GroupStudent.findOne({
           where: { studentId: presentation.studentId },
-          include: [{
-            model: Group,
-            as: "group",
-            where: { classId: presentation.classId },
-            attributes: ["groupId"],
-          }],
+          include: [
+            {
+              model: Group,
+              as: "group",
+              where: { classId: presentation.classId },
+              attributes: ["groupId"],
+            },
+          ],
         });
 
         if (ownerGroup) {
