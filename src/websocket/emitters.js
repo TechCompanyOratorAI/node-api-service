@@ -21,7 +21,7 @@ import {
   saveForPresentationInstructors,
 } from "../services/notificationService.js";
 
-const { Enrollment, ClassInstructor, Presentation } = db;
+const { Enrollment, ClassInstructor, Presentation, Group, GroupStudent } = db;
 
 const withTimestamp = (payload = {}) => ({
   ...payload,
@@ -45,7 +45,6 @@ const emitToUsers = (userIds = [], event, payload = {}) => {
 
 const emitToInstructors = (userIds = [], event, payload = {}) => {
   [...new Set(userIds.filter(Boolean))].forEach((userId) => {
-    emitUserScopedEvent(userId, event, payload);
     emitInstructorScopedEvent(userId, event, payload);
   });
 };
@@ -66,6 +65,44 @@ const getClassInstructorIds = async (classId) => {
     attributes: ["instructorId"],
   });
   return instructors.map((row) => row.instructorId);
+};
+
+const getPresentationParticipantIds = async (presentationId) => {
+  if (!presentationId) return [];
+
+  const presentation = await Presentation.findByPk(presentationId, {
+    attributes: ["presentationId", "studentId", "classId", "groupCode"],
+  });
+  if (!presentation) return [];
+
+  const participantIds = new Set();
+  if (presentation.studentId) {
+    participantIds.add(presentation.studentId);
+  }
+
+  if (presentation.classId && presentation.groupCode) {
+    const group = await Group.findOne({
+      where: {
+        classId: presentation.classId,
+        groupName: presentation.groupCode,
+      },
+      attributes: ["groupId"],
+    });
+
+    if (group?.groupId) {
+      const members = await GroupStudent.findAll({
+        where: { groupId: group.groupId },
+        attributes: ["studentId"],
+      });
+      members.forEach((member) => {
+        if (member.studentId) {
+          participantIds.add(member.studentId);
+        }
+      });
+    }
+  }
+
+  return [...participantIds];
 };
 
 export const emitManagementEvent = (event, payload = {}) => {
@@ -202,12 +239,10 @@ export const emitSpeakerMappingEvent = async (subEvent, payload = {}) => {
   const event = `speaker:mapping:${subEvent}`;
   if (payload.presentationId) {
     emitToRoom(`presentation:${payload.presentationId}`, event, payload);
+    emitToUsers(await getPresentationParticipantIds(payload.presentationId), event, payload);
     const presentation = await Presentation.findByPk(payload.presentationId, {
-      attributes: ["studentId", "classId"],
+      attributes: ["classId"],
     });
-    if (presentation?.studentId) {
-      emitUserScopedEvent(presentation.studentId, event, payload);
-    }
     if (presentation?.classId) {
       emitToInstructors(await getClassInstructorIds(presentation.classId), event, payload);
     }
