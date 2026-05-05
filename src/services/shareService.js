@@ -8,9 +8,9 @@
  * Data trả về khi view qua share link: toàn bộ presentation (slides, media) + AI report
  */
 
-import crypto from 'crypto';
-import db from '../models/index.js';
-import emailService from './emailService.js';
+import crypto from "crypto";
+import db from "../models/index.js";
+import emailService from "./emailService.js";
 
 const {
   Presentation,
@@ -29,31 +29,42 @@ const {
 } = db;
 
 /** Generate a url-safe random token */
-const generateToken = () => crypto.randomBytes(48).toString('base64url');
+const generateToken = () => crypto.randomBytes(48).toString("base64url");
 
 class ShareService {
   async _getAuthorizedPresentation(presentationId, actor) {
-    const actorId = typeof actor === 'object' ? actor?.userId : actor;
-    const roleNames = typeof actor === 'object'
-      ? [
-          ...(actor?.userRoles || []).map((userRole) => userRole?.role?.roleName),
-          actor?.role,
-        ]
-          .map((roleName) => String(roleName || '').toLowerCase())
-          .filter(Boolean)
-      : [];
+    const actorId = typeof actor === "object" ? actor?.userId : actor;
+    const roleNames =
+      typeof actor === "object"
+        ? [
+            ...(actor?.userRoles || []).map(
+              (userRole) => userRole?.role?.roleName,
+            ),
+            actor?.role,
+          ]
+            .map((roleName) => String(roleName || "").toLowerCase())
+            .filter(Boolean)
+        : [];
 
     if (!actorId) return null;
 
     const presentation = await Presentation.findByPk(presentationId, {
-      include: [{ model: User, as: 'student', attributes: ['userId', 'firstName', 'lastName'] }],
+      include: [
+        {
+          model: User,
+          as: "student",
+          attributes: ["userId", "firstName", "lastName"],
+        },
+      ],
     });
 
     if (!presentation) return null;
 
     if (
       presentation.studentId === actorId ||
-      roleNames.some((role) => ['admin', 'teacher', 'instructor'].includes(role))
+      roleNames.some((role) =>
+        ["admin", "teacher", "instructor"].includes(role),
+      )
     ) {
       return presentation;
     }
@@ -75,23 +86,29 @@ class ShareService {
    */
   async createPublicShare(presentationId, actor, options = {}) {
     try {
-      const actorId = typeof actor === 'object' ? actor?.userId : actor;
-      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
+      const actorId = typeof actor === "object" ? actor?.userId : actor;
+      const presentation = await this._getAuthorizedPresentation(
+        presentationId,
+        actor,
+      );
 
       if (!presentation) {
-        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
+        return {
+          success: false,
+          message: "Bạn không có quyền thực hiện thao tác này",
+        };
       }
 
       const { expiresAt } = options;
 
       // Upsert: nếu đã có public share thì return ngay (hoặc refresh token nếu cần)
       const [accessRecord, created] = await PresentationAccess.findOrCreate({
-        where: { presentationId, shareType: 'public', userId: null },
+        where: { presentationId, shareType: "public", userId: null },
         defaults: {
           presentationId,
           userId: null,
-          accessLevel: 'view',
-          shareType: 'public',
+          accessLevel: "view",
+          shareType: "public",
           shareToken: generateToken(),
           grantedBy: actorId,
           grantedAt: new Date(),
@@ -103,16 +120,22 @@ class ShareService {
 
       return {
         success: true,
-        message: created ? 'Public share link created' : 'Public share link already exists',
+        message: created
+          ? "Public share link created"
+          : "Public share link already exists",
         shareToken: accessRecord.shareToken,
         shareUrl,
-        shareType: 'public',
+        shareType: "public",
         expiresAt: accessRecord.expiresAt,
         accessId: accessRecord.accessId,
       };
     } catch (error) {
-      console.error('Create public share error:', error);
-      return { success: false, message: 'Thao tác thất bại', error: error.message };
+      console.error("Create public share error:", error);
+      return {
+        success: false,
+        message: "Thao tác thất bại",
+        error: error.message,
+      };
     }
   }
 
@@ -130,17 +153,23 @@ class ShareService {
    */
   async inviteByEmails(presentationId, actor, emails, options = {}) {
     try {
-      const actorId = typeof actor === 'object' ? actor?.userId : actor;
-      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
+      const actorId = typeof actor === "object" ? actor?.userId : actor;
+      const presentation = await this._getAuthorizedPresentation(
+        presentationId,
+        actor,
+      );
 
       if (!presentation) {
-        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
+        return {
+          success: false,
+          message: "Bạn không có quyền thực hiện thao tác này",
+        };
       }
 
       const { expiresAt } = options;
       const senderName = presentation.student
         ? `${presentation.student.firstName} ${presentation.student.lastName}`.trim()
-        : 'Ai đó';
+        : "Ai đó";
       const results = [];
 
       for (const email of emails) {
@@ -153,7 +182,7 @@ class ShareService {
           results.push({
             email: normalizedEmail,
             success: false,
-            message: 'Không tìm thấy dữ liệu',
+            message: "Không tìm thấy dữ liệu",
           });
           continue;
         }
@@ -163,19 +192,19 @@ class ShareService {
           results.push({
             email: normalizedEmail,
             success: false,
-            message: 'Thao tác thất bại',
+            message: "Thao tác thất bại",
           });
           continue;
         }
 
         // Upsert per-user private share
         const [accessRecord, created] = await PresentationAccess.findOrCreate({
-          where: { presentationId, shareType: 'private', userId: user.userId },
+          where: { presentationId, shareType: "private", userId: user.userId },
           defaults: {
             presentationId,
             userId: user.userId,
-            accessLevel: 'view',
-            shareType: 'private',
+            accessLevel: "view",
+            shareType: "private",
             shareToken: generateToken(),
             grantedBy: actorId,
             grantedAt: new Date(),
@@ -185,7 +214,11 @@ class ShareService {
 
         if (!created && !accessRecord.shareToken) {
           // Bổ sung token nếu cũ chưa có
-          await accessRecord.update({ shareToken: generateToken(), grantedBy: actorId, expiresAt: expiresAt || null });
+          await accessRecord.update({
+            shareToken: generateToken(),
+            grantedBy: actorId,
+            expiresAt: expiresAt || null,
+          });
         }
 
         await accessRecord.reload();
@@ -193,28 +226,39 @@ class ShareService {
         const shareUrl = this._buildShareUrl(accessRecord.shareToken);
 
         // Send invite email (async, don't block response)
-        emailService.sendShareInviteEmail(
-          normalizedEmail,
-          `${user.firstName} ${user.lastName}`.trim() || normalizedEmail,
-          senderName,
-          presentation.title,
-          shareUrl,
-          expiresAt || null
-        ).then(emailResult => {
-          if (emailResult.success) {
-            console.log(`✉️ Share invite email sent to ${normalizedEmail}`);
-          } else {
-            console.warn(`⚠️ Failed to send share invite email to ${normalizedEmail}:`, emailResult.error);
-          }
-        }).catch(err => {
-          console.error(`❌ Error sending share invite email to ${normalizedEmail}:`, err.message);
-        });
+        emailService
+          .sendShareInviteEmail(
+            normalizedEmail,
+            `${user.firstName} ${user.lastName}`.trim() || normalizedEmail,
+            senderName,
+            presentation.title,
+            shareUrl,
+            expiresAt || null,
+          )
+          .then((emailResult) => {
+            if (emailResult.success) {
+              console.log(`✉️ Share invite email sent to ${normalizedEmail}`);
+            } else {
+              console.warn(
+                `⚠️ Failed to send share invite email to ${normalizedEmail}:`,
+                emailResult.error,
+              );
+            }
+          })
+          .catch((err) => {
+            console.error(
+              `❌ Error sending share invite email to ${normalizedEmail}:`,
+              err.message,
+            );
+          });
 
         results.push({
           email: normalizedEmail,
           userId: user.userId,
           success: true,
-          message: created ? 'Invited successfully' : 'Already shared, refreshed token',
+          message: created
+            ? "Đã gửi lời mời chia sẻ cho email thành công"
+            : "Đã chia sẻ, cập nhật token",
           shareToken: accessRecord.shareToken,
           shareUrl,
           expiresAt: accessRecord.expiresAt,
@@ -229,8 +273,12 @@ class ShareService {
         results,
       };
     } catch (error) {
-      console.error('Invite by emails error:', error);
-      return { success: false, message: 'Thao tác thất bại', error: error.message };
+      console.error("Invite by emails error:", error);
+      return {
+        success: false,
+        message: "Thao tác thất bại",
+        error: error.message,
+      };
     }
   }
 
@@ -243,23 +291,35 @@ class ShareService {
    */
   async revokePublicShare(presentationId, actor) {
     try {
-      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
+      const presentation = await this._getAuthorizedPresentation(
+        presentationId,
+        actor,
+      );
       if (!presentation) {
-        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
+        return {
+          success: false,
+          message: "Bạn không có quyền thực hiện thao tác này",
+        };
       }
 
       const deleted = await PresentationAccess.destroy({
-        where: { presentationId, shareType: 'public', userId: null },
+        where: { presentationId, shareType: "public", userId: null },
       });
 
       return {
         success: true,
-        message: deleted ? 'Public share revoked' : 'No public share found to revoke',
+        message: deleted
+          ? "Public share revoked"
+          : "No public share found to revoke",
         deleted,
       };
     } catch (error) {
-      console.error('Revoke public share error:', error);
-      return { success: false, message: 'Thao tác thất bại', error: error.message };
+      console.error("Revoke public share error:", error);
+      return {
+        success: false,
+        message: "Thao tác thất bại",
+        error: error.message,
+      };
     }
   }
 
@@ -268,23 +328,33 @@ class ShareService {
    */
   async revokePrivateShare(presentationId, actor, accessId) {
     try {
-      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
+      const presentation = await this._getAuthorizedPresentation(
+        presentationId,
+        actor,
+      );
       if (!presentation) {
-        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
+        return {
+          success: false,
+          message: "Bạn không có quyền thực hiện thao tác này",
+        };
       }
 
       const deleted = await PresentationAccess.destroy({
-        where: { accessId, presentationId, shareType: 'private' },
+        where: { accessId, presentationId, shareType: "private" },
       });
 
       return {
         success: true,
-        message: deleted ? 'Access revoked' : 'No matching access record found',
+        message: deleted ? "Access revoked" : "No matching access record found",
         deleted,
       };
     } catch (error) {
-      console.error('Revoke private share error:', error);
-      return { success: false, message: 'Thao tác thất bại', error: error.message };
+      console.error("Revoke private share error:", error);
+      return {
+        success: false,
+        message: "Thao tác thất bại",
+        error: error.message,
+      };
     }
   }
 
@@ -297,9 +367,15 @@ class ShareService {
    */
   async getShareList(presentationId, actor) {
     try {
-      const presentation = await this._getAuthorizedPresentation(presentationId, actor);
+      const presentation = await this._getAuthorizedPresentation(
+        presentationId,
+        actor,
+      );
       if (!presentation) {
-        return { success: false, message: 'Bạn không có quyền thực hiện thao tác này' };
+        return {
+          success: false,
+          message: "Bạn không có quyền thực hiện thao tác này",
+        };
       }
 
       const accessList = await PresentationAccess.findAll({
@@ -307,12 +383,12 @@ class ShareService {
         include: [
           {
             model: User,
-            as: 'user',
-            attributes: ['userId', 'firstName', 'lastName', 'email'],
+            as: "user",
+            attributes: ["userId", "firstName", "lastName", "email"],
             required: false,
           },
         ],
-        order: [['grantedAt', 'DESC']],
+        order: [["grantedAt", "DESC"]],
       });
 
       const shares = accessList.map((a) => ({
@@ -328,8 +404,12 @@ class ShareService {
 
       return { success: true, presentationId, shares };
     } catch (error) {
-      console.error('Get share list error:', error);
-      return { success: false, message: 'Thao tác thất bại', error: error.message };
+      console.error("Get share list error:", error);
+      return {
+        success: false,
+        message: "Thao tác thất bại",
+        error: error.message,
+      };
     }
   }
 
@@ -346,19 +426,22 @@ class ShareService {
    */
   async validateShareToken(token) {
     try {
-      if (!token) return { valid: false, reason: 'No token provided' };
+      if (!token) return { valid: false, reason: "No token provided" };
 
       const accessRecord = await PresentationAccess.findOne({
         where: { shareToken: token },
       });
 
       if (!accessRecord) {
-        return { valid: false, reason: 'Invalid or expired share token' };
+        return { valid: false, reason: "Invalid or expired share token" };
       }
 
       // Check expiry
-      if (accessRecord.expiresAt && new Date() > new Date(accessRecord.expiresAt)) {
-        return { valid: false, reason: 'Share link has expired' };
+      if (
+        accessRecord.expiresAt &&
+        new Date() > new Date(accessRecord.expiresAt)
+      ) {
+        return { valid: false, reason: "Share link has expired" };
       }
 
       return {
@@ -369,8 +452,8 @@ class ShareService {
         accessLevel: accessRecord.accessLevel,
       };
     } catch (error) {
-      console.error('Validate share token error:', error);
-      return { valid: false, reason: 'Token validation error' };
+      console.error("Validate share token error:", error);
+      return { valid: false, reason: "Token validation error" };
     }
   }
 
@@ -391,77 +474,89 @@ class ShareService {
         include: [
           {
             model: User,
-            as: 'student',
-            attributes: ['userId', 'firstName', 'lastName'],
+            as: "student",
+            attributes: ["userId", "firstName", "lastName"],
           },
           {
             model: Topic,
-            as: 'topic',
-            attributes: ['topicId', 'topicName'],
+            as: "topic",
+            attributes: ["topicId", "topicName"],
           },
           {
             model: Course,
-            as: 'course',
-            attributes: ['courseId', 'courseName'],
+            as: "course",
+            attributes: ["courseId", "courseName"],
           },
           {
             model: Class,
-            as: 'class',
-            attributes: ['classId', 'classCode'],
+            as: "class",
+            attributes: ["classId", "classCode"],
           },
           {
             model: Slide,
-            as: 'slides',
-            attributes: ['slideId', 'slideNumber', 'fileName', 'filePath', 'fileFormat'],
+            as: "slides",
+            attributes: [
+              "slideId",
+              "slideNumber",
+              "fileName",
+              "filePath",
+              "fileFormat",
+            ],
           },
           {
             model: AudioRecord,
-            as: 'audioRecord',
-            attributes: ['audioId', 'fileName', 'filePath', 'durationSeconds', 'fileFormat'],
+            as: "audioRecord",
+            attributes: [
+              "audioId",
+              "fileName",
+              "filePath",
+              "durationSeconds",
+              "fileFormat",
+            ],
           },
           {
             model: Transcript,
-            as: 'transcript',
+            as: "transcript",
             attributes: [
-              'transcriptId',
-              'presentationId',
-              'audioId',
-              'fullTranscript',
-              'language',
-              'confidenceScore',
-              'generatedAt',
+              "transcriptId",
+              "presentationId",
+              "audioId",
+              "fullTranscript",
+              "language",
+              "confidenceScore",
+              "generatedAt",
             ],
             include: [
               {
                 model: TranscriptSegment,
-                as: 'segments',
+                as: "segments",
                 attributes: [
-                  'segmentId',
-                  'transcriptId',
-                  'speakerId',
-                  'segmentNumber',
-                  'segmentText',
-                  'startTimestamp',
-                  'endTimestamp',
-                  'confidenceScore',
+                  "segmentId",
+                  "transcriptId",
+                  "speakerId",
+                  "segmentNumber",
+                  "segmentText",
+                  "startTimestamp",
+                  "endTimestamp",
+                  "confidenceScore",
                 ],
                 include: [
                   {
                     model: Speaker,
-                    as: 'speaker',
+                    as: "speaker",
                     attributes: [
-                      'speakerId',
-                      'aiSpeakerLabel',
-                      'isMapped',
-                      'totalDurationSeconds',
-                      'segmentCount',
+                      "speakerId",
+                      "aiSpeakerLabel",
+                      "isMapped",
+                      "totalDurationSeconds",
+                      "segmentCount",
                     ],
                     required: false,
                     include: [
                       {
                         model: User,
-                        as: 'mappedStudent',
-                        attributes: ['userId', 'firstName', 'lastName'],
+                        as: "mappedStudent",
+                        attributes: ["userId", "firstName", "lastName"],
                         required: false,
                       },
                     ],
@@ -474,7 +569,7 @@ class ShareService {
       });
 
       if (!presentation) {
-        return { success: false, message: 'Không tìm thấy bài thuyết trình' };
+        return { success: false, message: "Không tìm thấy bài thuyết trình" };
       }
 
       // AI report (nếu có)
@@ -485,19 +580,19 @@ class ShareService {
           include: [
             {
               model: User,
-              as: 'confirmer',
-              attributes: ['userId', 'firstName', 'lastName'],
+              as: "confirmer",
+              attributes: ["userId", "firstName", "lastName"],
               required: false,
             },
             {
               model: Feedback,
-              as: 'instructorFeedback',
+              as: "instructorFeedback",
               required: false,
               include: [
                 {
                   model: User,
-                  as: 'reviewer',
-                  attributes: ['userId', 'firstName', 'lastName'],
+                  as: "reviewer",
+                  attributes: ["userId", "firstName", "lastName"],
                   required: false,
                 },
               ],
@@ -514,8 +609,12 @@ class ShareService {
         },
       };
     } catch (error) {
-      console.error('Get shared presentation data error:', error);
-      return { success: false, message: 'Thao tác thất bại', error: error.message };
+      console.error("Get shared presentation data error:", error);
+      return {
+        success: false,
+        message: "Thao tác thất bại",
+        error: error.message,
+      };
     }
   }
 
@@ -524,7 +623,10 @@ class ShareService {
   // ─────────────────────────────────────────────────
 
   _buildShareUrl(token) {
-    const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+    const baseUrl =
+      process.env.FRONTEND_URL ||
+      process.env.APP_URL ||
+      "http://localhost:3000";
     return `${baseUrl}/share/${token}`;
   }
 }
