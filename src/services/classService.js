@@ -20,7 +20,10 @@ const { Op } = require("sequelize");
 const { emitUploadPermissionChanged } = require("../websocket/emitters");
 const auditLogService = require("./auditLogService");
 const competencyService = require("./competencyService");
-const { AUDIT_ACTIONS, AUDIT_STATUSES } = require("../constants/businessConstants");
+const {
+  AUDIT_ACTIONS,
+  AUDIT_STATUSES,
+} = require("../constants/businessConstants");
 
 class ClassService {
   async getOccupiedTopicGroupCount(topicId) {
@@ -54,7 +57,11 @@ class ClassService {
     });
 
     presentationGroups.forEach((row) => {
-      if (row.groupCode !== null && row.groupCode !== undefined && String(row.groupCode).trim()) {
+      if (
+        row.groupCode !== null &&
+        row.groupCode !== undefined &&
+        String(row.groupCode).trim()
+      ) {
         occupiedGroups.add(String(row.groupCode).trim());
       }
     });
@@ -64,9 +71,18 @@ class ClassService {
 
   normalizeClassBlockIds(payload = {}) {
     if (Array.isArray(payload.academicBlockIds)) {
-      return [...new Set(payload.academicBlockIds.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))];
+      return [
+        ...new Set(
+          payload.academicBlockIds
+            .map((id) => parseInt(id, 10))
+            .filter((id) => Number.isInteger(id) && id > 0),
+        ),
+      ];
     }
-    if (payload.academicBlockId !== undefined && payload.academicBlockId !== null) {
+    if (
+      payload.academicBlockId !== undefined &&
+      payload.academicBlockId !== null
+    ) {
       const parsed = parseInt(payload.academicBlockId, 10);
       return Number.isInteger(parsed) && parsed > 0 ? [parsed] : [];
     }
@@ -77,16 +93,20 @@ class ClassService {
     const mappings = await CourseAcademicBlock.findAll({
       where: { courseId },
       attributes: ["academicBlockId", "isPrimary"],
-      order: [["isPrimary", "DESC"], ["courseAcademicBlockId", "ASC"]],
+      order: [
+        ["isPrimary", "DESC"],
+        ["courseAcademicBlockId", "ASC"],
+      ],
       transaction,
     });
     return mappings.map((mapping) => mapping.academicBlockId);
   }
 
   resolveClassAcademicBlockId(requestedBlockId, allowedBlockIds) {
-    const normalizedRequestedBlockId = requestedBlockId === undefined || requestedBlockId === null
-      ? requestedBlockId
-      : parseInt(requestedBlockId, 10);
+    const normalizedRequestedBlockId =
+      requestedBlockId === undefined || requestedBlockId === null
+        ? requestedBlockId
+        : parseInt(requestedBlockId, 10);
 
     if (!allowedBlockIds.length) {
       return {
@@ -95,7 +115,10 @@ class ClassService {
       };
     }
 
-    if (normalizedRequestedBlockId !== undefined && normalizedRequestedBlockId !== null) {
+    if (
+      normalizedRequestedBlockId !== undefined &&
+      normalizedRequestedBlockId !== null
+    ) {
       if (!allowedBlockIds.includes(normalizedRequestedBlockId)) {
         return {
           success: false,
@@ -127,7 +150,9 @@ class ClassService {
     }
 
     if (requestedBlockIds.length > 0) {
-      const invalid = requestedBlockIds.filter((id) => !allowedBlockIds.includes(id));
+      const invalid = requestedBlockIds.filter(
+        (id) => !allowedBlockIds.includes(id),
+      );
       if (invalid.length > 0) {
         return { success: false, message: "Dữ liệu không hợp lệ" };
       }
@@ -154,7 +179,7 @@ class ClassService {
         academicBlockId: blockId,
         isPrimary: index === 0,
       })),
-      { transaction }
+      { transaction },
     );
   }
 
@@ -162,15 +187,28 @@ class ClassService {
     const mappings = await ClassAcademicBlock.findAll({
       where: { classId },
       attributes: ["academicBlockId", "isPrimary"],
-      order: [["isPrimary", "DESC"], ["classAcademicBlockId", "ASC"]],
+      order: [
+        ["isPrimary", "DESC"],
+        ["classAcademicBlockId", "ASC"],
+      ],
       transaction,
     });
     return mappings.map((mapping) => mapping.academicBlockId);
   }
 
-  async validateClassDateWithinBlocks(academicBlockIds, startDate, endDate, entityLabel = "Class") {
+  async validateClassDateWithinBlocks(
+    academicBlockIds,
+    startDate,
+    endDate,
+    entityLabel = "Class",
+  ) {
     if (!academicBlockIds.length) {
-      return { success: true, startDate, endDate, primaryAcademicBlockId: null };
+      return {
+        success: true,
+        startDate,
+        endDate,
+        primaryAcademicBlockId: null,
+      };
     }
 
     const blocks = await AcademicBlock.findAll({
@@ -186,11 +224,14 @@ class ClassService {
     if (distinctTerms.length > 1) {
       return {
         success: false,
-        message: "Một lớp chỉ được thuộc một kỳ (term). Sang kỳ mới phải tạo lớp mới.",
+        message:
+          "Một lớp chỉ được thuộc một kỳ (term). Sang kỳ mới phải tạo lớp mới.",
       };
     }
 
-    const distinctAcademicYears = [...new Set(blocks.map((block) => block.academicYearId))];
+    const distinctAcademicYears = [
+      ...new Set(blocks.map((block) => block.academicYearId)),
+    ];
     if (distinctAcademicYears.length > 1) {
       return {
         success: false,
@@ -198,16 +239,35 @@ class ClassService {
       };
     }
 
-    const minStart = blocks.reduce((acc, block) => (!acc || new Date(block.startDate) < new Date(acc) ? block.startDate : acc), null);
-    const maxEnd = blocks.reduce((acc, block) => (!acc || new Date(block.endDate) > new Date(acc) ? block.endDate : acc), null);
+    const minStart = blocks.reduce(
+      (acc, block) =>
+        !acc || new Date(block.startDate) < new Date(acc)
+          ? block.startDate
+          : acc,
+      null,
+    );
+    const maxEnd = blocks.reduce(
+      (acc, block) =>
+        !acc || new Date(block.endDate) > new Date(acc) ? block.endDate : acc,
+      null,
+    );
     const nextStart = startDate || minStart;
     const nextEnd = endDate || maxEnd;
 
     if (new Date(nextStart) >= new Date(nextEnd)) {
-      return { success: false, message: `${entityLabel} endDate must be after startDate` };
+      return {
+        success: false,
+        message: `${entityLabel} endDate must be after startDate`,
+      };
     }
-    if (new Date(nextStart) < new Date(minStart) || new Date(nextEnd) > new Date(maxEnd)) {
-      return { success: false, message: `${entityLabel} dates must be inside selected academic blocks range` };
+    if (
+      new Date(nextStart) < new Date(minStart) ||
+      new Date(nextEnd) > new Date(maxEnd)
+    ) {
+      return {
+        success: false,
+        message: `${entityLabel} dates must be inside selected academic blocks range`,
+      };
     }
 
     return {
@@ -222,7 +282,14 @@ class ClassService {
    * Create new class (Admin only)
    */
   async createClass(classData, userId, userRoles = []) {
-    const { courseId, classCode, startDate, endDate, maxStudents, maxGroupMembers } = classData;
+    const {
+      courseId,
+      classCode,
+      startDate,
+      endDate,
+      maxStudents,
+      maxGroupMembers,
+    } = classData;
     const transaction = await db.sequelize.transaction();
 
     try {
@@ -236,7 +303,7 @@ class ClassService {
       // Check class code unique within course
       const existing = await Class.findOne({
         where: { courseId, classCode },
-        transaction
+        transaction,
       });
       if (existing) {
         await transaction.rollback();
@@ -247,43 +314,64 @@ class ClassService {
       }
 
       const requestedBlockIds = this.normalizeClassBlockIds(classData);
-      const allowedBlockIds = await this.getAllowedCourseBlockIds(courseId, transaction);
-      const blockSelection = this.resolveClassAcademicBlockIds(requestedBlockIds, allowedBlockIds);
+      const allowedBlockIds = await this.getAllowedCourseBlockIds(
+        courseId,
+        transaction,
+      );
+      const blockSelection = this.resolveClassAcademicBlockIds(
+        requestedBlockIds,
+        allowedBlockIds,
+      );
       if (!blockSelection.success) {
         await transaction.rollback();
         return blockSelection;
       }
       const finalBlockIds = blockSelection.academicBlockIds;
-      const dateValidation = await this.validateClassDateWithinBlocks(finalBlockIds, startDate, endDate, "Class");
+      const dateValidation = await this.validateClassDateWithinBlocks(
+        finalBlockIds,
+        startDate,
+        endDate,
+        "Class",
+      );
       if (!dateValidation.success) {
         await transaction.rollback();
         return dateValidation;
       }
 
       // Create class
-      const newClass = await Class.create({
-        courseId,
-        academicBlockId: dateValidation.primaryAcademicBlockId || null,
-        classCode,
-        status: "active",
-        startDate: dateValidation.startDate || null,
-        endDate: dateValidation.endDate || null,
-        maxStudents,
-        maxGroupMembers,
-        createdBy: userId,
-      }, { transaction });
-      await this.syncClassAcademicBlocks(newClass.classId, finalBlockIds, transaction);
+      const newClass = await Class.create(
+        {
+          courseId,
+          academicBlockId: dateValidation.primaryAcademicBlockId || null,
+          classCode,
+          status: "active",
+          startDate: dateValidation.startDate || null,
+          endDate: dateValidation.endDate || null,
+          maxStudents,
+          maxGroupMembers,
+          createdBy: userId,
+        },
+        { transaction },
+      );
+      await this.syncClassAcademicBlocks(
+        newClass.classId,
+        finalBlockIds,
+        transaction,
+      );
 
       const isAdmin = userRoles.includes("Admin");
       const isInstructor = userRoles.includes("Instructor");
 
       // Only instructor creators should be auto-assigned to the class.
       if (isInstructor && !isAdmin) {
-        await ClassInstructor.create({
-          classId: newClass.classId,
-          instructorId: userId,
-          assignedBy: userId
-        }, { transaction });
+        await ClassInstructor.create(
+          {
+            classId: newClass.classId,
+            instructorId: userId,
+            assignedBy: userId,
+          },
+          { transaction },
+        );
       }
 
       await transaction.commit();
@@ -330,7 +418,11 @@ class ClassService {
         }).then((records) => records.map((r) => r.classId));
 
         if (instructorClassIds.length === 0) {
-          return { success: true, data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } };
+          return {
+            success: true,
+            data: [],
+            pagination: { total: 0, page: 1, limit: 10, totalPages: 0 },
+          };
         }
 
         where.classId = { [Op.in]: instructorClassIds };
@@ -349,13 +441,20 @@ class ClassService {
           {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName", "academicBlockId"],
-            include: [{
-              model: db.AcademicBlock,
-              as: "academicBlocks",
-              through: { attributes: ["isPrimary"] },
-              required: false,
-            }],
+            attributes: [
+              "courseId",
+              "courseCode",
+              "courseName",
+              "academicBlockId",
+            ],
+            include: [
+              {
+                model: db.AcademicBlock,
+                as: "academicBlocks",
+                through: { attributes: ["isPrimary"] },
+                required: false,
+              },
+            ],
           },
           {
             model: User,
@@ -385,7 +484,9 @@ class ClassService {
         data: classes.map((c) => {
           const classData = {
             ...c.toJSON(),
-            academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
+            academicBlockIds: (c.academicBlocks || []).map(
+              (b) => b.academicBlockId,
+            ),
             enrollmentCount: c.enrollments?.length || 0,
             activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
           };
@@ -414,7 +515,6 @@ class ClassService {
       };
     }
   }
-
 
   /**
    * Get all classes (Admin and Student) with pagination and filters
@@ -454,13 +554,20 @@ class ClassService {
           {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName", "academicBlockId"],
-            include: [{
-              model: db.AcademicBlock,
-              as: "academicBlocks",
-              through: { attributes: ["isPrimary"] },
-              required: false,
-            }],
+            attributes: [
+              "courseId",
+              "courseCode",
+              "courseName",
+              "academicBlockId",
+            ],
+            include: [
+              {
+                model: db.AcademicBlock,
+                as: "academicBlocks",
+                through: { attributes: ["isPrimary"] },
+                required: false,
+              },
+            ],
           },
           {
             model: User,
@@ -490,7 +597,9 @@ class ClassService {
         data: classes.map((c) => {
           const classData = {
             ...c.toJSON(),
-            academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
+            academicBlockIds: (c.academicBlocks || []).map(
+              (b) => b.academicBlockId,
+            ),
             enrollmentCount: c.enrollments?.length || 0,
             activeKeyCount: c.enrollKeys?.filter((k) => k.isActive).length || 0,
           };
@@ -563,12 +672,14 @@ class ClassService {
               "academicYear",
               "academicBlockId",
             ],
-            include: [{
-              model: db.AcademicBlock,
-              as: "academicBlocks",
-              through: { attributes: ["isPrimary"] },
-              required: false,
-            }],
+            include: [
+              {
+                model: db.AcademicBlock,
+                as: "academicBlocks",
+                through: { attributes: ["isPrimary"] },
+                required: false,
+              },
+            ],
           },
           {
             model: User,
@@ -611,7 +722,9 @@ class ClassService {
           endDate: c.endDate,
           maxStudents: c.maxStudents,
           maxGroupMembers: c.maxGroupMembers,
-          academicBlockIds: (c.academicBlocks || []).map((b) => b.academicBlockId),
+          academicBlockIds: (c.academicBlocks || []).map(
+            (b) => b.academicBlockId,
+          ),
           academicBlocks: c.academicBlocks || [],
           course: c.course,
           instructors: c.instructors,
@@ -646,13 +759,22 @@ class ClassService {
           {
             model: Course,
             as: "course",
-            attributes: ["courseId", "courseCode", "courseName", "semester", "academicYear", "academicBlockId"],
-            include: [{
-              model: db.AcademicBlock,
-              as: "academicBlocks",
-              through: { attributes: ["isPrimary"] },
-              required: false,
-            }],
+            attributes: [
+              "courseId",
+              "courseCode",
+              "courseName",
+              "semester",
+              "academicYear",
+              "academicBlockId",
+            ],
+            include: [
+              {
+                model: db.AcademicBlock,
+                as: "academicBlocks",
+                through: { attributes: ["isPrimary"] },
+                required: false,
+              },
+            ],
           },
           {
             model: Topic,
@@ -733,14 +855,20 @@ class ClassService {
             where: { classId, instructorId: userId },
           });
           if (!isInstructor) {
-            return { success: false, message: "Bạn không có quyền truy cập lớp học này" };
+            return {
+              success: false,
+              message: "Bạn không có quyền truy cập lớp học này",
+            };
           }
         } else if (userRole === "Student") {
           const isEnrolled = await Enrollment.findOne({
             where: { classId, studentId: userId, status: "enrolled" },
           });
           if (!isEnrolled) {
-            return { success: false, message: "Bạn không có quyền truy cập lớp học này" };
+            return {
+              success: false,
+              message: "Bạn không có quyền truy cập lớp học này",
+            };
           }
         }
       }
@@ -754,7 +882,9 @@ class ClassService {
         success: true,
         class: {
           ...response,
-          academicBlockIds: (response.academicBlocks || []).map((b) => b.academicBlockId),
+          academicBlockIds: (response.academicBlocks || []).map(
+            (b) => b.academicBlockId,
+          ),
           totalStudents: response.enrollments?.length || 0,
           // topics is now directly on the class
         },
@@ -786,7 +916,7 @@ class ClassService {
       if (userRole !== "Admin") {
         const isInstructor = await ClassInstructor.findOne({
           where: { classId, instructorId: userId },
-          transaction
+          transaction,
         });
         if (!isInstructor) {
           await transaction.rollback();
@@ -798,7 +928,8 @@ class ClassService {
       }
 
       // Extract enrollment key fields from updates
-      const { enrollKey, keyExpiresAt, keyMaxUses, ...rawClassUpdates } = updates;
+      const { enrollKey, keyExpiresAt, keyMaxUses, ...rawClassUpdates } =
+        updates;
       let classUpdates = rawClassUpdates;
 
       if (userRole === "Instructor") {
@@ -809,12 +940,20 @@ class ClassService {
       }
 
       // Update class info
-      const allowedBlockIds = await this.getAllowedCourseBlockIds(classData.courseId, transaction);
-      const hasBlocksInPayload = Array.isArray(classUpdates.academicBlockIds) || classUpdates.academicBlockId !== undefined;
+      const allowedBlockIds = await this.getAllowedCourseBlockIds(
+        classData.courseId,
+        transaction,
+      );
+      const hasBlocksInPayload =
+        Array.isArray(classUpdates.academicBlockIds) ||
+        classUpdates.academicBlockId !== undefined;
       const requestedBlockIds = hasBlocksInPayload
         ? this.normalizeClassBlockIds(classUpdates)
         : await this.getClassAcademicBlockIds(classId, transaction);
-      const blockSelection = this.resolveClassAcademicBlockIds(requestedBlockIds, allowedBlockIds);
+      const blockSelection = this.resolveClassAcademicBlockIds(
+        requestedBlockIds,
+        allowedBlockIds,
+      );
       if (!blockSelection.success) {
         await transaction.rollback();
         return blockSelection;
@@ -824,18 +963,28 @@ class ClassService {
       const hasEndDateInPayload = classUpdates.endDate !== undefined;
       const nextStartDate = hasStartDateInPayload
         ? classUpdates.startDate
-        : (hasBlocksInPayload ? null : classData.startDate);
+        : hasBlocksInPayload
+          ? null
+          : classData.startDate;
       const nextEndDate = hasEndDateInPayload
         ? classUpdates.endDate
-        : (hasBlocksInPayload ? null : classData.endDate);
-      const dateValidation = await this.validateClassDateWithinBlocks(nextBlockIds, nextStartDate, nextEndDate, "Class");
+        : hasBlocksInPayload
+          ? null
+          : classData.endDate;
+      const dateValidation = await this.validateClassDateWithinBlocks(
+        nextBlockIds,
+        nextStartDate,
+        nextEndDate,
+        "Class",
+      );
       if (!dateValidation.success) {
         await transaction.rollback();
         return dateValidation;
       }
 
       if (hasBlocksInPayload) {
-        classUpdates.academicBlockId = dateValidation.primaryAcademicBlockId || null;
+        classUpdates.academicBlockId =
+          dateValidation.primaryAcademicBlockId || null;
       }
       if (!hasStartDateInPayload && hasBlocksInPayload) {
         classUpdates.startDate = dateValidation.startDate || null;
@@ -843,7 +992,8 @@ class ClassService {
       if (!hasEndDateInPayload && hasBlocksInPayload) {
         classUpdates.endDate = dateValidation.endDate || null;
       }
-      if (classUpdates.academicBlockIds !== undefined) delete classUpdates.academicBlockIds;
+      if (classUpdates.academicBlockIds !== undefined)
+        delete classUpdates.academicBlockIds;
 
       await classData.update(classUpdates, { transaction });
       if (hasBlocksInPayload) {
@@ -851,37 +1001,45 @@ class ClassService {
       }
 
       // Update enrollment key if provided
-      if (enrollKey !== undefined || keyExpiresAt !== undefined || keyMaxUses !== undefined) {
+      if (
+        enrollKey !== undefined ||
+        keyExpiresAt !== undefined ||
+        keyMaxUses !== undefined
+      ) {
         // Find active enrollment key for this class
         const activeKey = await EnrollKey.findOne({
           where: {
             classId,
             isActive: true,
-            isRevoked: false
+            isRevoked: false,
           },
-          order: [['createdAt', 'DESC']],
-          transaction
+          order: [["createdAt", "DESC"]],
+          transaction,
         });
 
         if (activeKey) {
           // Update existing key
           const keyUpdates = {};
           if (enrollKey !== undefined) keyUpdates.keyValue = enrollKey;
-          if (keyExpiresAt !== undefined) keyUpdates.expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : null;
+          if (keyExpiresAt !== undefined)
+            keyUpdates.expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : null;
           if (keyMaxUses !== undefined) keyUpdates.maxUses = keyMaxUses;
 
           await activeKey.update(keyUpdates, { transaction });
         } else if (enrollKey !== undefined) {
-          await EnrollKey.create({
-            classId,
-            keyValue: enrollKey,
-            expiresAt: keyExpiresAt ? new Date(keyExpiresAt) : null,
-            maxUses: keyMaxUses || null,
-            usedCount: 0,
-            isActive: true,
-            isRevoked: false,
-            createdBy: userId,
-          }, { transaction });
+          await EnrollKey.create(
+            {
+              classId,
+              keyValue: enrollKey,
+              expiresAt: keyExpiresAt ? new Date(keyExpiresAt) : null,
+              maxUses: keyMaxUses || null,
+              usedCount: 0,
+              isActive: true,
+              isRevoked: false,
+              createdBy: userId,
+            },
+            { transaction },
+          );
         }
       }
 
@@ -892,11 +1050,20 @@ class ClassService {
         include: [
           {
             model: EnrollKey,
-            as: 'enrollKeys',
-            attributes: ['keyId', 'keyValue', 'expiresAt', 'maxUses', 'usedCount', 'isActive', 'isRevoked', 'createdAt'],
-            required: false
-          }
-        ]
+            as: "enrollKeys",
+            attributes: [
+              "keyId",
+              "keyValue",
+              "expiresAt",
+              "maxUses",
+              "usedCount",
+              "isActive",
+              "isRevoked",
+              "createdAt",
+            ],
+            required: false,
+          },
+        ],
       });
 
       return {
@@ -992,28 +1159,35 @@ class ClassService {
         };
       }
 
-      const actorRoles = Array.isArray(options.actorRoles) ? options.actorRoles : [];
+      const actorRoles = Array.isArray(options.actorRoles)
+        ? options.actorRoles
+        : [];
       const canOverride =
-        actorRoles.includes("Admin") || actorRoles.includes("AcademicCoordinator");
+        actorRoles.includes("Admin") ||
+        actorRoles.includes("AcademicCoordinator");
       const overrideReason =
-        typeof options.overrideReason === "string" ? options.overrideReason.trim() : "";
+        typeof options.overrideReason === "string"
+          ? options.overrideReason.trim()
+          : "";
 
-      const eligibility = await competencyService.evaluateInstructorEligibilityForCourse(
-        classData.courseId,
-        instructorId,
-        {
-          classContext: {
-            classId,
-            startDate: classData.startDate,
-            endDate: classData.endDate,
+      const eligibility =
+        await competencyService.evaluateInstructorEligibilityForCourse(
+          classData.courseId,
+          instructorId,
+          {
+            classContext: {
+              classId,
+              startDate: classData.startDate,
+              endDate: classData.endDate,
+            },
           },
-        }
-      );
+        );
 
       if (!eligibility.success) {
         return {
           success: false,
-          message: eligibility.message || "Unable to evaluate instructor eligibility",
+          message:
+            eligibility.message || "Unable to evaluate instructor eligibility",
           error: eligibility.error,
         };
       }
@@ -1021,7 +1195,8 @@ class ClassService {
       if (!eligibility.eligible && !(canOverride && overrideReason)) {
         return {
           success: false,
-          message: "Giảng viên chưa đủ điều kiện phụ trách lớp (cần overrideReason nếu muốn override)",
+          message:
+            "Giảng viên chưa đủ điều kiện phụ trách lớp (cần overrideReason nếu muốn override)",
           eligibility,
         };
       }
@@ -1059,8 +1234,8 @@ class ClassService {
       return {
         success: true,
         message: isOverrideAssignment
-          ? "Instructor assigned with override"
-          : "Instructor assigned successfully",
+          ? "Giảng viên đã được phân công với lý do quá trình phụ trách"
+          : "Giảng viên đã được phân công vào lớp học thành công",
         assignmentStatus: isOverrideAssignment ? "override" : "eligible",
       };
     } catch (error) {
@@ -1131,27 +1306,55 @@ class ClassService {
           where: { classId, instructorId: userId },
         });
         if (!isInstructor) {
-          return { success: false, message: "Bạn không có quyền tạo topic cho lớp này" };
+          return {
+            success: false,
+            message: "Bạn không có quyền tạo topic cho lớp này",
+          };
         }
       }
 
-      const { topicName, description, submissionStartDate, submissionDeadline, dueDate, minGroups, maxGroups, maxDurationMinutes, requirements } = topicData;
+      const {
+        topicName,
+        description,
+        submissionStartDate,
+        submissionDeadline,
+        dueDate,
+        minGroups,
+        maxGroups,
+        maxDurationMinutes,
+        requirements,
+      } = topicData;
 
-      const normalizedSubmissionStartDate = submissionStartDate !== undefined ? submissionStartDate : null;
-      const normalizedSubmissionDeadline = submissionDeadline !== undefined ? submissionDeadline : (dueDate !== undefined ? dueDate : null);
-      const normalizedMinGroups = minGroups !== undefined ? parseInt(minGroups, 10) : 1;
-      const normalizedMaxGroups = maxGroups !== undefined ? parseInt(maxGroups, 10) : normalizedMinGroups;
+      const normalizedSubmissionStartDate =
+        submissionStartDate !== undefined ? submissionStartDate : null;
+      const normalizedSubmissionDeadline =
+        submissionDeadline !== undefined
+          ? submissionDeadline
+          : dueDate !== undefined
+            ? dueDate
+            : null;
+      const normalizedMinGroups =
+        minGroups !== undefined ? parseInt(minGroups, 10) : 1;
+      const normalizedMaxGroups =
+        maxGroups !== undefined ? parseInt(maxGroups, 10) : normalizedMinGroups;
 
-      if (normalizedMinGroups < 1 || normalizedMaxGroups < normalizedMinGroups) {
+      if (
+        normalizedMinGroups < 1 ||
+        normalizedMaxGroups < normalizedMinGroups
+      ) {
         return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
       if (
         normalizedSubmissionStartDate &&
         normalizedSubmissionDeadline &&
-        new Date(normalizedSubmissionDeadline) <= new Date(normalizedSubmissionStartDate)
+        new Date(normalizedSubmissionDeadline) <=
+          new Date(normalizedSubmissionStartDate)
       ) {
-        return { success: false, message: "submissionDeadline phải sau submissionStartDate" };
+        return {
+          success: false,
+          message: "submissionDeadline phải sau submissionStartDate",
+        };
       }
 
       const topic = await Topic.create({
@@ -1172,7 +1375,11 @@ class ClassService {
       return { success: true, message: "Tạo topic thành công", topic };
     } catch (error) {
       console.error("Create topic error:", error);
-      return { success: false, message: "Không thể tạo topic", error: error.message };
+      return {
+        success: false,
+        message: "Không thể tạo topic",
+        error: error.message,
+      };
     }
   }
 
@@ -1194,7 +1401,11 @@ class ClassService {
       return { success: true, topics };
     } catch (error) {
       console.error("Get topics by class error:", error);
-      return { success: false, message: "Không thể lấy danh sách topic", error: error.message };
+      return {
+        success: false,
+        message: "Không thể lấy danh sách topic",
+        error: error.message,
+      };
     }
   }
 
@@ -1213,22 +1424,47 @@ class ClassService {
           where: { classId: topic.classId, instructorId: userId },
         });
         if (!isInstructor) {
-          return { success: false, message: "Bạn không có quyền sửa topic này" };
+          return {
+            success: false,
+            message: "Bạn không có quyền sửa topic này",
+          };
         }
       }
 
-      const { topicName, description, submissionStartDate, submissionDeadline, dueDate, minGroups, maxGroups, maxDurationMinutes, requirements } = topicData;
+      const {
+        topicName,
+        description,
+        submissionStartDate,
+        submissionDeadline,
+        dueDate,
+        minGroups,
+        maxGroups,
+        maxDurationMinutes,
+        requirements,
+      } = topicData;
 
-      const nextSubmissionStartDate = submissionStartDate !== undefined ? submissionStartDate : topic.submissionStartDate;
-      const nextSubmissionDeadline = submissionDeadline !== undefined ? submissionDeadline : (dueDate !== undefined ? dueDate : topic.submissionDeadline);
-      const nextMinGroups = minGroups !== undefined ? parseInt(minGroups, 10) : topic.minGroups;
-      const nextMaxGroups = maxGroups !== undefined ? parseInt(maxGroups, 10) : topic.maxGroups;
+      const nextSubmissionStartDate =
+        submissionStartDate !== undefined
+          ? submissionStartDate
+          : topic.submissionStartDate;
+      const nextSubmissionDeadline =
+        submissionDeadline !== undefined
+          ? submissionDeadline
+          : dueDate !== undefined
+            ? dueDate
+            : topic.submissionDeadline;
+      const nextMinGroups =
+        minGroups !== undefined ? parseInt(minGroups, 10) : topic.minGroups;
+      const nextMaxGroups =
+        maxGroups !== undefined ? parseInt(maxGroups, 10) : topic.maxGroups;
 
       if (nextMinGroups < 1 || nextMaxGroups < nextMinGroups) {
         return { success: false, message: "Dữ liệu không hợp lệ" };
       }
 
-      const occupiedGroupCount = await this.getOccupiedTopicGroupCount(topic.topicId);
+      const occupiedGroupCount = await this.getOccupiedTopicGroupCount(
+        topic.topicId,
+      );
       if (nextMaxGroups < occupiedGroupCount) {
         return {
           success: false,
@@ -1241,26 +1477,38 @@ class ClassService {
         nextSubmissionDeadline &&
         new Date(nextSubmissionDeadline) <= new Date(nextSubmissionStartDate)
       ) {
-        return { success: false, message: "submissionDeadline phải sau submissionStartDate" };
+        return {
+          success: false,
+          message: "submissionDeadline phải sau submissionStartDate",
+        };
       }
 
       await topic.update({
         topicName: topicName || topic.topicName,
-        description: description !== undefined ? description : topic.description,
+        description:
+          description !== undefined ? description : topic.description,
         sequenceNumber: null,
         dueDate: nextSubmissionDeadline,
         submissionStartDate: nextSubmissionStartDate,
         submissionDeadline: nextSubmissionDeadline,
         minGroups: nextMinGroups,
         maxGroups: nextMaxGroups,
-        maxDurationMinutes: maxDurationMinutes !== undefined ? maxDurationMinutes : topic.maxDurationMinutes,
-        requirements: requirements !== undefined ? requirements : topic.requirements,
+        maxDurationMinutes:
+          maxDurationMinutes !== undefined
+            ? maxDurationMinutes
+            : topic.maxDurationMinutes,
+        requirements:
+          requirements !== undefined ? requirements : topic.requirements,
       });
 
       return { success: true, message: "Cập nhật topic thành công", topic };
     } catch (error) {
       console.error("Update topic error:", error);
-      return { success: false, message: "Không thể cập nhật topic", error: error.message };
+      return {
+        success: false,
+        message: "Không thể cập nhật topic",
+        error: error.message,
+      };
     }
   }
 
@@ -1279,21 +1527,31 @@ class ClassService {
           where: { classId: topic.classId, instructorId: userId },
         });
         if (!isInstructor) {
-          return { success: false, message: "Bạn không có quyền xóa topic này" };
+          return {
+            success: false,
+            message: "Bạn không có quyền xóa topic này",
+          };
         }
       }
 
       const { Presentation } = db;
       const hasPresentation = await Presentation.count({ where: { topicId } });
       if (hasPresentation > 0) {
-        return { success: false, message: "Không thể xóa topic đã có bài thuyết trình" };
+        return {
+          success: false,
+          message: "Không thể xóa topic đã có bài thuyết trình",
+        };
       }
 
       await topic.destroy();
       return { success: true, message: "Xóa topic thành công" };
     } catch (error) {
       console.error("Delete topic error:", error);
-      return { success: false, message: "Không thể xóa topic", error: error.message };
+      return {
+        success: false,
+        message: "Không thể xóa topic",
+        error: error.message,
+      };
     }
   }
 
@@ -1376,7 +1634,12 @@ class ClassService {
       const { Class } = require("../models");
 
       const classRecord = await Class.findByPk(classId, {
-        attributes: ["classId", "isUploadEnabled", "uploadStartDate", "uploadEndDate"],
+        attributes: [
+          "classId",
+          "isUploadEnabled",
+          "uploadStartDate",
+          "uploadEndDate",
+        ],
       });
 
       if (!classRecord) {
@@ -1540,13 +1803,18 @@ class ClassService {
   async addSingleEmail(classId, email, userId, userRole) {
     try {
       const classData = await Class.findByPk(classId);
-      if (!classData) return { success: false, message: "Không tìm thấy lớp học" };
+      if (!classData)
+        return { success: false, message: "Không tìm thấy lớp học" };
 
       // Authorization
       if (userRole !== "Admin") {
-        if (userRole !== "Instructor") return { success: false, message: "Bạn không có quyền thực hiện" };
-        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId } });
-        if (!isInstructor) return { success: false, message: "Bạn không có quyền thực hiện" };
+        if (userRole !== "Instructor")
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId: userId },
+        });
+        if (!isInstructor)
+          return { success: false, message: "Bạn không có quyền thực hiện" };
       }
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1558,10 +1826,16 @@ class ClassService {
       const { ClassEmailWhitelist } = db;
 
       // Check duplicate
-      const existing = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedEmail } });
-      if (existing) return { success: false, message: "Email này đã có trong danh sách" };
+      const existing = await ClassEmailWhitelist.findOne({
+        where: { classId, email: normalizedEmail },
+      });
+      if (existing)
+        return { success: false, message: "Email này đã có trong danh sách" };
 
-      const record = await ClassEmailWhitelist.create({ classId, email: normalizedEmail });
+      const record = await ClassEmailWhitelist.create({
+        classId,
+        email: normalizedEmail,
+      });
 
       return {
         success: true,
@@ -1570,7 +1844,11 @@ class ClassService {
       };
     } catch (error) {
       console.error("Add single email error:", error);
-      return { success: false, message: "Không thể thêm email", error: error.message };
+      return {
+        success: false,
+        message: "Không thể thêm email",
+        error: error.message,
+      };
     }
   }
 
@@ -1580,13 +1858,18 @@ class ClassService {
   async updateSingleEmail(classId, oldEmail, newEmail, userId, userRole) {
     try {
       const classData = await Class.findByPk(classId);
-      if (!classData) return { success: false, message: "Không tìm thấy lớp học" };
+      if (!classData)
+        return { success: false, message: "Không tìm thấy lớp học" };
 
       // Authorization
       if (userRole !== "Admin") {
-        if (userRole !== "Instructor") return { success: false, message: "Bạn không có quyền thực hiện" };
-        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId } });
-        if (!isInstructor) return { success: false, message: "Bạn không có quyền thực hiện" };
+        if (userRole !== "Instructor")
+          return { success: false, message: "Bạn không có quyền thực hiện" };
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId: userId },
+        });
+        if (!isInstructor)
+          return { success: false, message: "Bạn không có quyền thực hiện" };
       }
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1599,13 +1882,25 @@ class ClassService {
 
       const { ClassEmailWhitelist } = db;
 
-      const existing = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedOld } });
-      if (!existing) return { success: false, message: "Email cũ không tồn tại trong danh sách" };
+      const existing = await ClassEmailWhitelist.findOne({
+        where: { classId, email: normalizedOld },
+      });
+      if (!existing)
+        return {
+          success: false,
+          message: "Email cũ không tồn tại trong danh sách",
+        };
 
       // Check if new email already exists
       if (normalizedNew !== normalizedOld) {
-        const duplicate = await ClassEmailWhitelist.findOne({ where: { classId, email: normalizedNew } });
-        if (duplicate) return { success: false, message: "Email mới đã tồn tại trong danh sách" };
+        const duplicate = await ClassEmailWhitelist.findOne({
+          where: { classId, email: normalizedNew },
+        });
+        if (duplicate)
+          return {
+            success: false,
+            message: "Email mới đã tồn tại trong danh sách",
+          };
       }
 
       await existing.update({ email: normalizedNew });
@@ -1617,7 +1912,11 @@ class ClassService {
       };
     } catch (error) {
       console.error("Update single email error:", error);
-      return { success: false, message: "Không thể cập nhật email", error: error.message };
+      return {
+        success: false,
+        message: "Không thể cập nhật email",
+        error: error.message,
+      };
     }
   }
 
@@ -1640,7 +1939,10 @@ class ClassService {
           await transaction.rollback();
           return { success: false, message: "Bạn không có quyền thực hiện" };
         }
-        const isInstructor = await ClassInstructor.findOne({ where: { classId, instructorId: userId }, transaction });
+        const isInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId: userId },
+          transaction,
+        });
         if (!isInstructor) {
           await transaction.rollback();
           return { success: false, message: "Bạn không có quyền thực hiện" };
@@ -1651,28 +1953,48 @@ class ClassService {
       const { ClassEmailWhitelist, User, Enrollment, Presentation } = db;
 
       // Remove from whitelist
-      const deleted = await ClassEmailWhitelist.destroy({ where: { classId, email: normalizedEmail }, transaction });
+      const deleted = await ClassEmailWhitelist.destroy({
+        where: { classId, email: normalizedEmail },
+        transaction,
+      });
       if (deleted === 0) {
         await transaction.rollback();
-        return { success: false, message: "Email không tồn tại trong danh sách" };
+        return {
+          success: false,
+          message: "Email không tồn tại trong danh sách",
+        };
       }
 
       // Find and kick the student if enrolled
       let kicked = false;
       let kickDetail = null;
-      const student = await User.findOne({ where: { email: normalizedEmail }, attributes: ["userId", "email"], transaction });
+      const student = await User.findOne({
+        where: { email: normalizedEmail },
+        attributes: ["userId", "email"],
+        transaction,
+      });
 
       if (student) {
-        const enrollment = await Enrollment.findOne({ where: { classId, studentId: student.userId }, transaction });
+        const enrollment = await Enrollment.findOne({
+          where: { classId, studentId: student.userId },
+          transaction,
+        });
         if (enrollment) {
-          const presentationCount = await Presentation.count({ where: { studentId: student.userId, classId }, transaction });
+          const presentationCount = await Presentation.count({
+            where: { studentId: student.userId, classId },
+            transaction,
+          });
           if (presentationCount > 0) {
             await enrollment.update({ status: "dropped" }, { transaction });
           } else {
             await enrollment.destroy({ transaction });
           }
           kicked = true;
-          kickDetail = { studentId: student.userId, email: normalizedEmail, hadPresentations: presentationCount > 0 };
+          kickDetail = {
+            studentId: student.userId,
+            email: normalizedEmail,
+            hadPresentations: presentationCount > 0,
+          };
         }
       }
 
@@ -1689,14 +2011,13 @@ class ClassService {
     } catch (error) {
       await transaction.rollback();
       console.error("Remove single email error:", error);
-      return { success: false, message: "Không thể xóa email", error: error.message };
+      return {
+        success: false,
+        message: "Không thể xóa email",
+        error: error.message,
+      };
     }
   }
 }
 
 module.exports = new ClassService();
-
-
-
-
-
