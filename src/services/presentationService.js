@@ -92,6 +92,79 @@ const detectPageCount = async (fileBuffer, mimeType) => {
 };
 
 class PresentationService {
+  async validateUploadAvailability(presentation) {
+    const now = new Date();
+
+    if (presentation.classId) {
+      const classRecord = await Class.findByPk(presentation.classId, {
+        attributes: ["classId", "isUploadEnabled", "uploadStartDate", "uploadEndDate"],
+      });
+
+      if (classRecord) {
+        if (!classRecord.isUploadEnabled) {
+          return {
+            success: false,
+            message:
+              "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
+            uploadLocked: true,
+          };
+        }
+
+        if (
+          classRecord.uploadStartDate &&
+          new Date(classRecord.uploadStartDate) > now
+        ) {
+          return {
+            success: false,
+            message: "Chưa tới thời gian cho phép upload của lớp học",
+            uploadLocked: true,
+          };
+        }
+
+        if (
+          classRecord.uploadEndDate &&
+          new Date(classRecord.uploadEndDate) < now
+        ) {
+          return {
+            success: false,
+            message: "Đã hết thời gian cho phép upload của lớp học",
+            uploadLocked: true,
+          };
+        }
+      }
+    }
+
+    const topic = await Topic.findByPk(presentation.topicId, {
+      attributes: [
+        "topicId",
+        "submissionStartDate",
+        "submissionDeadline",
+        "dueDate",
+      ],
+    });
+
+    if (topic) {
+      if (topic.submissionStartDate && new Date(topic.submissionStartDate) > now) {
+        return {
+          success: false,
+          message: "Chưa tới thời gian mở nộp bài của topic",
+          uploadLocked: true,
+        };
+      }
+
+      const effectiveDeadline = topic.submissionDeadline || topic.dueDate;
+      if (effectiveDeadline && new Date(effectiveDeadline) < now) {
+        return {
+          success: false,
+          message: "Topic đã hết hạn nộp bài",
+          uploadLocked: true,
+        };
+      }
+    }
+
+    return { success: true };
+  }
+
   async createPresentation({
     classId,
     topicId,
@@ -229,19 +302,12 @@ class PresentationService {
 
       const presentation = accessResult.presentation;
 
-      // Kiểm tra upload permission nếu có classId
-      if (presentation.classId) {
-        const { Class } = db;
-        const classRecord = await Class.findByPk(presentation.classId);
-        if (classRecord && !classRecord.isUploadEnabled) {
-          await transaction.rollback();
-          return {
-            success: false,
-            message:
-              "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
-            uploadLocked: true,
-          };
-        }
+const uploadCheck = await this.validateUploadAvailability(presentation);
+if (!uploadCheck.success) {
+  await transaction.rollback();
+  return uploadCheck;
+}
+
       }
 
       // Get existing slides để xóa their files from storage
@@ -372,18 +438,11 @@ class PresentationService {
 
       const presentation = accessResult.presentation;
 
-      // Kiểm tra upload permission nếu có classId
-      if (presentation.classId) {
-        const { Class } = db;
-        const classRecord = await Class.findByPk(presentation.classId);
-        if (classRecord && !classRecord.isUploadEnabled) {
-          return {
-            success: false,
-            message:
-              "Lớp học chưa mở cho phép upload bài thuyết trình. Vui lòng đợi giảng viên mở.",
-            uploadLocked: true,
-          };
-        }
+const uploadCheck = await this.validateUploadAvailability(presentation);
+if (!uploadCheck.success) {
+  return uploadCheck;
+}
+
       }
 
       const extension = path.extname(file.originalname || "");
@@ -535,6 +594,10 @@ class PresentationService {
       }
 
       const presentation = accessResult.presentation;
+      const uploadCheck = await this.validateUploadAvailability(presentation);
+      if (!uploadCheck.success) {
+        return uploadCheck;
+      }
 
       // Validate presentation is complete
       const validationResult =
@@ -691,6 +754,10 @@ class PresentationService {
       }
 
       const presentation = accessResult.presentation;
+      const uploadCheck = await this.validateUploadAvailability(presentation);
+      if (!uploadCheck.success) {
+        return uploadCheck;
+      }
 
       // Only allow resubmit when status is "failed"
       if (presentation.status !== "failed") {

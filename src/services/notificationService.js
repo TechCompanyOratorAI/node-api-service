@@ -1,7 +1,7 @@
 "use strict";
 
 const db = require("../models");
-const { Notification, Presentation, GroupStudent, Enrollment } = db;
+const { Notification, Presentation, GroupStudent, Enrollment, ClassInstructor } = db;
 
 /**
  * Save a notification for a single user.
@@ -54,4 +54,57 @@ const saveForClass = async (classId, type, title, message, data = null) => {
   }
 };
 
-module.exports = { saveForUser, saveForPresentation, saveForGroup, saveForClass };
+/**
+ * Save a notification for all instructors assigned to a class.
+ */
+const saveForClassInstructors = async (classId, type, title, message, data = null) => {
+  try {
+    const instructors = await ClassInstructor.findAll({
+      where: { classId },
+      attributes: ["instructorId"],
+    });
+    await Promise.all(
+      instructors.map((record) =>
+        saveForUser(record.instructorId, type, title, message, data),
+      ),
+    );
+  } catch (err) {
+    console.error(`[NotificationService] ❌ saveForClassInstructors failed: ${err.message}`);
+  }
+};
+
+/**
+ * Save a notification for all instructors of the presentation's class.
+ */
+const saveForPresentationInstructors = async (
+  presentationId,
+  type,
+  title,
+  message,
+  data = null,
+) => {
+  try {
+    const presentation = await Presentation.findByPk(presentationId, {
+      attributes: ["classId"],
+    });
+    if (!presentation?.classId) return;
+    await saveForClassInstructors(
+      presentation.classId,
+      type,
+      title,
+      message,
+      data,
+    );
+  } catch (err) {
+    console.error(`[NotificationService] ❌ saveForPresentationInstructors failed: ${err.message}`);
+  }
+};
+
+module.exports = {
+  saveForUser,
+  saveForPresentation,
+  saveForGroup,
+  saveForClass,
+  saveForClassInstructors,
+  saveForPresentationInstructors,
+};

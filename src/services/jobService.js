@@ -953,7 +953,7 @@ class JobService {
               stepStatus = "failed";
               errorMessage = failed[0].errorMessage;
             } else if (running.length > 0) {
-              stepStatus = "running";
+              stepStatus = "processing";
               currentStep = step.name;
               currentStepProgress = stepProgress;
               representativeJob = running[0];
@@ -965,7 +965,7 @@ class JobService {
                 );
               }
             } else if (queued.length > 0) {
-              stepStatus = "queued";
+              stepStatus = "pending";
               stepProgress = stepProgress || 10;
               representativeJob = queued[0];
             } else if (completed === total) {
@@ -978,12 +978,12 @@ class JobService {
         } else if (job) {
           switch (job.status) {
             case JOB_STATUS.QUEUED:
-              stepStatus = "queued";
+              stepStatus = "pending";
               stepProgress = 10;
               estimatedDuration = this._getEstimatedDuration(step.type);
               break;
             case JOB_STATUS.RUNNING:
-              stepStatus = "running";
+              stepStatus = "processing";
               stepProgress = 50;
               currentStep = step.name;
               currentStepProgress = 50;
@@ -1043,7 +1043,7 @@ class JobService {
       let overallStatus = "pending";
       const hasFailedJob = stepDetails.some((step) => step.status === "failed");
       const hasRunningJob = stepDetails.some(
-        (step) => step.status === "running",
+        (step) => step.status === "processing",
       );
       const allCompleted = stepDetails.every(
         (step) => step.status === "completed",
@@ -1054,9 +1054,9 @@ class JobService {
       } else if (allCompleted) {
         overallStatus = "completed";
       } else if (hasRunningJob) {
-        overallStatus = "running";
-      } else if (stepDetails.some((step) => step.status === "queued")) {
-        overallStatus = "queued";
+        overallStatus = "processing";
+      } else if (stepDetails.some((step) => step.status === "pending")) {
+        overallStatus = "pending";
       }
 
       // Get presentation info
@@ -1072,8 +1072,8 @@ class JobService {
         const remainingSteps = stepDetails.filter(
           (step) =>
             step.status === "pending" ||
-            step.status === "queued" ||
-            step.status === "running",
+            step.status === "pending" ||
+            step.status === "processing",
         );
         const totalEstimatedSeconds = remainingSteps.reduce((sum, step) => {
           return sum + (step.estimatedDuration || 0);

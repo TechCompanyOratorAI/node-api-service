@@ -729,6 +729,24 @@ class GroupService {
           message: "Topic không thuộc lớp học này",
         };
       }
+
+      const now = new Date();
+      if (topic.submissionDeadline && new Date(topic.submissionDeadline) < now) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Topic này đã hết hạn chọn hoặc nộp bài",
+        };
+      }
+
+      if (topic.submissionStartDate && new Date(topic.submissionStartDate) > now) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Topic này chưa mở trong thời gian cho phép",
+        };
+      }
+
       // Enforce topic group capacity
       const currentGroupCount = await TopicEnrollment.count({
         where: { topicId, status: "enrolled" },

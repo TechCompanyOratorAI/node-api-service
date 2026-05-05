@@ -333,7 +333,7 @@ class GroupGradeDistributionService {
         where: { groupId: topicEnrollment.groupId, reportId },
         include: [
           { model: GroupGradeMember, as: "members" },
-          { model: Group, as: "group", attributes: ["groupId", "groupName"] },
+          { model: Group, as: "group", attributes: ["groupId", "groupName", "classId"] },
           { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email", "avatar"] },
         ],
       });
@@ -461,7 +461,7 @@ class GroupGradeDistributionService {
         where: { groupId: groupIds },
         include: [
           { model: GroupGradeMember, as: "members" },
-          { model: Group, as: "group", attributes: ["groupId", "groupName"] },
+          { model: Group, as: "group", attributes: ["groupId", "groupName", "classId"] },
           { model: AIReport, as: "report", attributes: ["reportId", "reportStatus", "overallScore", "gradeForInstructor"] },
           { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email", "avatar"] },
         ],
@@ -534,7 +534,7 @@ class GroupGradeDistributionService {
     const dist = await GroupGradeDistribution.findByPk(distributionId, {
       include: [
         { model: GroupGradeMember, as: "members" },
-        { model: Group, as: "group", attributes: ["groupId", "groupName"] },
+        { model: Group, as: "group", attributes: ["groupId", "groupName", "classId"] },
         { model: AIReport, as: "report", attributes: ["reportId"] },
         { model: db.User, as: "leader", attributes: ["userId", "firstName", "lastName", "email", "avatar"] },
       ],
