@@ -302,12 +302,10 @@ class PresentationService {
 
       const presentation = accessResult.presentation;
 
-const uploadCheck = await this.validateUploadAvailability(presentation);
-if (!uploadCheck.success) {
-  await transaction.rollback();
-  return uploadCheck;
-}
-
+      const uploadCheck = await this.validateUploadAvailability(presentation);
+      if (!uploadCheck.success) {
+        await transaction.rollback();
+        return uploadCheck;
       }
 
       // Get existing slides để xóa their files from storage
@@ -438,11 +436,9 @@ if (!uploadCheck.success) {
 
       const presentation = accessResult.presentation;
 
-const uploadCheck = await this.validateUploadAvailability(presentation);
-if (!uploadCheck.success) {
-  return uploadCheck;
-}
-
+      const uploadCheck = await this.validateUploadAvailability(presentation);
+      if (!uploadCheck.success) {
+        return uploadCheck;
       }
 
       const extension = path.extname(file.originalname || "");
