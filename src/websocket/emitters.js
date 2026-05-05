@@ -434,6 +434,18 @@ export const emitGradeReopened = (groupId, reportId, distribution) => {
     io.to(`group:${groupId}`).emit("grade:reopened", payload);
     console.log(`[SocketEmitter] ✅ emitGradeReopened succeeded`);
     saveForGroup(groupId, "grade:reopened", "Điểm được mở lại", "Giảng viên đã mở lại việc phân chia điểm.", { groupId, reportId });
+    if (distribution?.group?.classId) {
+      getClassInstructorIds(distribution.group.classId)
+        .then((userIds) => emitToInstructors(userIds, "grade:reopened", payload))
+        .catch((err) => console.error(`[SocketEmitter] grade:reopened instructor fan-out failed: ${err.message}`));
+      saveForClassInstructors(
+        distribution.group.classId,
+        "grade:reopened",
+        "Bang diem nhom da duoc mo lai",
+        `Ban vua mo lai bang diem cua nhom ${distribution.group.groupName || groupId}.`,
+        { groupId, reportId, distribution },
+      );
+    }
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitGradeReopened failed: ${err.message}`);
   }
@@ -489,6 +501,25 @@ export const emitCriterionFeedbackChanged = (presentationId, reportId, payload =
     io.to(room).emit("report:criterion-feedback-changed", data);
     console.log(`[SocketEmitter] ✅ emitCriterionFeedbackChanged succeeded`);
     saveForPresentation(presentationId, "report:criterion-feedback-changed", "Phản hồi tiêu chí cập nhật", "Giảng viên đã cập nhật phản hồi cho một tiêu chí đánh giá.", { presentationId, reportId });
+    Presentation.findByPk(presentationId, { attributes: ["classId"] })
+      .then(async (presentation) => {
+        if (!presentation?.classId) return;
+        emitToInstructors(
+          await getClassInstructorIds(presentation.classId),
+          "report:criterion-feedback-changed",
+          data,
+        );
+        await saveForPresentationInstructors(
+          presentationId,
+          "report:criterion-feedback-changed",
+          "Feedback tieu chi da duoc cap nhat",
+          payload?.message || "Feedback rubric cua bai thuyet trinh vua duoc cap nhat.",
+          data,
+        );
+      })
+      .catch((err) => {
+        console.error(`[SocketEmitter] criterion feedback instructor fan-out failed: ${err.message}`);
+      });
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitCriterionFeedbackChanged failed: ${err.message}`);
   }
