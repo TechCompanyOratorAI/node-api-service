@@ -1,4 +1,5 @@
 const groupService = require('../services/groupService');
+const { emitGroupAutoAssignedEvent } = require('../websocket/emitters');
 
 // Lấy thông tin user hiện tại từ request
 const getCurrentUser = (req) => {
@@ -358,6 +359,13 @@ const autoAssignGroups = async (req, res) => {
             success: true,
             message: result.message,
             data: result.data
+        });
+
+        await emitGroupAutoAssignedEvent({
+            actorUserId: currentUser.userId,
+            classId: parseInt(classId),
+            ...result.data,
+            message: result.message,
         });
 
     } catch (error) {

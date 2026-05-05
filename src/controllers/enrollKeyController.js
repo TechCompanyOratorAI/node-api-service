@@ -2,6 +2,7 @@
 
 const { validationResult } = require('express-validator');
 const enrollKeyService = require('../services/enrollKeyService');
+const { emitEnrollKeyEvent } = require('../websocket/emitters');
 
 class EnrollKeyController {
     // Create enrollment key
@@ -37,6 +38,12 @@ class EnrollKeyController {
             );
 
             if (result.success) {
+                await emitEnrollKeyEvent("created", {
+                    actorUserId: userId,
+                    classId: parseInt(classId),
+                    key: result.key,
+                    message: result.message,
+                });
                 return res.status(201).json(result);
             } else {
                 const status = result.message.includes('quyền') || result.message.includes('phân công') ? 403 : 400;
@@ -73,6 +80,14 @@ class EnrollKeyController {
             );
 
             if (result.success) {
+                await emitEnrollKeyEvent("rotated", {
+                    actorUserId: userId,
+                    classId: result.newKey?.classId || result.oldKey?.classId,
+                    keyId: parseInt(keyId),
+                    oldKey: result.oldKey,
+                    newKey: result.newKey,
+                    message: result.message,
+                });
                 return res.status(200).json(result);
             } else {
                 const status = result.message === 'Bạn không có quyền' ? 403 : 404;
@@ -102,6 +117,13 @@ class EnrollKeyController {
             );
 
             if (result.success) {
+                await emitEnrollKeyEvent("revoked", {
+                    actorUserId: userId,
+                    classId: result.key?.classId,
+                    keyId: parseInt(keyId),
+                    key: result.key,
+                    message: result.message,
+                });
                 return res.status(200).json(result);
             } else {
                 const status = result.message === 'Bạn không có quyền' ? 403 : 404;

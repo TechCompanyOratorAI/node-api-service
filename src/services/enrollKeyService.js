@@ -180,6 +180,7 @@ class EnrollKeyService {
         message: "Thay đổi mã đăng ký thành công",
         oldKey: {
           keyId: oldKey.keyId,
+          classId: oldKey.classId,
           keyValue: oldKey.keyValue,
           isActive: false,
         },
@@ -223,7 +224,17 @@ class EnrollKeyService {
         revokedBy: userId,
       });
 
-      return { success: true, message: "Thu hồi mã đăng ký thành công" };
+      return {
+        success: true,
+        message: "Thu hồi mã đăng ký thành công",
+        key: {
+          keyId: key.keyId,
+          classId: key.classId,
+          keyValue: key.keyValue,
+          isActive: false,
+          isRevoked: true,
+        },
+      };
     } catch (error) {
       console.error("Revoke key error:", error);
       return {

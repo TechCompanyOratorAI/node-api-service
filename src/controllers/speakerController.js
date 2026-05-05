@@ -4,6 +4,7 @@
 
 const _speakerServiceModule = require('../services/speakerService');
 const speakerService = _speakerServiceModule.default || _speakerServiceModule;
+const { emitSpeakerMappingEvent } = require('../websocket/emitters');
 
 class SpeakerController {
     /**
@@ -113,6 +114,13 @@ class SpeakerController {
                 parsedStudentId
             );
 
+            await emitSpeakerMappingEvent("updated", {
+                presentationId: speaker.presentationId,
+                speakerId: speaker.speakerId,
+                studentId: parsedStudentId,
+                message: "Anh xa speaker vua duoc cap nhat",
+            });
+
             return res.json({
                 success: true,
                 message: 'Đã ánh xạ speaker với sinh viên thành công',
@@ -145,6 +153,13 @@ class SpeakerController {
 
             const speaker = await speakerService.unmapSpeaker(parsedSpeakerId);
 
+            await emitSpeakerMappingEvent("updated", {
+                presentationId: speaker.presentationId,
+                speakerId: speaker.speakerId,
+                studentId: null,
+                message: "Anh xa speaker vua duoc cap nhat",
+            });
+
             return res.json({
                 success: true,
                 message: 'Speaker unmapped thành công',
@@ -175,6 +190,17 @@ class SpeakerController {
             }
 
             const results = await speakerService.batchMapSpeakers(mappings);
+
+            const presentationIds = [...new Set(results.success.map((speaker) => speaker.presentationId).filter(Boolean))];
+            await Promise.all(
+                presentationIds.map((presentationId) =>
+                    emitSpeakerMappingEvent("updated", {
+                        presentationId,
+                        mappingsApplied: results.success.length,
+                        message: "Batch map speaker da duoc luu",
+                    })
+                )
+            );
 
             return res.json({
                 success: true,
@@ -304,6 +330,14 @@ class SpeakerController {
             }
 
             const result = await speakerService.autoMapSpeakers(parsedPresentationId);
+
+            if (result.mapped > 0) {
+                await emitSpeakerMappingEvent("updated", {
+                    presentationId: parsedPresentationId,
+                    mappingsApplied: result.mapped,
+                    message: "Anh xa speaker tu dong da duoc cap nhat",
+                });
+            }
 
             return res.json({
                 success: true,

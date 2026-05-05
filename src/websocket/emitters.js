@@ -11,12 +11,17 @@
  */
 
 import { getIO } from "../websocket/index.js";
+import db from "../models/index.js";
 import {
   saveForPresentation,
   saveForGroup,
   saveForClass,
   saveForUser,
+  saveForClassInstructors,
+  saveForPresentationInstructors,
 } from "../services/notificationService.js";
+
+const { Enrollment, ClassInstructor, Presentation } = db;
 
 const withTimestamp = (payload = {}) => ({
   ...payload,
@@ -30,6 +35,37 @@ const emitToRoom = (room, event, payload = {}) => {
   } catch (err) {
     console.error(`[SocketEmitter] Failed to emit ${event} to room ${room}: ${err.message}`);
   }
+};
+
+const emitToUsers = (userIds = [], event, payload = {}) => {
+  [...new Set(userIds.filter(Boolean))].forEach((userId) => {
+    emitUserScopedEvent(userId, event, payload);
+  });
+};
+
+const emitToInstructors = (userIds = [], event, payload = {}) => {
+  [...new Set(userIds.filter(Boolean))].forEach((userId) => {
+    emitUserScopedEvent(userId, event, payload);
+    emitInstructorScopedEvent(userId, event, payload);
+  });
+};
+
+const getClassStudentIds = async (classId) => {
+  if (!classId) return [];
+  const enrollments = await Enrollment.findAll({
+    where: { classId, status: "enrolled" },
+    attributes: ["studentId"],
+  });
+  return enrollments.map((row) => row.studentId);
+};
+
+const getClassInstructorIds = async (classId) => {
+  if (!classId) return [];
+  const instructors = await ClassInstructor.findAll({
+    where: { classId },
+    attributes: ["instructorId"],
+  });
+  return instructors.map((row) => row.instructorId);
 };
 
 export const emitManagementEvent = (event, payload = {}) => {
@@ -113,6 +149,78 @@ export const emitClassInstructorEvent = (subEvent, payload = {}) => {
   }
 };
 
+export const emitEnrollKeyEvent = async (subEvent, payload = {}) => {
+  const event = `class:enroll-key:${subEvent}`;
+  emitManagementEvent(event, payload);
+
+  if (payload.classId) {
+    emitToRoom(`class:${payload.classId}`, event, payload);
+    emitToInstructors(await getClassInstructorIds(payload.classId), event, payload);
+  }
+
+  if (payload.actorUserId) {
+    emitUserScopedEvent(payload.actorUserId, event, payload);
+    emitInstructorScopedEvent(payload.actorUserId, event, payload);
+  }
+
+  if (payload.classId) {
+    await saveForClassInstructors(
+      payload.classId,
+      event,
+      subEvent === "created" ? "Ma dang ky moi da duoc tao" : "Ma dang ky da duoc cap nhat",
+      payload.message || "Thong tin ma dang ky lop hoc vua thay doi.",
+      payload,
+    );
+  }
+};
+
+export const emitGroupAutoAssignedEvent = async (payload = {}) => {
+  const event = "group:auto-assigned";
+  if (payload.classId) {
+    emitToRoom(`class:${payload.classId}`, event, payload);
+    emitToUsers(await getClassStudentIds(payload.classId), event, payload);
+    emitToInstructors(await getClassInstructorIds(payload.classId), event, payload);
+    await saveForClass(
+      payload.classId,
+      event,
+      "Danh sach nhom vua duoc cap nhat",
+      payload.message || "Giang vien vua phan nhom tu dong cho lop hoc.",
+      payload,
+    );
+    await saveForClassInstructors(
+      payload.classId,
+      event,
+      "Da phan nhom tu dong",
+      payload.message || "Ban vua phan nhom tu dong cho lop hoc.",
+      payload,
+    );
+  }
+  emitManagementEvent(event, payload);
+};
+
+export const emitSpeakerMappingEvent = async (subEvent, payload = {}) => {
+  const event = `speaker:mapping:${subEvent}`;
+  if (payload.presentationId) {
+    emitToRoom(`presentation:${payload.presentationId}`, event, payload);
+    const presentation = await Presentation.findByPk(payload.presentationId, {
+      attributes: ["studentId", "classId"],
+    });
+    if (presentation?.studentId) {
+      emitUserScopedEvent(presentation.studentId, event, payload);
+    }
+    if (presentation?.classId) {
+      emitToInstructors(await getClassInstructorIds(presentation.classId), event, payload);
+    }
+    await saveForPresentationInstructors(
+      payload.presentationId,
+      event,
+      "Anh xa speaker da duoc cap nhat",
+      payload.message || "Anh xa speaker va transcript vua duoc cap nhat.",
+      payload,
+    );
+  }
+};
+
 /**
  * Emit an event to the presentation room.
  * @param {string} event - Full event name (including namespace)
@@ -182,6 +290,27 @@ export const emitReportEvent = (subEvent, presentationId, payload) => {
   if (meta) {
     const msg = payload?.message || meta.message;
     saveForPresentation(presentationId, `report:${subEvent}`, meta.title, msg, { presentationId, ...payload });
+    if (subEvent === "generated") {
+      Presentation.findByPk(presentationId, { attributes: ["classId"] })
+        .then(async (presentation) => {
+          if (!presentation?.classId) return;
+          emitToInstructors(
+            await getClassInstructorIds(presentation.classId),
+            `report:${subEvent}`,
+            { presentationId, ...payload },
+          );
+          await saveForPresentationInstructors(
+            presentationId,
+            `report:${subEvent}`,
+            "Bao cao AI can duoc xu ly",
+            "Mot bao cao AI moi da san sang de giang vien xem va xac nhan.",
+            { presentationId, ...payload },
+          );
+        })
+        .catch((err) => {
+          console.error(`[SocketEmitter] report generated instructor fan-out failed: ${err.message}`);
+        });
+    }
   }
 };
 
@@ -197,12 +326,19 @@ export const emitReportEvent = (subEvent, presentationId, payload) => {
 export const emitUploadPermissionChanged = (classId, payload) => {
   try {
     const io = getIO();
-    io.to(`class:${classId}`).emit("class:upload-permission-changed", {
+    const eventPayload = {
       classId,
       ...payload,
       _ts: Date.now(),
-    });
+    };
+    io.to(`class:${classId}`).emit("class:upload-permission-changed", eventPayload);
     console.log(`[SocketEmitter] EMIT → room="class:${classId}" event="class:upload-permission-changed"`);
+    getClassStudentIds(classId)
+      .then((userIds) => emitToUsers(userIds, "class:upload-permission-changed", eventPayload))
+      .catch((err) => console.error(`[SocketEmitter] upload-permission student fan-out failed: ${err.message}`));
+    getClassInstructorIds(classId)
+      .then((userIds) => emitToInstructors(userIds, "class:upload-permission-changed", eventPayload))
+      .catch((err) => console.error(`[SocketEmitter] upload-permission instructor fan-out failed: ${err.message}`));
     const enabled = payload?.isUploadEnabled;
     saveForClass(
       classId,
@@ -232,6 +368,18 @@ export const emitGradeDistributed = (groupId, reportId, distribution) => {
     io.to(`group:${groupId}`).emit("grade:distributed", payload);
     console.log(`[SocketEmitter] ✅ emitGradeDistributed succeeded`);
     saveForGroup(groupId, "grade:distributed", "Điểm đã được phân chia", "Trưởng nhóm đã phân chia điểm cho các thành viên.", { groupId, reportId });
+    if (distribution?.group?.classId) {
+      getClassInstructorIds(distribution.group.classId)
+        .then((userIds) => emitToInstructors(userIds, "grade:distributed", payload))
+        .catch((err) => console.error(`[SocketEmitter] grade:distributed instructor fan-out failed: ${err.message}`));
+      saveForClassInstructors(
+        distribution.group.classId,
+        "grade:distributed",
+        "Leader da chia diem",
+        `Nhom ${distribution.group.groupName || groupId} da nop bang chia diem va cho giang vien xu ly.`,
+        { groupId, reportId, distribution },
+      );
+    }
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitGradeDistributed failed: ${err.message}`);
   }
@@ -253,6 +401,18 @@ export const emitGradeFinalized = (groupId, reportId, distribution) => {
     io.to(`group:${groupId}`).emit("grade:finalized", payload);
     console.log(`[SocketEmitter] ✅ emitGradeFinalized succeeded`);
     saveForGroup(groupId, "grade:finalized", "Điểm đã được chốt", "Điểm đã được chốt bởi giảng viên.", { groupId, reportId });
+    if (distribution?.group?.classId) {
+      getClassInstructorIds(distribution.group.classId)
+        .then((userIds) => emitToInstructors(userIds, "grade:finalized", payload))
+        .catch((err) => console.error(`[SocketEmitter] grade:finalized instructor fan-out failed: ${err.message}`));
+      saveForClassInstructors(
+        distribution.group.classId,
+        "grade:finalized",
+        "Diem nhom da duoc chot",
+        `Ban da chot diem cho nhom ${distribution.group.groupName || groupId}.`,
+        { groupId, reportId, distribution },
+      );
+    }
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitGradeFinalized failed: ${err.message}`);
   }
@@ -295,6 +455,18 @@ export const emitGradeFeedbackUpdated = (groupId, reportId, distribution) => {
     io.to(`group:${groupId}`).emit("grade:feedback-updated", payload);
     console.log(`[SocketEmitter] ✅ emitGradeFeedbackUpdated succeeded`);
     saveForGroup(groupId, "grade:feedback-updated", "Phản hồi điểm cập nhật", "Phản hồi về điểm số của bạn đã được cập nhật.", { groupId, reportId });
+    if (distribution?.group?.classId) {
+      getClassInstructorIds(distribution.group.classId)
+        .then((userIds) => emitToInstructors(userIds, "grade:feedback-updated", payload))
+        .catch((err) => console.error(`[SocketEmitter] grade:feedback-updated instructor fan-out failed: ${err.message}`));
+      saveForClassInstructors(
+        distribution.group.classId,
+        "grade:feedback-updated",
+        "Thanh vien vua gui phan hoi diem",
+        `Co phan hoi moi ve bang diem cua nhom ${distribution.group.groupName || groupId}.`,
+        { groupId, reportId, distribution },
+      );
+    }
   } catch (err) {
     console.error(`[SocketEmitter] ❌ emitGradeFeedbackUpdated failed: ${err.message}`);
   }
