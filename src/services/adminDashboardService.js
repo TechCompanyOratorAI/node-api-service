@@ -58,6 +58,9 @@ class AdminDashboardService {
         finalizedGroups,
         pendingJobs,
         processingJobs,
+        failedJobs,
+        doneJobs,
+        enrollmentsThisMonth,
       ] = await Promise.all([
         // Users
         User.count(),
@@ -82,7 +85,21 @@ class AdminDashboardService {
         // Jobs
         Job.count({ where: { status: "pending" } }),
         Job.count({ where: { status: "processing" } }),
+        Job.count({ where: { status: "failed" } }),
+        Job.count({ where: { status: "done" } }),
+        // Enrollments this month
+        Enrollment.count({ where: { status: "enrolled", createdAt: { [db.Sequelize.Op.gte]: monthStart } } }),
       ]);
+
+      const activeStudentsThisWeek = await Presentation.count({
+        where: { createdAt: { [db.Sequelize.Op.gte]: weekStart } },
+        distinct: true,
+        col: "studentId",
+      });
+
+      const confirmationRate = totalReports > 0
+        ? parseFloat(((confirmedReports / totalReports) * 100).toFixed(1))
+        : null;
 
       const totalEnrollments = await Enrollment.count({ where: { status: "enrolled" } });
 
@@ -202,10 +219,10 @@ class AdminDashboardService {
       });
 
       const avgScore = scoreStats[0]?.avgScore != null
-        ? parseFloat(parseFloat(scoreStats[0].avgScore).toFixed(2))
+        ? parseFloat((parseFloat(scoreStats[0].avgScore) * 10).toFixed(2))
         : null;
 
-      const scoreRangeExpr = `CASE WHEN overallScore < 4 THEN '0-4' WHEN overallScore < 6 THEN '4-6' WHEN overallScore < 8 THEN '6-8' ELSE '8-10' END`;
+      const scoreRangeExpr = `CASE WHEN overallScore < 0.4 THEN '0-4' WHEN overallScore < 0.6 THEN '4-6' WHEN overallScore < 0.8 THEN '6-8' ELSE '8-10' END`;
       const scoreDist = await AIReport.findAll({
         attributes: [
           [db.Sequelize.literal(scoreRangeExpr), "overallScore"],
@@ -335,23 +352,43 @@ class AdminDashboardService {
         limit: 5,
       });
 
+      const topPresentationsRaw = await Presentation.findAll({
+        attributes: ["presentationId", "title", "createdAt"],
+        include: [
+          { model: User, as: "student", attributes: ["firstName", "lastName"] },
+          {
+            model: AIReport,
+            as: "submission",
+            attributes: ["gradeForInstructor", "overallScore", "reportStatus"],
+            required: true,
+            where: {
+              reportStatus: "confirmed",
+              gradeForInstructor: { [db.Sequelize.Op.ne]: null },
+            },
+          },
+          { model: Class, as: "class", attributes: ["classCode"] },
+        ],
+        order: [[{ model: AIReport, as: "submission" }, "gradeForInstructor", "DESC"]],
+        limit: 5,
+      });
+
       const result = {
         success: true,
         data: {
           // ── STAT CARDS ────────────────────────────────────────────────
           stats: {
-            users:        { total: totalUsers,        students: totalStudents,    instructors: totalInstructors, newThisWeek: weekNewUsers },
+            users:        { total: totalUsers, students: totalStudents, instructors: totalInstructors, newThisWeek: weekNewUsers },
             presentations:{ total: totalPresentations, thisWeek: weekPresentations, today: todayPresentations },
-            reports:     { total: totalReports,      confirmed: confirmedReports, pending: totalReports - confirmedReports },
-            courses:      { total: totalCourses,      classes: totalClasses,      active: activeClasses, enrollments: totalEnrollments },
-            groups:      { total: totalGroups,        finalized: finalizedGroups },
-            jobs:        { pending: pendingJobs,      processing: processingJobs },
+            reports:     { total: totalReports, confirmed: confirmedReports, pending: totalReports - confirmedReports, confirmationRate },
+            courses:      { total: totalCourses, classes: totalClasses, active: activeClasses, enrollments: totalEnrollments, enrollmentsThisMonth },
+            groups:      { total: totalGroups, finalized: finalizedGroups },
+            jobs:        { pending: pendingJobs, processing: processingJobs, failed: failedJobs, done: doneJobs },
             avgScore,
+            activeStudentsThisWeek,
           },
           // ── CHART DATA ────────────────────────────────────────────────
           charts: {
             presentationsPerDay,
-            reportsPerDay,
             reportStatus:    reportStatusChart,
             usersByRole,
             presentationsByStatus,
@@ -398,9 +435,24 @@ class AdminDashboardService {
                 ? `${plain.student.firstName ?? ""} ${plain.student.lastName ?? ""}`.trim()
                 : "—",
               score: plain.submission?.overallScore != null
-                ? parseFloat(plain.submission.overallScore).toFixed(1)
+                ? (parseFloat(plain.submission.overallScore) * 10).toFixed(1)
                 : null,
               reportStatus: plain.submission?.reportStatus ?? null,
+              createdAt: plain.createdAt,
+            };
+          }),
+          topPresentations: topPresentationsRaw.map((p) => {
+            const plain = p.toJSON ? p.toJSON() : p;
+            return {
+              presentationId: plain.presentationId,
+              title: plain.title ?? "—",
+              studentName: plain.student
+                ? `${plain.student.firstName ?? ""} ${plain.student.lastName ?? ""}`.trim()
+                : "—",
+              classCode: plain.class?.classCode ?? "—",
+              score: plain.submission?.gradeForInstructor != null
+                ? parseFloat(plain.submission.gradeForInstructor).toFixed(1)
+                : null,
               createdAt: plain.createdAt,
             };
           }),

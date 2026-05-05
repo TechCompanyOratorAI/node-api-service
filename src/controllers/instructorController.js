@@ -227,9 +227,9 @@ class InstructorController {
         where: { ...reportWhere, reportStatus: 'confirmed' },
         raw: true,
       });
-      const avgScore = scoreStats[0]?.avgScore != null ? parseFloat(parseFloat(scoreStats[0].avgScore).toFixed(2)) : null;
+      const avgScore = scoreStats[0]?.avgScore != null ? parseFloat((parseFloat(scoreStats[0].avgScore) * 10).toFixed(2)) : null;
 
-      const scoreRangeExpr = `CASE WHEN overallScore < 4 THEN '0-4' WHEN overallScore < 6 THEN '4-6' WHEN overallScore < 8 THEN '6-8' ELSE '8-10' END`;
+      const scoreRangeExpr = `CASE WHEN overallScore < 0.4 THEN '0-4' WHEN overallScore < 0.6 THEN '4-6' WHEN overallScore < 0.8 THEN '6-8' ELSE '8-10' END`;
       const scoreDist = await AIReport.findAll({
         attributes: [
           [db.Sequelize.literal(scoreRangeExpr), 'overallScore'],
