@@ -26,6 +26,8 @@ const {
   Transcript,
   TranscriptSegment,
   Speaker,
+  GroupStudent,
+  Group,
 } = db;
 
 /** Generate a url-safe random token */
@@ -67,6 +69,34 @@ class ShareService {
       )
     ) {
       return presentation;
+    }
+
+    // Allow users in the same group as the presentation owner (within the same class)
+    if (presentation.classId) {
+      const ownerGroup = await GroupStudent.findOne({
+        where: { studentId: presentation.studentId },
+        include: [
+          {
+            model: Group,
+            as: "group",
+            where: { classId: presentation.classId },
+            attributes: ["groupId"],
+          },
+        ],
+      });
+
+      if (ownerGroup?.group?.groupId) {
+        const isMember = await GroupStudent.findOne({
+          where: {
+            studentId: actorId,
+            groupId: ownerGroup.group.groupId,
+          },
+        });
+
+        if (isMember) {
+          return presentation;
+        }
+      }
     }
 
     return null;

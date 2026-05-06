@@ -6,7 +6,7 @@ import { validateShareInvite } from '../middleware/validationMiddleware.js';
 
 const router = express.Router({ mergeParams: true });
 
-// All routes here are protected (owner only)
+// All routes here are protected (owner, same-group member, or admin/teacher/instructor)
 router.use(authenticateToken, requireEmailVerification);
 
 // GET /presentations/:presentationId/share
