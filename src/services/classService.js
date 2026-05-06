@@ -15,6 +15,8 @@ const {
   Topic,
   AcademicBlock,
   TopicEnrollment,
+  ClassAISetting,
+  ClassRubricCriteria,
 } = db;
 const { Op } = require("sequelize");
 const { emitUploadPermissionChanged } = require("../websocket/emitters");
@@ -1093,6 +1095,26 @@ class ClassService {
       const classData = await Class.findByPk(classId);
       if (!classData) {
         return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      const topicCount = await Topic.count({ where: { classId } });
+      if (topicCount > 0) {
+        return {
+          success: false,
+          message: "Không thể xóa lớp học vì đã có topic",
+        };
+      }
+
+      const [classAISettingCount, rubricCriteriaCount] = await Promise.all([
+        ClassAISetting.count({ where: { classId } }),
+        ClassRubricCriteria.count({ where: { classId } }),
+      ]);
+
+      if (classAISettingCount > 0 || rubricCriteriaCount > 0) {
+        return {
+          success: false,
+          message: "Không thể xóa lớp học vì đã có tiêu chí",
+        };
       }
 
       // Check enrollments
