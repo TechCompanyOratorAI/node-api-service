@@ -129,7 +129,7 @@ class AuthService {
     }
   }
 
-  // Register instructor
+  // Register instructor (admin only, no email verification required)
   async registerInstructor(userData) {
     try {
       const { username, email, password, firstName, lastName, studyMajor, departmentId } = userData;
@@ -154,15 +154,7 @@ class AuthService {
       // Hash password
       const passwordHash = await this.hashPassword(password);
 
-      // Generate email verification token
-      const emailVerificationToken = this.generateRandomToken();
-      const emailVerificationExpires = new Date(
-        Date.now() +
-        (parseInt(process.env.EMAIL_VERIFICATION_EXPIRES) ||
-          24 * 60 * 60 * 1000) // 24 hours default
-      );
-
-      // Create user
+      // Create user with email already verified (admin-created accounts skip verification)
       const user = await User.create({
         username,
         email,
@@ -171,9 +163,7 @@ class AuthService {
         studyMajor,
         departmentId,
         passwordHash,
-        emailVerificationToken,
-        emailVerificationExpires,
-        isEmailVerified: false,
+        isEmailVerified: true,
         isActive: true,
       });
 
@@ -186,18 +176,9 @@ class AuthService {
         console.error("Failed to assign Instructor role:", roleResult.error);
       }
 
-      // Send verification email for instructor
-      await emailService.sendVerificationEmail(
-        email,
-        firstName,
-        username,
-        emailVerificationToken
-      );
-
       return {
         success: true,
-        message:
-          "Đăng ký tài khoản giảng viên thành công, vui lòng kiểm tra email để xác thực",
+        message: "Tạo tài khoản giảng viên thành công",
         user: {
           userId: user.userId,
           username: user.username,
