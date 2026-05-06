@@ -174,6 +174,37 @@ class CourseService {
         );
     }
 
+    async getUsedAcademicBlockIdsByClasses(courseId, transaction = null) {
+        const classes = await Class.findAll({
+            where: { courseId },
+            attributes: ["classId", "academicBlockId"],
+            include: [
+                {
+                    model: AcademicBlock,
+                    as: "academicBlocks",
+                    attributes: ["academicBlockId"],
+                    through: { attributes: [] },
+                    required: false,
+                },
+            ],
+            transaction,
+        });
+
+        const usedBlockIds = new Set();
+        classes.forEach((classItem) => {
+            if (classItem.academicBlockId) {
+                usedBlockIds.add(classItem.academicBlockId);
+            }
+            (classItem.academicBlocks || []).forEach((block) => {
+                if (block.academicBlockId) {
+                    usedBlockIds.add(block.academicBlockId);
+                }
+            });
+        });
+
+        return [...usedBlockIds];
+    }
+
     buildAcademicBlocksInclude(required = false, where = null) {
         return {
             model: AcademicBlock,
@@ -793,6 +824,21 @@ class CourseService {
                 return resolvedBlocks;
             }
 
+            if (hasAcademicBlocksInPayload) {
+                const usedBlockIds = await this.getUsedAcademicBlockIdsByClasses(courseId, transaction);
+                const removedUsedBlockIds = usedBlockIds.filter(
+                    (blockId) => !nextAcademicBlockIds.includes(blockId)
+                );
+
+                if (removedUsedBlockIds.length > 0) {
+                    await transaction.rollback();
+                    return {
+                        success: false,
+                        message: "Không thể bỏ học kỳ/block đang được lớp học của môn này sử dụng",
+                    };
+                }
+            }
+
             const nextStartDate =
                 startDate !== undefined
                     ? startDate
@@ -930,6 +976,17 @@ class CourseService {
                         message: 'Bạn không có quyền xóa môn học này'
                     };
                 }
+            }
+
+            const classCount = await Class.count({
+                where: { courseId }
+            });
+
+            if (classCount > 0) {
+                return {
+                    success: false,
+                    message: 'Không thể xóa môn học vì đang có lớp học thuộc môn này'
+                };
             }
 
             // Check if course has presentations

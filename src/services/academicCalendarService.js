@@ -8,7 +8,14 @@ const {
   ACADEMIC_BLOCK_TYPE_VALUES,
 } = require("../constants/businessConstants");
 
-const { AcademicYear, AcademicBlock } = db;
+const {
+  AcademicYear,
+  AcademicBlock,
+  CourseAcademicBlock,
+  ClassAcademicBlock,
+  Course,
+  Class,
+} = db;
 const { Op } = db.Sequelize;
 
 const toDateOnly = (value) => {
@@ -233,7 +240,7 @@ class AcademicCalendarService {
   async deleteAcademicYear(academicYearId) {
     try {
       const academicYear = await AcademicYear.findByPk(academicYearId);
-      if (!academicYear) return { success: false, message: "Không tìm thấy năm học" };
+      if (!academicYear) return { success: false, message: "Academic year not found" };
 
       const blockCount = await AcademicBlock.count({
         where: { academicYearId },
@@ -241,15 +248,15 @@ class AcademicCalendarService {
       if (blockCount > 0) {
         return {
           success: false,
-          message: "Thao tác thất bại",
+          message: "Cannot delete academic year because it still has academic blocks",
         };
       }
 
       await academicYear.destroy();
-      return { success: true, message: "Đã xóa năm học thành công" };
+      return { success: true, message: "Academic year deleted successfully" };
     } catch (error) {
       console.error("Delete academic year error:", error);
-      return { success: false, message: "Thao tác thất bại", error: error.message };
+      return { success: false, message: "Operation failed", error: error.message };
     }
   }
 
@@ -440,13 +447,27 @@ class AcademicCalendarService {
   async deleteAcademicBlock(academicBlockId) {
     try {
       const academicBlock = await AcademicBlock.findByPk(academicBlockId);
-      if (!academicBlock) return { success: false, message: "Không tìm thấy học kỳ" };
+      if (!academicBlock) return { success: false, message: "Academic block not found" };
+
+      const [courseBlockCount, classBlockCount, legacyCourseCount, legacyClassCount] = await Promise.all([
+        CourseAcademicBlock.count({ where: { academicBlockId } }),
+        ClassAcademicBlock.count({ where: { academicBlockId } }),
+        Course.count({ where: { academicBlockId } }),
+        Class.count({ where: { academicBlockId } }),
+      ]);
+
+      if (courseBlockCount > 0 || classBlockCount > 0 || legacyCourseCount > 0 || legacyClassCount > 0) {
+        return {
+          success: false,
+          message: "Cannot delete academic block because it is used by existing courses or classes",
+        };
+      }
 
       await academicBlock.destroy();
-      return { success: true, message: "Đã xóa học kỳ thành công" };
+      return { success: true, message: "Academic block deleted successfully" };
     } catch (error) {
       console.error("Delete academic block error:", error);
-      return { success: false, message: "Thao tác thất bại", error: error.message };
+      return { success: false, message: "Operation failed", error: error.message };
     }
   }
 
