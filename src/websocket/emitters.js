@@ -150,12 +150,12 @@ export const emitInstructorCompetencyEvent = async (subEvent, payload = {}) => {
   if (subEvent === "reviewed" && payload.instructorId) {
     const title =
       payload.status === "approved"
-        ? "Nang luc da duoc duyet"
-        : "Nang luc bi tu choi";
+        ? "Năng lực đã được duyệt"
+        : "Năng lực bị từ chối";
     const message =
       payload.status === "approved"
-        ? "Khai bao nang luc cua ban da duoc phe duyet."
-        : payload.rejectionReason || "Khai bao nang luc cua ban da bi tu choi.";
+        ? "Khai báo năng lực của bạn đã được phê duyệt."
+        : payload.rejectionReason || "Khai báo năng lực của bạn đã bị từ chối.";
     await saveForUser(payload.instructorId, event, title, message, payload);
   }
 };
@@ -204,8 +204,8 @@ export const emitEnrollKeyEvent = async (subEvent, payload = {}) => {
     await saveForClassInstructors(
       payload.classId,
       event,
-      subEvent === "created" ? "Ma dang ky moi da duoc tao" : "Ma dang ky da duoc cap nhat",
-      payload.message || "Thong tin ma dang ky lop hoc vua thay doi.",
+      subEvent === "created" ? "Mã đăng ký mới đã được tạo" : "Mã đăng ký đã được cập nhật",
+      payload.message || "Thông tin mã đăng ký lớp học vừa thay đổi.",
       payload,
     );
   }
@@ -220,15 +220,15 @@ export const emitGroupAutoAssignedEvent = async (payload = {}) => {
     await saveForClass(
       payload.classId,
       event,
-      "Danh sach nhom vua duoc cap nhat",
-      payload.message || "Giang vien vua phan nhom tu dong cho lop hoc.",
+      "Danh sách nhóm vừa được cập nhật",
+      payload.message || "Giảng viên vừa phân nhóm tự động cho lớp học.",
       payload,
     );
     await saveForClassInstructors(
       payload.classId,
       event,
-      "Da phan nhom tu dong",
-      payload.message || "Ban vua phan nhom tu dong cho lop hoc.",
+      "Đã phân nhóm tự động",
+      payload.message || "Bạn vừa phân nhóm tự động cho lớp học.",
       payload,
     );
   }
@@ -249,8 +249,8 @@ export const emitSpeakerMappingEvent = async (subEvent, payload = {}) => {
     await saveForPresentationInstructors(
       payload.presentationId,
       event,
-      "Anh xa speaker da duoc cap nhat",
-      payload.message || "Anh xa speaker va transcript vua duoc cap nhat.",
+      "Ánh xạ speaker đã được cập nhật",
+      payload.message || "Ánh xạ speaker và transcript vừa được cập nhật.",
       payload,
     );
   }
@@ -337,8 +337,8 @@ export const emitReportEvent = (subEvent, presentationId, payload) => {
           await saveForPresentationInstructors(
             presentationId,
             `report:${subEvent}`,
-            "Bao cao AI can duoc xu ly",
-            "Mot bao cao AI moi da san sang de giang vien xem va xac nhan.",
+            "Báo cáo AI cần được xử lý",
+            "Một báo cáo AI mới đã sẵn sàng để giảng viên xem và xác nhận.",
             { presentationId, ...payload },
           );
         })
@@ -410,8 +410,8 @@ export const emitGradeDistributed = (groupId, reportId, distribution) => {
       saveForClassInstructors(
         distribution.group.classId,
         "grade:distributed",
-        "Leader da chia diem",
-        `Nhom ${distribution.group.groupName || groupId} da nop bang chia diem va cho giang vien xu ly.`,
+        "Leader đã chia điểm",
+        `Nhóm ${distribution.group.groupName || groupId} đã nộp bảng chia điểm và chờ giảng viên xử lý.`,
         { groupId, reportId, distribution },
       );
     }
@@ -443,8 +443,8 @@ export const emitGradeFinalized = (groupId, reportId, distribution) => {
       saveForClassInstructors(
         distribution.group.classId,
         "grade:finalized",
-        "Diem nhom da duoc chot",
-        `Ban da chot diem cho nhom ${distribution.group.groupName || groupId}.`,
+        "Điểm nhóm đã được chốt",
+        `Bạn đã chốt điểm cho nhóm ${distribution.group.groupName || groupId}.`,
         { groupId, reportId, distribution },
       );
     }
@@ -476,8 +476,8 @@ export const emitGradeReopened = (groupId, reportId, distribution) => {
       saveForClassInstructors(
         distribution.group.classId,
         "grade:reopened",
-        "Bang diem nhom da duoc mo lai",
-        `Ban vua mo lai bang diem cua nhom ${distribution.group.groupName || groupId}.`,
+        "Bảng điểm nhóm đã được mở lại",
+        `Bạn vừa mở lại bảng điểm của nhóm ${distribution.group.groupName || groupId}.`,
         { groupId, reportId, distribution },
       );
     }
@@ -509,8 +509,8 @@ export const emitGradeFeedbackUpdated = (groupId, reportId, distribution) => {
       saveForClassInstructors(
         distribution.group.classId,
         "grade:feedback-updated",
-        "Thanh vien vua gui phan hoi diem",
-        `Co phan hoi moi ve bang diem cua nhom ${distribution.group.groupName || groupId}.`,
+        "Thành viên vừa gửi phản hồi điểm",
+        `Có phản hồi mới về bảng điểm của nhóm ${distribution.group.groupName || groupId}.`,
         { groupId, reportId, distribution },
       );
     }
@@ -547,8 +547,8 @@ export const emitCriterionFeedbackChanged = (presentationId, reportId, payload =
         await saveForPresentationInstructors(
           presentationId,
           "report:criterion-feedback-changed",
-          "Feedback tieu chi da duoc cap nhat",
-          payload?.message || "Feedback rubric cua bai thuyet trinh vua duoc cap nhat.",
+          "Feedback tiêu chí đã được cập nhật",
+          payload?.message || "Feedback rubric của bài thuyết trình vừa được cập nhật.",
           data,
         );
       })

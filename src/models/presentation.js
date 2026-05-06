@@ -58,6 +58,9 @@ module.exports = (sequelize, DataTypes) => {
 
       versionNumber: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
 
+      // Số lần đã nộp (tăng mỗi khi submit hoặc resubmit thành công)
+      submissionCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+
       instructorApproved: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

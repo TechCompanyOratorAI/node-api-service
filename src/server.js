@@ -9,6 +9,7 @@ import connectDB from "./config/conectDB.js";
 import cors from "cors";
 import http from "http";
 import { initSocketIO } from "./websocket/index.js";
+import { startDeadlineReminderScheduler } from "./services/deadlineReminderService.js";
 
 let app = express();
 let httpServer = http.createServer(app); // keep raw server so Socket.IO can attach
@@ -48,4 +49,5 @@ let port = process.env.PORT || 8080;
 httpServer.listen(port, () => {
   console.log("Backend Nodejs is running on the port: " + port);
   initSocketIO(httpServer);
+  startDeadlineReminderScheduler();
 });

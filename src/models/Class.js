@@ -59,6 +59,12 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
+      // Số lần nộp bài tối đa mỗi sinh viên/nhóm (1-3, mặc định 1)
+      maxSubmissions: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+      },
     },
     {
       tableName: "Classes",
