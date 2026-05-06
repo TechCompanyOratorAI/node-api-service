@@ -25,6 +25,7 @@ const {
   Enrollment,
   GroupStudent,
   Group,
+  AIReport,
 } = db;
 
 const sanitizeFileName = (filename) => {
@@ -614,6 +615,26 @@ class PresentationService {
         };
       }
 
+      // ─── Check maxSubmissions limit (only for first submit from draft) ───────────
+      // First submit (draft → processing): consumes 1 slot
+      if (presentation.status === "draft") {
+        if (presentation.classId) {
+          const classRecord = await Class.findByPk(presentation.classId, {
+            attributes: ["classId", "maxSubmissions"],
+          });
+          const maxSubmissions = classRecord?.maxSubmissions ?? 1;
+          if (presentation.submissionCount >= maxSubmissions) {
+            return {
+              success: false,
+              message: `Bạn đã sử dụng hết ${maxSubmissions} lượt nộp bài.`,
+              submissionCount: presentation.submissionCount,
+              maxSubmissions,
+            };
+          }
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
       // If processing, cleanup orphaned jobs first, then check for active jobs
       if (presentation.status === "processing") {
         // Cleanup any orphaned jobs (queued/running but SQS message deleted)
@@ -668,13 +689,14 @@ class PresentationService {
         await Feedback.destroy({ where: { presentationId } });
         await AnalysisResult.destroy({ where: { presentationId } });
       }
-      // ─────────────────────────────────────────────────────────────────────────
+      // ──────────────────────────────────────────────────────────────────────
 
-      // Update presentation status
+      // Update presentation status and increment submissionCount
       await Presentation.update(
         {
           status: "processing",
           submissionDate: new Date(),
+          submissionCount: db.sequelize.literal("submissionCount + 1"),
         },
         { where: { presentationId } },
       );
@@ -732,8 +754,12 @@ class PresentationService {
   }
 
   /**
-   * Resubmit presentation after failure (failed → processing)
-   * Only allows resubmit when presentation status is "failed"
+   * Resubmit presentation — student-initiated resubmission to update their work.
+   * Conditions:
+   *   1. AIReport is NOT yet confirmed by instructor (reportStatus !== 'confirmed')
+   *   2. topic.submissionDeadline has not passed
+   *   3. submissionCount < class.maxSubmissions
+   *   4. status is NOT draft (must have been submitted at least once)
    * @param {number} presentationId
    * @param {number} studentId
    * @returns {Promise<object>}
@@ -750,17 +776,71 @@ class PresentationService {
       }
 
       const presentation = accessResult.presentation;
-      const uploadCheck = await this.validateUploadAvailability(presentation);
-      if (!uploadCheck.success) {
-        return uploadCheck;
-      }
 
-      // Only allow resubmit when status is "failed"
-      if (presentation.status !== "failed") {
+      // Must have been submitted at least once
+      if (presentation.status === "draft") {
         return {
           success: false,
-          message: `Không thể nộp lại bài thuyết trình ở trạng thái "${presentation.status}". Chỉ có thể nộp lại khi trạng thái là "failed".`,
+          message: "Bài chưa được nộp lần đầu. Hãy nộp bài trước khi nộp lại.",
         };
+      }
+
+      // ─── Condition 1: Check if instructor has already graded (confirmed AI report) ───
+      // Note: instructorApproved = "approved to submit" (different from graded).
+      // The actual grading signal is AIReport.reportStatus === 'confirmed'.
+      const existingReport = await AIReport.findOne({
+        where: { presentationId },
+        attributes: ["reportId", "reportStatus"],
+      });
+      if (existingReport?.reportStatus === "confirmed") {
+        return {
+          success: false,
+          message: "Không thể nộp lại sau khi giảng viên đã chấm điểm (AI report đã xác nhận).",
+          reportStatus: existingReport.reportStatus,
+        };
+      }
+
+      // ─── Condition 2: Check deadline ────────────────────────────────
+      const topic = await Topic.findByPk(presentation.topicId, {
+        attributes: ["topicId", "submissionDeadline", "dueDate"],
+      });
+      const effectiveDeadline = topic?.submissionDeadline || topic?.dueDate;
+      if (effectiveDeadline && new Date(effectiveDeadline) < new Date()) {
+        return {
+          success: false,
+          message: "Không thể nộp lại sau khi quá hạn nộp bài.",
+        };
+      }
+
+      // ─── Condition 3: Check maxSubmissions limit ───────────────────────
+      let maxSubmissions = 1;
+      if (presentation.classId) {
+        const classRecord = await Class.findByPk(presentation.classId, {
+          attributes: ["classId", "maxSubmissions"],
+        });
+        maxSubmissions = classRecord?.maxSubmissions ?? 1;
+      }
+
+      if (presentation.submissionCount >= maxSubmissions) {
+        return {
+          success: false,
+          message: `Bạn đã sử dụng hết ${maxSubmissions} lượt nộp bài. Không thể nộp lại.`,
+          submissionCount: presentation.submissionCount,
+          maxSubmissions,
+        };
+      }
+
+      // ─── If currently processing, check for active jobs ────────────────
+      if (presentation.status === "processing") {
+        await jobService.cleanupOrphanedJobs(presentationId);
+        const activeJob = await jobService.getActiveJobForPresentation(presentationId);
+        if (activeJob) {
+          return {
+            success: false,
+            message: "Đang có tiến trình xử lý dở dang. Vui lòng đợi hoàn tất rồi thử lại.",
+            job: activeJob,
+          };
+        }
       }
 
       // Validate presentation still has required files
@@ -776,15 +856,9 @@ class PresentationService {
         };
       }
 
-      // ─── Full cleanup before restarting pipeline ────────────────────────────
-      // CRITICAL: Delete ALL old jobs so that stale SQS messages processed by
-      // workers after this point will get a "job not found" response from the
-      // webhook and be safely acknowledged without side-effects.
-
-      // 1. Delete all existing jobs for this presentation
-      await Job.destroy({
-        where: { presentationId },
-      });
+      // ─── Full cleanup before restarting pipeline ──────────────────────────
+      // 1. Delete all existing jobs
+      await Job.destroy({ where: { presentationId } });
       console.log(
         `🧹 Cleared all jobs for presentation ${presentationId} before resubmit`,
       );
@@ -817,7 +891,7 @@ class PresentationService {
       await Feedback.destroy({ where: { presentationId } });
       await AnalysisResult.destroy({ where: { presentationId } });
 
-      // 3. Recreate slide jobs for all existing slides so OCR restarts cleanly
+      // 3. Recreate slide jobs for all existing slides
       const slides = await Slide.findAll({ where: { presentationId } });
       for (const slide of slides) {
         try {
@@ -836,13 +910,18 @@ class PresentationService {
           console.error("⚠️ Failed to recreate slides job:", slideJobError);
         }
       }
-      // ────────────────────────────────────────────────────────────────────────
+      // ──────────────────────────────────────────────────────────────────────
 
-      // Update presentation status back to processing
+      // Update presentation status and increment submissionCount
       await Presentation.update(
         {
           status: "processing",
           submissionDate: new Date(),
+          // Reset instructor approval since this is a new submission
+          instructorApproved: false,
+          approvedBy: null,
+          approvedAt: null,
+          submissionCount: db.sequelize.literal("submissionCount + 1"),
         },
         { where: { presentationId } },
       );
@@ -851,19 +930,28 @@ class PresentationService {
       const job = await jobService.createJob(presentationId, "asr", {
         resubmittedBy: studentId,
         resubmittedAt: new Date().toISOString(),
-        reason: "Resubmit after failure",
+        reason: "Student resubmission",
       });
 
-      // Emit WebSocket event so student UI knows processing restarted
+      // Emit WebSocket event
       emitJobEvent("started", presentationId, {
         jobType: "asr",
         jobId: job.jobId,
         message: "Đang xử lý lại bài thuyết trình...",
       });
 
+      // Fetch updated presentation to get new submissionCount
+      const updatedPresentation = await Presentation.findByPk(presentationId, {
+        attributes: ["presentationId", "submissionCount"],
+      });
+      const remainingSubmissions = maxSubmissions - (updatedPresentation?.submissionCount ?? presentation.submissionCount + 1);
+
       return {
         success: true,
-        message: "Đã gửi lại bài thuyết trình để xử lý",
+        message: `Đã gửi lại bài thuyết trình thành công. Bạn còn ${remainingSubmissions} lượt nộp.`,
+        submissionCount: updatedPresentation?.submissionCount ?? presentation.submissionCount + 1,
+        maxSubmissions,
+        remainingSubmissions,
         presentation: await this.getPresentationById(presentationId, studentId),
         job,
       };

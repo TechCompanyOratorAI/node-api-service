@@ -938,6 +938,90 @@ class ClassController {
       return res.status(500).json({ success: false, message: "Lỗi server nội bộ" });
     }
   }
+
+  // ============================================================
+  // RESUBMIT SETTING HANDLERS
+  // ============================================================
+
+  /**
+   * POST /api/v1/classes/:classId/resubmit-setting
+   * Instructor/Admin sets the maximum number of submissions allowed per presentation.
+   */
+  async setResubmitSetting(req, res) {
+    try {
+      const { classId } = req.params;
+      const { maxSubmissions } = req.body;
+
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      if (maxSubmissions === undefined || maxSubmissions === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng cung cấp maxSubmissions (1-3)",
+        });
+      }
+
+      const instructorId = req.user.userId;
+      const userRole = req.userRoles?.includes("Admin")
+        ? "Admin"
+        : req.userRoles?.includes("Instructor")
+          ? "Instructor"
+          : null;
+
+      if (!userRole) {
+        return res.status(403).json({
+          success: false,
+          message: "Chỉ giảng viên hoặc admin mới có quyền thực hiện",
+        });
+      }
+
+      const result = await classService.setResubmitSetting(
+        parseInt(classId),
+        maxSubmissions,
+        instructorId,
+        userRole,
+      );
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Set resubmit setting error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * GET /api/v1/classes/:classId/resubmit-setting
+   * Get the maximum submissions setting for a class.
+   */
+  async getResubmitSetting(req, res) {
+    try {
+      const { classId } = req.params;
+
+      if (!classId || isNaN(parseInt(classId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID lớp học không hợp lệ",
+        });
+      }
+
+      const result = await classService.getResubmitSetting(parseInt(classId));
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("Get resubmit setting error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lỗi server nội bộ",
+      });
+    }
+  }
 }
 
 module.exports = new ClassController();

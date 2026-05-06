@@ -217,4 +217,23 @@ router.delete(
   classController.removeSingleEmailFromWhitelist
 );
 
+// ============================================================
+// RESUBMIT SETTING ROUTES
+// ============================================================
+// GET  /api/classes/:classId/resubmit-setting - Lấy cài đặt số lần nộp
+router.get(
+  "/:classId/resubmit-setting",
+  authenticateToken,
+  requireEmailVerification,
+  classController.getResubmitSetting
+);
+
+// POST /api/classes/:classId/resubmit-setting - Cài đặt số lần nộp tối đa
+router.post(
+  "/:classId/resubmit-setting",
+  requireRole(["Admin", "Instructor"]),
+  requireClassInstructorOrAdmin,
+  classController.setResubmitSetting
+);
+
 export default router;

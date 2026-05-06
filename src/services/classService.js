@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 const db = require("../models");
 const {
@@ -2036,6 +2036,102 @@ class ClassService {
       return {
         success: false,
         message: "Không thể xóa email",
+        error: error.message,
+      };
+    }
+  }
+
+  // ============================================================
+  // RESUBMIT SETTING MANAGEMENT
+  // ============================================================
+
+  /**
+   * Set maximum submissions (resubmit limit) for a class.
+   * @param {number} classId
+   * @param {number} maxSubmissions - must be between 1 and 3
+   * @param {number} instructorId
+   * @param {string} userRole
+   */
+  async setResubmitSetting(classId, maxSubmissions, instructorId, userRole) {
+    try {
+      const classRecord = await Class.findByPk(classId);
+      if (!classRecord) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      // Authorization: Admin or Instructor of this class
+      let hasPermission = false;
+      if (userRole === "Admin") {
+        hasPermission = true;
+      } else if (userRole === "Instructor") {
+        const classInstructor = await ClassInstructor.findOne({
+          where: { classId, instructorId },
+        });
+        hasPermission = !!classInstructor;
+      }
+
+      if (!hasPermission) {
+        return {
+          success: false,
+          message: "Bạn không có quyền thay đổi cài đặt của lớp học này",
+        };
+      }
+
+      // Validate value
+      const value = parseInt(maxSubmissions, 10);
+      if (isNaN(value) || value < 1 || value > 3) {
+        return {
+          success: false,
+          message: "Số lần nộp tối đa phải từ 1 đến 3",
+        };
+      }
+
+      await classRecord.update({ maxSubmissions: value });
+
+      return {
+        success: true,
+        message: `Đã cập nhật số lần nộp bài tối đa thành ${value}`,
+        data: {
+          classId,
+          maxSubmissions: value,
+        },
+      };
+    } catch (error) {
+      console.error("Set resubmit setting error:", error);
+      return {
+        success: false,
+        message: "Không thể cập nhật cài đặt số lần nộp",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get maximum submissions setting for a class.
+   * @param {number} classId
+   */
+  async getResubmitSetting(classId) {
+    try {
+      const classRecord = await Class.findByPk(classId, {
+        attributes: ["classId", "maxSubmissions"],
+      });
+
+      if (!classRecord) {
+        return { success: false, message: "Không tìm thấy lớp học" };
+      }
+
+      return {
+        success: true,
+        data: {
+          classId: classRecord.classId,
+          maxSubmissions: classRecord.maxSubmissions ?? 1,
+        },
+      };
+    } catch (error) {
+      console.error("Get resubmit setting error:", error);
+      return {
+        success: false,
+        message: "Không thể lấy cài đặt số lần nộp",
         error: error.message,
       };
     }
