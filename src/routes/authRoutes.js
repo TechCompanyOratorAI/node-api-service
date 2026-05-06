@@ -1,6 +1,6 @@
 import express from 'express';
 import authController from '../controllers/authController.js';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
 import {
   validateRegistration,
   validateInstructorRegistration,
@@ -18,7 +18,9 @@ const router = express.Router();
 
 // Public authentication routes
 router.post('/register', validateRegistration, authController.register);
-router.post('/register-instructor', validateInstructorRegistration, authController.registerInstructor);
+
+// Admin-only: create instructor account (no email verification needed)
+router.post('/register-instructor', authenticateToken, requireRole(['Admin']), validateInstructorRegistration, authController.registerInstructor);
 router.post('/login', validateLogin, authController.login);
 router.post('/logout', authController.logout);
 
