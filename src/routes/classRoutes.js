@@ -81,6 +81,14 @@ router.get(
   classScoreController.getClassScores
 );
 
+// Export class scores to Excel (Instructor/Admin)
+router.get(
+  "/:classId/scores/export",
+  requireRole(["Admin", "AcademicCoordinator", "Instructor"]),
+  requireClassInstructorOrAdmin,
+  classScoreController.exportClassScoresExcel
+);
+
 // Group grade distributions - get all grade distributions for all groups in a class (Instructor)
 router.get(
   "/:classId/group-grade-distributions",
