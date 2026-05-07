@@ -1,5 +1,41 @@
 import { validationResult } from "express-validator";
 import aiReportService from "../services/aiReportService.js";
+import presentationService from "../services/presentationService.js";
+
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const sanitizeFileName = (value = "ai-report") =>
+  String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120) || "ai-report";
+
+const buildReportDocHtml = ({ title, reportContent, updatedAt }) => `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; color: #111827; }
+    h1 { font-size: 20pt; margin: 0 0 8pt; }
+    .meta { color: #6b7280; font-size: 10pt; margin-bottom: 18pt; }
+    .content { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="meta">AI Report${updatedAt ? ` - Updated ${escapeHtml(new Date(updatedAt).toISOString())}` : ""}</div>
+  <div class="content">${escapeHtml(reportContent)}</div>
+</body>
+</html>`;
 
 class AIReportController {
   /**
@@ -286,6 +322,67 @@ class AIReportController {
       return res.status(500).json({
         success: false,
         message: "Lỗi server nội bộ",
+      });
+    }
+  }
+
+  /**
+   * GET /ai-reports/presentation/:presentationId/download-doc
+   * Download AI reportContent by presentation ID as a .doc file
+   */
+  async downloadReportDocByPresentation(req, res) {
+    try {
+      const { presentationId } = req.params;
+
+      if (!presentationId || isNaN(parseInt(presentationId))) {
+        return res.status(400).json({
+          success: false,
+          message: "ID presentation khÃ´ng há»£p lá»‡",
+        });
+      }
+
+      const parsedPresentationId = parseInt(presentationId);
+      const hasAccess = await presentationService.checkPresentationAccess(
+        parsedPresentationId,
+        req.user?.userId,
+        req.user?.role
+      );
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "KhÃ´ng cÃ³ quyá»n táº£i AI report cá»§a presentation nÃ y",
+        });
+      }
+
+      const result = await aiReportService.getReportDocumentByPresentation(parsedPresentationId);
+
+      if (!result.success) {
+        if (result.code === "NOT_FOUND") {
+          return res.status(404).json(result);
+        }
+        if (result.code === "EMPTY_REPORT_CONTENT") {
+          return res.status(400).json(result);
+        }
+        return res.status(400).json(result);
+      }
+
+      const html = buildReportDocHtml(result.data);
+      const filename = `${sanitizeFileName(result.data.title)}-ai-report.doc`;
+
+      res.setHeader("Content-Type", "application/msword; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`
+      );
+      res.setHeader("Cache-Control", "no-store");
+
+      return res.status(200).send(Buffer.from(html, "utf8"));
+    } catch (error) {
+      console.error("Download AI report doc controller error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Lá»—i server ná»™i bá»™",
       });
     }
   }
