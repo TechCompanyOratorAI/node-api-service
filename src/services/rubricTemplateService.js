@@ -168,10 +168,12 @@ class RubricTemplateService {
   }
 
   async deleteTemplate(templateId) {
+    const transaction = await RubricTemplate.sequelize.transaction();
     try {
-      const template = await RubricTemplate.findByPk(templateId);
+      const template = await RubricTemplate.findByPk(templateId, { transaction });
 
       if (!template) {
+        await transaction.rollback();
         return {
           success: false,
           message: "Rubric template không tìm thấy",
@@ -184,9 +186,11 @@ class RubricTemplateService {
           rubricTemplateId: templateId,
           isActive: true,
         },
+        transaction,
       });
 
       if (classAiSettings) {
+        await transaction.rollback();
         return {
           success: false,
           message: "Không thể xóa rubric template đang được sử dụng bởi các lớp học",
@@ -194,14 +198,32 @@ class RubricTemplateService {
         };
       }
 
-      // Soft delete
-      await template.update({ isActive: false });
+      // Set rubricTemplateId to null in any settings referring to this template
+      await ClassAISetting.update(
+        { rubricTemplateId: null },
+        {
+          where: { rubricTemplateId: templateId },
+          transaction,
+        }
+      );
+
+      // Hard delete associated criteria first
+      await RubricCriteria.destroy({
+        where: { rubricTemplateId: templateId },
+        transaction,
+      });
+
+      // Hard delete the template
+      await template.destroy({ transaction });
+
+      await transaction.commit();
 
       return {
         success: true,
-        message: "Xóa rubric template thành công",
+        message: "Xóa rubric template vĩnh viễn thành công",
       };
     } catch (error) {
+      if (transaction) await transaction.rollback();
       console.error("Delete rubric template error:", error);
       return {
         success: false,

@@ -62,7 +62,7 @@ router.put(
   rubricTemplateController.updateCriteria
 );
 
-// DELETE /rubric-templates/:templateId - Soft delete rubric template
+// DELETE /rubric-templates/:templateId - Hard delete rubric template
 router.delete(
   "/:templateId",
   requireRole(["Admin"]),
