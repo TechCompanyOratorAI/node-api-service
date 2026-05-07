@@ -83,7 +83,7 @@ class EnrollmentService {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      if (classData.startDate && today < new Date(classData.startDate)) {
+      if (classData.startDate && today < new Date(classData.startDate + "T00:00:00")) {
         await transaction.rollback();
         return {
           success: false,
@@ -91,7 +91,7 @@ class EnrollmentService {
         };
       }
 
-      if (classData.endDate && today > new Date(classData.endDate)) {
+      if (classData.endDate && today > new Date(classData.endDate + "T00:00:00")) {
         await transaction.rollback();
         return {
           success: false,
