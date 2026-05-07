@@ -69,8 +69,36 @@ class EnrollmentService {
         };
       }
 
-      // Step 4: Check class capacity
+      // Step 4: Load class and validate status + enrollment window
       const classData = await Class.findByPk(key.classId, { transaction });
+
+      if (!classData || classData.status !== "active") {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Lớp học này hiện không hoạt động và không nhận đăng ký mới",
+        };
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (classData.startDate && today < new Date(classData.startDate)) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Lớp học chưa mở đăng ký",
+        };
+      }
+
+      if (classData.endDate && today > new Date(classData.endDate)) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Lớp học đã kết thúc, không thể đăng ký",
+        };
+      }
+
       if (classData.maxStudents) {
         const currentCount = await Enrollment.count({
           where: { classId: key.classId, status: "enrolled" },
