@@ -823,6 +823,7 @@ const reportComplete = async (req, res) => {
       segmentAnalyses,
       overallScores,
       rubricScores,
+      reportContent: generatedReportContent,
       metadata,
     } = req.body;
 
@@ -984,21 +985,24 @@ const reportComplete = async (req, res) => {
           });
 
           if (aiReport) {
-            // Prepare report content from rubric scores
-            let reportContent = "";
+            // Prefer full AI-generated content from py-report-worker.
+            // Fall back to a compact rubric summary for older worker payloads.
+            let reportContent = generatedReportContent || aiReport.reportContent || "";
             if (rubricScores && Object.keys(rubricScores).length > 0) {
-              reportContent = "BÁO CÁO ĐÁNH GIÁ AI\n\n";
-              reportContent += `Điểm tổng: ${overallScores.weightedOverallScore || overallScores.overallScore || 0}\n\n`;
+              if (!reportContent) {
+                reportContent = "BÁO CÁO ĐÁNH GIÁ AI\n\n";
+                reportContent += `Điểm tổng: ${overallScores.weightedOverallScore || overallScores.overallScore || 0}\n\n`;
 
-              for (const [criteriaId, cs] of Object.entries(rubricScores)) {
-                reportContent += `${cs.criteriaName}: ${cs.score}/${cs.maxScore}\n`;
-                if (cs.comment) {
-                  reportContent += `  - Nhận xét: ${cs.comment}\n`;
+                for (const [criteriaId, cs] of Object.entries(rubricScores)) {
+                  reportContent += `${cs.criteriaName}: ${cs.score}/${cs.maxScore}\n`;
+                  if (cs.comment) {
+                    reportContent += `  - Nhận xét: ${cs.comment}\n`;
+                  }
+                  if (cs.suggestions && cs.suggestions.length > 0) {
+                    reportContent += `  - Gợi ý: ${cs.suggestions.join(', ')}\n`;
+                  }
+                  reportContent += "\n";
                 }
-                if (cs.suggestions && cs.suggestions.length > 0) {
-                  reportContent += `  - Gợi ý: ${cs.suggestions.join(', ')}\n`;
-                }
-                reportContent += "\n";
               }
             }
 
