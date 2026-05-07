@@ -166,7 +166,7 @@ class RubricTemplateController {
 
   /**
    * DELETE /rubric-templates/:templateId
-   * Soft delete rubric template
+   * Hard delete rubric template
    */
   async deleteTemplate(req, res) {
     try {
