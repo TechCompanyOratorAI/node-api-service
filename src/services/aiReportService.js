@@ -640,6 +640,53 @@ class AIReportService {
     }
   }
 
+  async getReportDocumentByPresentation(presentationId) {
+    try {
+      const report = await AIReport.findOne({
+        where: { presentationId: presentationId },
+        attributes: ["reportId", "presentationId", "reportContent", "reportStatus", "updatedAt"],
+        include: [
+          { model: Presentation, as: "submission", attributes: ["presentationId", "title"] },
+        ],
+      });
+
+      if (!report) {
+        return {
+          success: false,
+          message: "AI report khÃ´ng tÃ¬m tháº¥y cho bÃ i thuyáº¿t trÃ¬nh nÃ y",
+          code: "NOT_FOUND",
+        };
+      }
+
+      if (!report.reportContent || !String(report.reportContent).trim()) {
+        return {
+          success: false,
+          message: "AI report chÆ°a cÃ³ ná»™i dung Ä‘á»ƒ táº£i xuá»‘ng",
+          code: "EMPTY_REPORT_CONTENT",
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          reportId: report.reportId,
+          presentationId: report.presentationId,
+          title: report.submission?.title || `presentation-${presentationId}`,
+          reportContent: report.reportContent,
+          reportStatus: report.reportStatus,
+          updatedAt: report.updatedAt,
+        },
+      };
+    } catch (error) {
+      console.error("Get AI report document error:", error);
+      return {
+        success: false,
+        message: "Lá»—i khi táº£i file AI report",
+        error: error.message,
+      };
+    }
+  }
+
   /**
    * Delete AI report by ID
    * @param {number} reportId - AI Report ID

@@ -28,18 +28,25 @@ router.post(
   aiReportController.generateReport
 );
 
-// GET /ai-reports/:reportId - Get report detail
-router.get(
-  "/:reportId",
-  requireRole(["Admin", "Instructor"]),
-  aiReportController.getReportById
-);
-
 // GET /classes/:classId/ai-reports - Get all reports of a class
 router.get(
   "/classes/:classId/ai-reports",
   //requireRole(["Admin", "Instructor"]),
   aiReportController.getReportsByClass
+);
+
+// GET /ai-reports/presentation/:presentationId/download-doc - Download AI reportContent as .doc
+router.get(
+  "/presentation/:presentationId/download-doc",
+  requireRole(["Admin", "Instructor", "Student"]),
+  aiReportController.downloadReportDocByPresentation
+);
+
+// GET /ai-reports/presentation/:presentationId - Get AI report by presentation ID
+router.get(
+  "/presentation/:presentationId",
+  requireRole(["Admin", "Instructor", "Student"]),
+  aiReportController.getReportBySubmission
 );
 
 // PUT /ai-reports/:reportId/confirm - Instructor confirms the AI report
@@ -72,11 +79,11 @@ router.patch(
   aiReportController.updateReportStatus
 );
 
-// GET /ai-reports/submission/:presentationId - Get AI report by presentation ID
+// GET /ai-reports/:reportId - Get report detail
 router.get(
-  "/presentation/:presentationId",
-  requireRole(["Admin", "Instructor", "Student"]),
-  aiReportController.getReportBySubmission
+  "/:reportId",
+  requireRole(["Admin", "Instructor"]),
+  aiReportController.getReportById
 );
 
 // DELETE /ai-reports/:reportId - Delete AI report
