@@ -1436,7 +1436,7 @@ class CourseService {
             if (presentationCount > 0) {
                 return {
                     success: false,
-                    message: 'Thao tác thất bại'
+                    message: 'Không thể xóa topic vì đã có bài thuyết trình'
                 };
             }
 

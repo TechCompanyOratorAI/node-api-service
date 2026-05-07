@@ -1117,26 +1117,20 @@ class ClassService {
         };
       }
 
-      // Check enrollments
       const enrollmentCount = await Enrollment.count({ where: { classId } });
-
       if (enrollmentCount > 0) {
-        // Soft delete (archive)
-        await classData.update({ status: "archived" });
         return {
-          success: true,
-          message: "Lớp học đã được lưu trữ (có sinh viên đã đăng ký)",
-          archived: true,
-        };
-      } else {
-        // Hard delete
-        await classData.destroy();
-        return {
-          success: true,
-          message: "Xóa lớp học thành công",
-          archived: false,
+          success: false,
+          message: "Không thể xóa lớp học vì đã có sinh viên đăng ký",
         };
       }
+
+      await classData.destroy();
+      return {
+        success: true,
+        message: "Xóa lớp học thành công",
+        archived: false,
+      };
     } catch (error) {
       console.error("Delete class error:", error);
       return {
