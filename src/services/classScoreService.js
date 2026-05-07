@@ -1,5 +1,6 @@
 "use strict";
 
+const XLSX = require("xlsx");
 const db = require("../models");
 const {
   Enrollment,
@@ -349,6 +350,99 @@ class ClassScoreService {
         error: error.message,
       };
     }
+  }
+
+  /**
+   * Export class scores to Excel buffer
+   * Accessible by Admin or assigned instructor
+   */
+  async exportClassScoresToExcel(classId, userId, userRole) {
+    const result = await this.getClassScores(classId, userId, userRole);
+
+    if (!result.success) {
+      return result;
+    }
+
+    const { class: classData, students } = result.data;
+    const exportedAt = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+
+    // ── Build header row ────────────────────────────────────────
+    const headers = [
+      "STT",
+      "Họ và Tên",
+      "Email",
+      "Điểm AI TB (0-10)",
+      "Điểm GV TB (0-10)",
+      "Điểm cuối kỳ",
+    ];
+
+    // ── Build data rows ─────────────────────────────────────────
+    const rows = students.map((s, index) => {
+      const fullName = `${s.student.lastName} ${s.student.firstName}`.trim();
+
+      return [
+        index + 1,
+        fullName,
+        s.student.email,
+        s.overallAverageScore !== null ? s.overallAverageScore : "",
+        s.instructorAverageScore !== null ? s.instructorAverageScore : "",
+        s.finalGrade !== null && s.finalGrade !== undefined ? s.finalGrade : "",
+      ];
+    });
+
+    // ── Assemble worksheet data ─────────────────────────────────
+    const wsData = [
+      // Row 1: Title
+      [`BẢNG ĐIỂM LỚP ${classData.classCode}`],
+      // Row 2: Export info
+      [`Xuất lúc: ${exportedAt}`],
+      // Row 3: blank spacer
+      [],
+      // Row 4: Headers
+      headers,
+      // Row 5+: Student data
+      ...rows,
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // ── Column widths ───────────────────────────────────────────
+    const colWidths = [
+      { wch: 5 },  // STT
+      { wch: 25 }, // Họ tên
+      { wch: 30 }, // Email
+      { wch: 18 }, // Điểm AI TB
+      { wch: 18 }, // Điểm GV TB
+      { wch: 15 }, // Điểm cuối kỳ
+    ];
+    ws["!cols"] = colWidths;
+
+    // ── Merge title cell across all columns ─────────────────────
+    const totalCols = headers.length - 1;
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } }, // Title row
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } }, // Export date row
+    ];
+
+    // ── Style: row heights ──────────────────────────────────────
+    ws["!rows"] = [
+      { hpt: 24 }, // Row 1: title
+      { hpt: 16 }, // Row 2: date
+      { hpt: 8 },  // Row 3: spacer
+      { hpt: 40 }, // Row 4: headers (multi-line)
+    ];
+
+    // ── Workbook ────────────────────────────────────────────────
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Bảng điểm");
+
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    return {
+      success: true,
+      buffer,
+      filename: `bang_diem_${classData.classCode}_${Date.now()}.xlsx`,
+    };
   }
 }
 
