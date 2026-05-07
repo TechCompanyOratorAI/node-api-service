@@ -354,8 +354,10 @@ class ClassController {
 
       if (result.success) {
         return res.status(200).json(result);
-      } else {
+      } else if (result.message === "Không tìm thấy lớp học") {
         return res.status(404).json(result);
+      } else {
+        return res.status(400).json(result);
       }
     } catch (error) {
       console.error("Delete class error:", error);
