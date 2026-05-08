@@ -26,7 +26,7 @@ class SpeakerController {
             const { includeStudent, includeSegments, onlyMapped, onlyUnmapped } = req.query;
 
             const options = {
-                includeStudent: includeStudent === 'true',
+                includeStudent: includeStudent !== 'false',
                 includeSegments: includeSegments === 'true',
                 onlyMapped: onlyMapped === 'true',
                 onlyUnmapped: onlyUnmapped === 'true'
