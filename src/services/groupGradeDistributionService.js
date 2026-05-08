@@ -328,21 +328,34 @@ class GroupGradeDistributionService {
       const presentation = await Presentation.findByPk(report.presentationId);
       if (!presentation) return { success: false, message: "Không tìm thấy bài thuyết trình" };
 
+      // Tìm nhóm phù hợp: ưu tiên nhóm của user (student), nếu không có thì instructor xem tất cả
       const userMemberships = await GroupStudent.findAll({
         where: { studentId: userId },
         attributes: ["groupId"],
       });
       const userGroupIds = userMemberships.map((m) => m.groupId);
 
-      const topicEnrollment = await db.TopicEnrollment.findOne({
-        where: { topicId: presentation.topicId, status: "enrolled", groupId: userGroupIds },
-      });
-      if (!topicEnrollment?.groupId) {
-        return { success: false, message: "Presentation không thuộc nhóm nào" };
+      let distributionGroupId = null;
+      if (userGroupIds.length > 0) {
+        // Student: chỉ lấy distribution của nhóm mình
+        const topicEnrollment = await db.TopicEnrollment.findOne({
+          where: { topicId: presentation.topicId, status: "enrolled", groupId: userGroupIds },
+        });
+        distributionGroupId = topicEnrollment?.groupId ?? null;
+      } else {
+        // Instructor hoặc user không thuộc nhóm nào: lấy nhóm enrolled topic này
+        const topicEnrollment = await db.TopicEnrollment.findOne({
+          where: { topicId: presentation.topicId, status: "enrolled", groupId: { [db.Sequelize.Op.ne]: null } },
+        });
+        distributionGroupId = topicEnrollment?.groupId ?? null;
+      }
+
+      if (!distributionGroupId) {
+        return { success: true, data: null, message: "Chưa có phân chia điểm cho report này" };
       }
 
       const distribution = await GroupGradeDistribution.findOne({
-        where: { groupId: topicEnrollment.groupId, reportId },
+        where: { groupId: distributionGroupId, reportId },
         include: [
           { model: GroupGradeMember, as: "members" },
           { model: Group, as: "group", attributes: ["groupId", "groupName", "classId"] },
