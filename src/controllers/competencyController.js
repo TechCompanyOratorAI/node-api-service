@@ -38,6 +38,31 @@ class CompetencyController {
     return res.status(result.success ? 201 : 400).json(result);
   }
 
+  async updateCompetency(req, res) {
+    const competencyId = parseInt(req.params.id, 10);
+    const result = await competencyService.updateCompetency(competencyId, req.body, req.user.userId);
+    if (result.success) {
+      emitCompetencyCatalogEvent("updated", {
+        actorUserId: req.user?.userId || null,
+        competencyId,
+        competency: result.competency,
+      });
+    }
+    return res.status(result.success ? 200 : 400).json(result);
+  }
+
+  async deleteCompetency(req, res) {
+    const competencyId = parseInt(req.params.id, 10);
+    const result = await competencyService.deleteCompetency(competencyId, req.user.userId);
+    if (result.success) {
+      emitCompetencyCatalogEvent("deleted", {
+        actorUserId: req.user?.userId || null,
+        competencyId,
+      });
+    }
+    return res.status(result.success ? 200 : 400).json(result);
+  }
+
   async declareInstructorCompetencies(req, res) {
     const actorId = req.user.userId;
     const instructorId = parseInt(req.params.id, 10);

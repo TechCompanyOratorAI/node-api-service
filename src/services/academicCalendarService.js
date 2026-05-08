@@ -40,13 +40,13 @@ const normalizeDateOnlyOrNull = (value) => {
 };
 
 class AcademicCalendarService {
-  validateDateRange(startDate, endDate, label = "Date range") {
+  validateDateRange(startDate, endDate) {
     if (!startDate || !endDate) {
-      return `${label} requires startDate and endDate`;
+      return "Ngày bắt đầu và ngày kết thúc là bắt buộc";
     }
 
     if (new Date(startDate) >= new Date(endDate)) {
-      return `${label} endDate must be after startDate`;
+      return "Ngày kết thúc phải sau ngày bắt đầu";
     }
 
     return null;
@@ -240,7 +240,7 @@ class AcademicCalendarService {
   async deleteAcademicYear(academicYearId) {
     try {
       const academicYear = await AcademicYear.findByPk(academicYearId);
-      if (!academicYear) return { success: false, message: "Academic year not found" };
+      if (!academicYear) return { success: false, message: "Không tìm thấy năm học" };
 
       const blockCount = await AcademicBlock.count({
         where: { academicYearId },
@@ -248,15 +248,15 @@ class AcademicCalendarService {
       if (blockCount > 0) {
         return {
           success: false,
-          message: "Cannot delete academic year because it still has academic blocks",
+          message: "Không thể xóa niên khóa vì vẫn còn các học kỳ liên kết",
         };
       }
 
       await academicYear.destroy();
-      return { success: true, message: "Academic year deleted successfully" };
+      return { success: true, message: "Đã xóa niên khóa thành công" };
     } catch (error) {
       console.error("Delete academic year error:", error);
-      return { success: false, message: "Operation failed", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 
@@ -293,7 +293,7 @@ class AcademicCalendarService {
           await transaction.rollback();
           return {
             success: false,
-            message: `Invalid block payload (${block.blockType || "NORMAL"}-${block.half || "NA"}): startDate/endDate must be YYYY-MM-DD`,
+            message: `Dữ liệu block không hợp lệ (${block.blockType || "NORMAL"}-${block.half || "NA"}): ngày bắt đầu/kết thúc phải có định dạng YYYY-MM-DD`,
           };
         }
 
@@ -302,7 +302,7 @@ class AcademicCalendarService {
           await transaction.rollback();
           return {
             success: false,
-            message: `Invalid block payload (${block.blockType || "NORMAL"}-${block.half || "NA"}): ${validation.message}`,
+            message: `Dữ liệu block không hợp lệ (${block.blockType || "NORMAL"}-${block.half || "NA"}): ${validation.message}`,
           };
         }
 
@@ -447,7 +447,7 @@ class AcademicCalendarService {
   async deleteAcademicBlock(academicBlockId) {
     try {
       const academicBlock = await AcademicBlock.findByPk(academicBlockId);
-      if (!academicBlock) return { success: false, message: "Academic block not found" };
+      if (!academicBlock) return { success: false, message: "Không tìm thấy học kỳ" };
 
       const [courseBlockCount, classBlockCount, legacyCourseCount, legacyClassCount] = await Promise.all([
         CourseAcademicBlock.count({ where: { academicBlockId } }),
@@ -459,15 +459,15 @@ class AcademicCalendarService {
       if (courseBlockCount > 0 || classBlockCount > 0 || legacyCourseCount > 0 || legacyClassCount > 0) {
         return {
           success: false,
-          message: "Cannot delete academic block because it is used by existing courses or classes",
+          message: "Không thể xóa học kỳ vì đang được sử dụng bởi các khóa học hoặc lớp học",
         };
       }
 
       await academicBlock.destroy();
-      return { success: true, message: "Academic block deleted successfully" };
+      return { success: true, message: "Đã xóa học kỳ thành công" };
     } catch (error) {
       console.error("Delete academic block error:", error);
-      return { success: false, message: "Operation failed", error: error.message };
+      return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }
 

@@ -4,6 +4,13 @@ const { Op } = require("sequelize");
 class RubricTemplateService {
   async createTemplate(data, userId) {
     try {
+      if (data.templateName) {
+        const existing = await RubricTemplate.findOne({ where: { templateName: data.templateName } });
+        if (existing) {
+          return { success: false, message: "Tên mẫu tiêu chí đã tồn tại" };
+        }
+      }
+
       const template = await RubricTemplate.create({
         ...data,
         createdBy: userId,
