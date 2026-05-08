@@ -78,6 +78,11 @@ class CompetencyService {
         return { success: false, message: "Competency code đã tồn tại" };
       }
 
+      const existingName = await CompetencyCatalog.findOne({ where: { competencyName } });
+      if (existingName) {
+        return { success: false, message: "Tên năng lực đã tồn tại" };
+      }
+
       const departmentId =
         payload.departmentId !== undefined && payload.departmentId !== null
           ? parseInt(payload.departmentId, 10)
@@ -127,6 +132,82 @@ class CompetencyService {
       return { success: true, message: "Competency đã tạo thành công", competency };
     } catch (error) {
       console.error("Create competency error:", error);
+      return { success: false, message: "Thao tác thất bại", error: error.message };
+    }
+  }
+
+  async updateCompetency(competencyId, payload, actorUserId) {
+    try {
+      const competency = await CompetencyCatalog.findByPk(competencyId);
+      if (!competency) return { success: false, message: "Không tìm thấy năng lực" };
+
+      const updates = {};
+
+      if (payload.competencyCode !== undefined) {
+        const nextCode = (payload.competencyCode || "").trim().toUpperCase();
+        if (!nextCode) return { success: false, message: "Dữ liệu không hợp lệ" };
+        const existingCode = await CompetencyCatalog.findOne({
+          where: { competencyCode: nextCode, competencyId: { [db.Sequelize.Op.ne]: competencyId } },
+        });
+        if (existingCode) return { success: false, message: "Competency code đã tồn tại" };
+        updates.competencyCode = nextCode;
+      }
+
+      if (payload.competencyName !== undefined) {
+        const nextName = (payload.competencyName || "").trim();
+        if (!nextName) return { success: false, message: "Dữ liệu không hợp lệ" };
+        const existingName = await CompetencyCatalog.findOne({
+          where: { competencyName: nextName, competencyId: { [db.Sequelize.Op.ne]: competencyId } },
+        });
+        if (existingName) return { success: false, message: "Tên năng lực đã tồn tại" };
+        updates.competencyName = nextName;
+      }
+
+      if (payload.description !== undefined) updates.description = payload.description || null;
+      if (payload.isActive !== undefined) updates.isActive = !!payload.isActive;
+
+      await competency.update(updates);
+
+      await auditLogService.log({
+        actorUserId,
+        action: "competency.updated",
+        entityType: "CompetencyCatalog",
+        entityId: competencyId,
+        status: AUDIT_STATUSES.SUCCESS,
+        metadata: { competencyCode: competency.competencyCode },
+      });
+
+      return { success: true, message: "Đã cập nhật năng lực thành công", competency };
+    } catch (error) {
+      console.error("Update competency error:", error);
+      return { success: false, message: "Thao tác thất bại", error: error.message };
+    }
+  }
+
+  async deleteCompetency(competencyId, actorUserId) {
+    try {
+      const competency = await CompetencyCatalog.findByPk(competencyId);
+      if (!competency) return { success: false, message: "Không tìm thấy năng lực" };
+
+      const usageCount = await InstructorCompetency.count({ where: { competencyId } });
+      if (usageCount > 0) {
+        return { success: false, message: "Không thể xóa năng lực đang được sử dụng bởi giảng viên" };
+      }
+
+      await competency.destroy();
+
+      await auditLogService.log({
+        actorUserId,
+        action: "competency.deleted",
+        entityType: "CompetencyCatalog",
+        entityId: competencyId,
+        status: AUDIT_STATUSES.SUCCESS,
+        metadata: { competencyCode: competency.competencyCode },
+      });
+
+      return { success: true, message: "Đã xóa năng lực thành công" };
+    } catch (error) {
+      console.error("Delete competency error:", error);
       return { success: false, message: "Thao tác thất bại", error: error.message };
     }
   }

@@ -26,6 +26,22 @@ router.post(
   competencyController.createCompetency
 );
 
+router.patch(
+  "/competencies/:id",
+  authenticateToken,
+  requireEmailVerification,
+  requireRole(["Admin", "AcademicCoordinator"]),
+  competencyController.updateCompetency
+);
+
+router.delete(
+  "/competencies/:id",
+  authenticateToken,
+  requireEmailVerification,
+  requireRole(["Admin", "AcademicCoordinator"]),
+  competencyController.deleteCompetency
+);
+
 router.get(
   "/courses/:courseId/eligible-instructors",
   authenticateToken,

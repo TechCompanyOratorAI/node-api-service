@@ -88,6 +88,9 @@ class SubjectAreaService {
       const existing = await SubjectArea.findOne({ where: { subjectCode } });
       if (existing) return { success: false, message: "SubjectCode đã tồn tại" };
 
+      const existingName = await SubjectArea.findOne({ where: { subjectName } });
+      if (existingName) return { success: false, message: "Tên lĩnh vực môn học đã tồn tại" };
+
       const subjectArea = await SubjectArea.create({
         subjectCode,
         subjectName,
