@@ -44,9 +44,28 @@ class GroupGradeDistributionService {
         return { success: false, message: "Không tìm thấy bài thuyết trình" };
       }
 
-      // 3. Tìm TopicEnrollment → groupId
+      // 3. Tìm tất cả nhóm mà user đang là leader
+      const leaderMemberships = await GroupStudent.findAll({
+        where: { studentId: leaderStudentId, role: "leader" },
+        attributes: ["groupId"],
+      });
+      if (!leaderMemberships.length) {
+        await transaction.rollback();
+        return {
+          success: false,
+          message: "Chỉ trưởng nhóm mới được phép chia điểm",
+          code: "NOT_LEADER",
+        };
+      }
+      const leaderGroupIds = leaderMemberships.map((m) => m.groupId);
+
+      // 4. Tìm TopicEnrollment của topic này trong một nhóm mà leader đang dẫn
       const topicEnrollment = await db.TopicEnrollment.findOne({
-        where: { topicId: presentation.topicId, status: "enrolled" },
+        where: {
+          topicId: presentation.topicId,
+          status: "enrolled",
+          groupId: leaderGroupIds,
+        },
       });
       if (!topicEnrollment?.groupId) {
         await transaction.rollback();
@@ -57,19 +76,6 @@ class GroupGradeDistributionService {
         };
       }
       const groupId = topicEnrollment.groupId;
-
-      // 4. Validate leader
-      const leaderMembership = await GroupStudent.findOne({
-        where: { groupId, studentId: leaderStudentId, role: "leader" },
-      });
-      if (!leaderMembership) {
-        await transaction.rollback();
-        return {
-          success: false,
-          message: "Chỉ trưởng nhóm mới được phép chia điểm",
-          code: "NOT_LEADER",
-        };
-      }
 
       // 5. Validate members
       const groupStudents = await GroupStudent.findAll({
@@ -322,8 +328,14 @@ class GroupGradeDistributionService {
       const presentation = await Presentation.findByPk(report.presentationId);
       if (!presentation) return { success: false, message: "Không tìm thấy bài thuyết trình" };
 
+      const userMemberships = await GroupStudent.findAll({
+        where: { studentId: userId },
+        attributes: ["groupId"],
+      });
+      const userGroupIds = userMemberships.map((m) => m.groupId);
+
       const topicEnrollment = await db.TopicEnrollment.findOne({
-        where: { topicId: presentation.topicId, status: "enrolled" },
+        where: { topicId: presentation.topicId, status: "enrolled", groupId: userGroupIds },
       });
       if (!topicEnrollment?.groupId) {
         return { success: false, message: "Presentation không thuộc nhóm nào" };
